@@ -118,7 +118,7 @@ export default function QuarterPriceList({ year, quarter, products, onDataChange
           <tr>
             <th>Product</th>
             <th>Reference</th>
-            <th>Region</th>
+            <th>Producing Region</th>
             <th>Price</th>
             <th>Volume</th>
             <th className="center" style={{ width: 100 }}>Actions</th>

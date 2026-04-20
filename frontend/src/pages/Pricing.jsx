@@ -159,7 +159,7 @@ export default function Pricing() {
       </div>
       {model && (
         <p className="ca-subtitle">
-          {model.product_name}{model.supplier_name ? ` \u00B7 ${model.supplier_name}` : ''} \u00B7 {model.region} \u00B7 {model.currency}
+          {model.product_name}{model.supplier_name ? ` \u00B7 ${model.supplier_name}` : ''} \u00B7 {model.region} \u00B7 {model.currency}{model.incoterm ? ` \u00B7 ${model.incoterm}` : ''}
         </p>
       )}
 
@@ -214,7 +214,7 @@ export default function Pricing() {
                               />
                             ) : (
                               <span style={{ fontWeight: 500 }}>
-                                {row.price != null ? `${sym}${row.price.toFixed(4)}` : '\u2014'}
+                                {row.price != null ? `${sym}${row.price.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}` : '\u2014'}
                               </span>
                             )}
                           </td>
@@ -378,17 +378,15 @@ export default function Pricing() {
                           </td>
                         </tr>
                       ))}
-                      {/* Margin row */}
-                      {analysis.margin_weight > 0 && (
-                        <tr style={{ opacity: 0.6 }}>
-                          <td>Margin</td>
-                          <td className="center">{analysis.margin_weight.toFixed(1)}%</td>
-                          <td className="center">\u2014</td>
-                          <td className="center">\u2014</td>
-                          <td className="center" style={{ color: 'var(--muted)' }}>0.0%</td>
-                          <td className="center" style={{ color: 'var(--muted)' }}>0.00%</td>
-                        </tr>
-                      )}
+                      {/* Margin row — always shown, zeros if no margin */}
+                      <tr style={{ opacity: 0.6 }}>
+                        <td>Margin</td>
+                        <td className="center">{(analysis.margin_weight || 0).toFixed(1)}%</td>
+                        <td className="center">0.00</td>
+                        <td className="center">0.00</td>
+                        <td className="center" style={{ color: 'var(--muted)' }}>0.0%</td>
+                        <td className="center" style={{ color: 'var(--muted)' }}>0.00%</td>
+                      </tr>
                       {/* Total row */}
                       <tr style={{ borderTop: '2px solid var(--border)', fontWeight: 600 }}>
                         <td>Total</td>

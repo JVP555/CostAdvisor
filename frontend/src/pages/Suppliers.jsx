@@ -160,7 +160,7 @@ export default function Suppliers() {
                               <tr>
                                 <th>Family</th>
                                 <th>Reference</th>
-                                <th>Region</th>
+                                <th>Producing Region</th>
                                 <th className="center">Gap %</th>
                                 <th className="center">Actions</th>
                               </tr>

@@ -28,6 +28,7 @@ class CostModel(Base):
     destination_country: Mapped[str | None] = mapped_column(String(64))
     region: Mapped[str] = mapped_column(String(20), default="Europe")
     currency: Mapped[str] = mapped_column(String(3), default="USD")
+    incoterm: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id")
     )

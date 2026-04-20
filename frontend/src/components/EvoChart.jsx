@@ -24,16 +24,9 @@ export default function EvoChart({ periods, theoretical, actual, refCost, compon
   const yScale = v => PAD.t + (H - PAD.t - PAD.b) * (1 - (v - minV) / (maxV - minV || 1));
 
   const gridLines = [];
-  const step = Math.max(0.1, Math.ceil((maxV - minV) * 10) / 100);
+  const step = Math.max(1, Math.ceil((maxV - minV) / 6));
   for (let v = Math.ceil(minV / step) * step; v <= maxV; v += step) {
     gridLines.push(v);
-  }
-  if (gridLines.length > 8) {
-    const newStep = step * 2;
-    gridLines.length = 0;
-    for (let v = Math.ceil(minV / newStep) * newStep; v <= maxV; v += newStep) {
-      gridLines.push(v);
-    }
   }
 
   const thePath = theoretical.map((v, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`).join(' ');
@@ -62,7 +55,7 @@ export default function EvoChart({ periods, theoretical, actual, refCost, compon
         <g key={i}>
           <line x1={PAD.l} y1={yScale(v)} x2={W - PAD.r} y2={yScale(v)} stroke="rgba(38,45,66,.6)" strokeWidth="1" />
           <text x={PAD.l - 6} y={yScale(v) + 3.5} fill="var(--muted)" fontSize="9" textAnchor="end" fontFamily="'JetBrains Mono', monospace">
-            ${v.toFixed(2)}
+            ${Math.round(v)}
           </text>
         </g>
       ))}

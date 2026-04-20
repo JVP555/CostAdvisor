@@ -59,6 +59,7 @@ class EvolutionResult(BaseModel):
     region: str
     currency: str
     unit: str
+    incoterm: str | None = None
     periods: list[EvolutionPeriod]
     components: list[ComponentInfo] = []
     available_from_year: int | None = None

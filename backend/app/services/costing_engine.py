@@ -389,6 +389,7 @@ def calculate_evolution(
         region=region,
         currency=out_ccy,
         unit=out_unit,
+        incoterm=cost_model.incoterm,
         periods=periods_out,
         components=comp_info,
         available_from_year=avail_min_y,

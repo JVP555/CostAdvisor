@@ -70,9 +70,10 @@ class TeamIndexSourceCreate(BaseModel):
     team_id: uuid.UUID
     commodity_id: int
     region: str
-    source_type: Literal["manual", "scrape_url", "upload"]
+    source_type: Literal["manual", "scrape_url", "upload", "fixed"]
     scrape_url: str | None = None
     scrape_config: dict | None = None
+    fixed_value: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -86,6 +87,7 @@ class TeamIndexSourceOut(BaseModel):
     scrape_url: str | None
     scrape_config: dict | None
     source_file: str | None
+    fixed_value: float | None = None
     created_by: uuid.UUID
     updated_at: datetime
     commodity_name: str | None = None

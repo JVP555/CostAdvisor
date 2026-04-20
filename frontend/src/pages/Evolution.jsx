@@ -127,7 +127,7 @@ export default function Evolution() {
   if (error) return <div className="ca-page" style={{ color: 'var(--accent2)' }}>Error: {error}</div>;
   if (!data) return null;
 
-  const { periods, product_name, supplier_name, reference_cost, region, currency, unit } = data;
+  const { periods, product_name, supplier_name, reference_cost, region, currency, unit, incoterm } = data;
   const theoretical = periods.map(p => p.theoretical);
   const actual = periods.map(p => p.actual ?? 0);
   const periodLabels = periods.map(p => p.period);
@@ -154,7 +154,7 @@ export default function Evolution() {
           )}>Export CSV</button>
         </div>
       </div>
-      <p className="ca-subtitle">{product_name}{supplier_name ? ` · ${supplier_name}` : ''} · {region} · Ref: {sym}{reference_cost?.toFixed(2)}</p>
+      <p className="ca-subtitle">{product_name}{supplier_name ? ` · ${supplier_name}` : ''} · {region}{incoterm ? ` · ${incoterm}` : ''} · Ref: {sym}{reference_cost?.toFixed(2)}</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
         <div className="ca-metric">

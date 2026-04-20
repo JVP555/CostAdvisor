@@ -105,7 +105,7 @@ export default function Dashboard() {
                       <th>Supplier</th>
                       <SortHeader label="Product Family" field="product" />
                       <th>Product Reference</th>
-                      <th className="center">Region</th>
+                      <th className="center">Producing Region</th>
                       <SortHeader label="Should-Cost" field="should_cost" />
                       <th className="center">Actual</th>
                       <SortHeader label="Gap %" field="gap_pct" />

@@ -46,6 +46,7 @@ class CostModelCreate(BaseModel):
     destination_country: str | None = None
     region: str = "Europe"
     currency: str = "USD"
+    incoterm: str | None = None
     formula: FormulaVersionCreate
 
 
@@ -54,6 +55,7 @@ class CostModelUpdate(BaseModel):
     destination_country: str | None = None
     region: str | None = None
     currency: str | None = None
+    incoterm: str | None = None
 
 
 # --- Output schemas ---
@@ -96,6 +98,7 @@ class CostModelOut(BaseModel):
     destination_country: str | None
     region: str
     currency: str
+    incoterm: str | None = None
     created_by: uuid.UUID
     created_at: datetime
     updated_at: datetime

@@ -6,7 +6,7 @@ import uuid
 from sqlalchemy.orm import Session
 from sqlalchemy import text, and_, or_
 
-from app.models.index_data import CommodityIndex, IndexValue, IndexOverride
+from app.models.index_data import CommodityIndex, IndexValue, IndexOverride, TeamIndexSource
 from app.models.user import User
 from app.schemas.index_data import IndexValueOut
 from app.services.scraper import SCRAPER_REGISTRY, SCRAPER_SOURCE_LABELS
@@ -146,7 +146,17 @@ def get_single_index_value(
     year: int,
     quarter: int,
 ) -> float | None:
-    """Get a single resolved index value (override > scraped)."""
+    """Get a single resolved index value (fixed source > override > scraped)."""
+    # A "fixed" team source means the value is constant across all periods.
+    fixed_source = db.query(TeamIndexSource).filter(
+        TeamIndexSource.team_id == team_id,
+        TeamIndexSource.commodity_id == commodity_id,
+        TeamIndexSource.region == region,
+        TeamIndexSource.source_type == "fixed",
+    ).first()
+    if fixed_source and fixed_source.fixed_value is not None:
+        return float(fixed_source.fixed_value)
+
     # Check override first (exact region, then GLOBAL fallback)
     override = db.query(IndexOverride).filter(
         IndexOverride.team_id == team_id,

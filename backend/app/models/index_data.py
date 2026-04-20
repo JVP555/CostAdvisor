@@ -91,10 +91,11 @@ class TeamIndexSource(Base):
     region: Mapped[str] = mapped_column(String(20), nullable=False)
     source_type: Mapped[str] = mapped_column(
         String(20), nullable=False
-    )  # "manual" | "scrape_url" | "upload"
+    )  # "manual" | "scrape_url" | "upload" | "fixed"
     scrape_url: Mapped[str | None] = mapped_column(String(512))
     scrape_config: Mapped[dict | None] = mapped_column(JSONB)
     source_file: Mapped[str | None] = mapped_column(String(255))
+    fixed_value: Mapped[float | None] = mapped_column(Numeric(14, 4), nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )

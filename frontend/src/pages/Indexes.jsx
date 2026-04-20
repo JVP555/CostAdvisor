@@ -291,9 +291,9 @@ export default function Indexes() {
             {filtersOpen && (
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', padding: '0 16px 14px 16px' }}>
                 <div style={{ flex: 1, minWidth: 120 }}>
-                  <label className="ca-label">Region</label>
+                  <label className="ca-label">Producing Region</label>
                   <select className="ca-select" value={regionFilter} onChange={e => setRegionFilter(e.target.value)}>
-                    <option value="all">All Regions</option>
+                    <option value="all">All Producing Regions</option>
                     {regions.map(r => <option key={r}>{r}</option>)}
                   </select>
                 </div>
@@ -367,7 +367,7 @@ export default function Indexes() {
                 <tr>
                   <th style={{ width: 28 }}></th>
                   <th>Material</th>
-                  <th>Region</th>
+                  <th>Producing Region</th>
                   {periods.map(p => <th key={p.label} className="center">{p.label}</th>)}
                 </tr>
               </thead>

@@ -79,6 +79,7 @@ def create_cost_model(
         destination_country=data.destination_country,
         region=data.region,
         currency=data.currency,
+        incoterm=data.incoterm,
         created_by=current_user.id,
     )
     db.add(cm)
@@ -140,7 +141,7 @@ def update_cost_model(
     require_team_access(db, current_user, cm.team_id)
 
     changes = {}
-    for field in ["supplier_id", "destination_country", "region", "currency"]:
+    for field in ["supplier_id", "destination_country", "region", "currency", "incoterm"]:
         val = getattr(data, field, None)
         if val is not None:
             changes[field] = {"old": str(getattr(cm, field)), "new": str(val)}
@@ -324,6 +325,7 @@ def clone_cost_model(
         destination_country=original.destination_country,
         region=original.region,
         currency=original.currency,
+        incoterm=original.incoterm,
         created_by=current_user.id,
     )
     db.add(clone)

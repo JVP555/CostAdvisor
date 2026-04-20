@@ -8,6 +8,7 @@ export default function AddIndexModal({ isOpen, onClose, commodities, teamId, on
   const [sourceType, setSourceType] = useState('manual');
   const [scrapeUrl, setScrapeUrl] = useState('');
   const [scrapeConfig, setScrapeConfig] = useState('{}');
+  const [fixedValue, setFixedValue] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [detectedSource, setDetectedSource] = useState(null);
@@ -34,6 +35,10 @@ export default function AddIndexModal({ isOpen, onClose, commodities, teamId, on
       setMessage({ type: 'error', text: 'Select a commodity and enter a region.' });
       return;
     }
+    if (sourceType === 'fixed' && fixedValue === '') {
+      setMessage({ type: 'error', text: 'Enter a fixed value.' });
+      return;
+    }
 
     setSaving(true);
     setMessage(null);
@@ -48,6 +53,7 @@ export default function AddIndexModal({ isOpen, onClose, commodities, teamId, on
         source_type: sourceType,
         scrape_url: sourceType === 'scrape_url' ? scrapeUrl : null,
         scrape_config: sourceType === 'scrape_url' ? config : null,
+        fixed_value: sourceType === 'fixed' ? parseFloat(fixedValue) : null,
       });
       setMessage({ type: 'success', text: 'Index source added.' });
       // Reset form
@@ -56,6 +62,7 @@ export default function AddIndexModal({ isOpen, onClose, commodities, teamId, on
       setSourceType('manual');
       setScrapeUrl('');
       setScrapeConfig('{}');
+      setFixedValue('');
       onAdded();
       setTimeout(() => onClose(), 600);
     } catch (err) {
@@ -105,8 +112,26 @@ export default function AddIndexModal({ isOpen, onClose, commodities, teamId, on
             <option value="manual">Manual</option>
             <option value="scrape_url">Scrape URL</option>
             <option value="upload">Upload</option>
+            <option value="fixed">Fixed (constant value)</option>
           </select>
         </div>
+
+        {sourceType === 'fixed' && (
+          <div style={{ marginBottom: 14 }}>
+            <label className="ca-label">Fixed Value</label>
+            <input
+              className="ca-input"
+              type="number"
+              step="0.0001"
+              value={fixedValue}
+              onChange={e => setFixedValue(e.target.value)}
+              placeholder="e.g. 100.00"
+            />
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+              Applied across all periods. No scraping, no per-quarter edits.
+            </div>
+          </div>
+        )}
 
         {sourceType === 'scrape_url' && (
           <>

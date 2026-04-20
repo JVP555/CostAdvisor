@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { OVC_ITEMS, RM_ITEMS, PIE_COLORS } from '../utils/constants';
+import { OVC_ITEMS, RM_ITEMS, PIE_COLORS, INCOTERMS } from '../utils/constants';
 import DonutChart from '../components/DonutChart';
 import api from '../api';
 import { useAuth } from '../AuthContext';
@@ -30,6 +30,7 @@ export default function CostModelBuilder() {
   const [destinationCountry, setDestinationCountry] = useState('');
   const [region, setRegion] = useState('Europe');
   const [currency, setCurrency] = useState('USD');
+  const [incoterm, setIncoterm] = useState('');
 
   // Formula version fields
   const [basePrice, setBasePrice] = useState(3.0);
@@ -37,14 +38,7 @@ export default function CostModelBuilder() {
   const [baseQuarter, setBaseQuarter] = useState(1);
   const [marginType, setMarginType] = useState('pct');
   const [marginValue, setMarginValue] = useState(20);
-  const [components, setComponents] = useState([
-    { label: 'Oil Price', commodity_name: 'Oil Price', parts: 41 },
-    { label: 'Chlorine', commodity_name: 'Chlorine', parts: 3 },
-    { label: 'Energy & Utilities', commodity_name: 'Energy & Utilities', parts: 7 },
-    { label: 'Direct Labor', commodity_name: 'Direct Labor Costs', parts: 10 },
-    { label: 'PPI Manufacturing', commodity_name: 'PPI Manufacturing Europe', parts: 26 },
-    { label: 'Freight', commodity_name: 'Container Freight WCI', parts: 13 },
-  ]);
+  const [components, setComponents] = useState([]);
 
   // Snapshot for cancel
   const [snapshot, setSnapshot] = useState(null);
@@ -84,6 +78,7 @@ export default function CostModelBuilder() {
         setDestinationCountry(data.destination_country || '');
         setRegion(data.region);
         setCurrency(data.currency);
+        setIncoterm(data.incoterm || '');
 
         const currentFv = data.formula_versions?.[0];
         if (currentFv) {
@@ -136,7 +131,7 @@ export default function CostModelBuilder() {
   const startEditing = () => {
     setSnapshot({
       productName, formula, activeContent, unit,
-      supplierId, newSupplierName, destinationCountry, region, currency,
+      supplierId, newSupplierName, destinationCountry, region, currency, incoterm,
       basePrice, baseYear, baseQuarter, marginType, marginValue,
       components: components.map(c => ({ ...c })),
     });
@@ -154,6 +149,7 @@ export default function CostModelBuilder() {
       setDestinationCountry(snapshot.destinationCountry);
       setRegion(snapshot.region);
       setCurrency(snapshot.currency);
+      setIncoterm(snapshot.incoterm);
       setBasePrice(snapshot.basePrice);
       setBaseYear(snapshot.baseYear);
       setBaseQuarter(snapshot.baseQuarter);
@@ -185,6 +181,9 @@ export default function CostModelBuilder() {
           name: newSupplierName,
         });
         sid = data.id;
+        setSuppliers(prev => [...prev, data]);
+        setSupplierId(String(data.id));
+        setNewSupplierName('');
       }
 
       const payload = {
@@ -193,6 +192,7 @@ export default function CostModelBuilder() {
         destination_country: destinationCountry || null,
         region,
         currency,
+        incoterm: incoterm || null,
         formula: {
           base_price: basePrice,
           base_year: baseYear,
@@ -221,12 +221,15 @@ export default function CostModelBuilder() {
           destination_country: destinationCountry || null,
           region,
           currency,
+          incoterm: incoterm || null,
         });
         await api.post(`/api/cost-models/${costModelId}/renegotiate`, payload.formula);
         setEditing(false);
         setSnapshot(null);
       } else {
         const { data } = await api.post(`/api/cost-models?team_id=${activeTeamId}`, payload);
+        setEditing(false);
+        setSnapshot(null);
         navigate(`/cost-models/${data.id}`, { replace: true });
       }
     } catch (err) {
@@ -309,7 +312,7 @@ export default function CostModelBuilder() {
                   <input className="ca-input" value={destinationCountry} onChange={e => setDestinationCountry(e.target.value)} />
                 </div>
                 <div>
-                  <label className="ca-label">Region</label>
+                  <label className="ca-label">Producing Region</label>
                   <select className="ca-select" value={region} onChange={e => setRegion(e.target.value)}>
                     {['Europe','NA','Asia','Latam'].map(r => <option key={r}>{r}</option>)}
                   </select>
@@ -318,6 +321,13 @@ export default function CostModelBuilder() {
                   <label className="ca-label">Currency</label>
                   <select className="ca-select" value={currency} onChange={e => setCurrency(e.target.value)}>
                     {['USD','EUR'].map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="ca-label">Incoterm</label>
+                  <select className="ca-select" value={incoterm} onChange={e => setIncoterm(e.target.value)}>
+                    <option value="">—</option>
+                    {INCOTERMS.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
@@ -332,12 +342,16 @@ export default function CostModelBuilder() {
                   <div style={{ fontSize: 13, padding: '7px 0' }}>{destinationCountry || '\u2014'}</div>
                 </div>
                 <div>
-                  <label className="ca-label">Region</label>
+                  <label className="ca-label">Producing Region</label>
                   <div style={{ fontSize: 13, padding: '7px 0' }}>{region}</div>
                 </div>
                 <div>
                   <label className="ca-label">Currency</label>
                   <div style={{ fontSize: 13, padding: '7px 0' }}>{currency}</div>
+                </div>
+                <div>
+                  <label className="ca-label">Incoterm</label>
+                  <div style={{ fontSize: 13, padding: '7px 0' }}>{incoterm || '\u2014'}</div>
                 </div>
               </div>
             )}

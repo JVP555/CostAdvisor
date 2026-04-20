@@ -430,6 +430,7 @@ def list_team_sources(
             scrape_url=s.scrape_url,
             scrape_config=s.scrape_config,
             source_file=s.source_file,
+            fixed_value=float(s.fixed_value) if s.fixed_value is not None else None,
             created_by=s.created_by,
             updated_at=s.updated_at,
             commodity_name=commodity.name if commodity else None,
@@ -457,6 +458,10 @@ async def create_or_update_team_source(
         raise HTTPException(
             status_code=422, detail="scrape_url required when source_type is scrape_url"
         )
+    if body.source_type == "fixed" and body.fixed_value is None:
+        raise HTTPException(
+            status_code=422, detail="fixed_value required when source_type is fixed"
+        )
 
     # Verify commodity exists
     commodity = db.query(CommodityIndex).filter(
@@ -475,6 +480,7 @@ async def create_or_update_team_source(
         existing.source_type = body.source_type
         existing.scrape_url = body.scrape_url
         existing.scrape_config = body.scrape_config
+        existing.fixed_value = body.fixed_value if body.source_type == "fixed" else None
         existing.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(existing)
@@ -487,6 +493,7 @@ async def create_or_update_team_source(
             source_type=body.source_type,
             scrape_url=body.scrape_url,
             scrape_config=body.scrape_config,
+            fixed_value=body.fixed_value if body.source_type == "fixed" else None,
             created_by=current_user.id,
         )
         db.add(source)
@@ -509,6 +516,7 @@ async def create_or_update_team_source(
         scrape_url=source.scrape_url,
         scrape_config=source.scrape_config,
         source_file=source.source_file,
+        fixed_value=float(source.fixed_value) if source.fixed_value is not None else None,
         created_by=source.created_by,
         updated_at=source.updated_at,
         commodity_name=commodity.name,
