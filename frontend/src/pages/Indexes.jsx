@@ -19,8 +19,14 @@ export default function Indexes() {
   const [materialFilter, setMaterialFilter] = useState('all');
   const [productFilter, setProductFilter] = useState('all');
   const [supplierFilter, setSupplierFilter] = useState('all');
-  const [startPeriod, setStartPeriod] = useState('2023-1');
-  const [endPeriod, setEndPeriod] = useState('2026-1');
+  const [endPeriod, setEndPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${Math.ceil((now.getMonth() + 1) / 3)}`;
+  });
+  const [startPeriod, setStartPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear() - 2}-${Math.ceil((now.getMonth() + 1) / 3)}`;
+  });
 
   // UI state
   const [editModal, setEditModal] = useState(null);
