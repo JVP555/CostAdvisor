@@ -193,7 +193,7 @@ export default function Brief() {
                 <td className="center">
                   <span style={{
                     display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
-                    background: d.direction === 'up' ? 'rgba(232,65,24,.15)' : d.direction === 'down' ? 'rgba(79,255,176,.12)' : 'rgba(255,255,255,.05)',
+                    background: d.direction === 'up' ? 'var(--danger-bg)' : d.direction === 'down' ? 'var(--success-bg)' : 'var(--neutral-bg)',
                     color: d.direction === 'up' ? 'var(--accent2)' : d.direction === 'down' ? 'var(--accent)' : 'var(--muted)',
                   }}>
                     {d.direction === 'up' ? '\u2191 Up' : d.direction === 'down' ? '\u2193 Down' : '\u2194 Flat'}

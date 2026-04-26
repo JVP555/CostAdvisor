@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from './api';
+import { applyTheme, cacheTheme } from './utils/theme';
 
 const AuthContext = createContext(null);
 
@@ -13,6 +14,11 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.get('/auth/me');
       setUser(data);
+
+      if (data.theme) {
+        applyTheme(data.theme);
+        cacheTheme(data.theme);
+      }
 
       // Extract teams from memberships
       const userTeams = data.memberships?.map(m => ({
@@ -34,6 +40,17 @@ export function AuthProvider({ children }) {
       setTeams([]);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const setTheme = useCallback(async (theme) => {
+    applyTheme(theme);
+    cacheTheme(theme);
+    setUser(prev => (prev ? { ...prev, theme } : prev));
+    try {
+      await api.put('/auth/me/theme', { theme });
+    } catch (err) {
+      console.error('Failed to persist theme', err);
     }
   }, []);
 
@@ -62,6 +79,7 @@ export function AuthProvider({ children }) {
       loading,
       logout,
       refreshUser: fetchUser,
+      setTheme,
     }}>
       {children}
     </AuthContext.Provider>

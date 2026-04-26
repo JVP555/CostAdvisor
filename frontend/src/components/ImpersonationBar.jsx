@@ -29,7 +29,7 @@ export default function ImpersonationBar() {
       background: 'var(--surface)', border: '1px solid var(--accent2)',
       borderRadius: 10, padding: '8px 16px',
       display: 'flex', alignItems: 'center', gap: 12,
-      boxShadow: '0 4px 20px rgba(0,0,0,.5)',
+      boxShadow: 'var(--shadow-bar)',
       fontSize: 11,
     }}>
       <div style={{
@@ -42,7 +42,7 @@ export default function ImpersonationBar() {
       <button
         onClick={stop}
         style={{
-          background: 'var(--accent2)', color: '#fff', border: 'none',
+          background: 'var(--accent2)', color: 'var(--on-danger)', border: 'none',
           borderRadius: 6, padding: '4px 12px', fontSize: 10, fontWeight: 600,
           cursor: 'pointer', fontFamily: "'JetBrains Mono', monospace",
           textTransform: 'uppercase', letterSpacing: 0.5,

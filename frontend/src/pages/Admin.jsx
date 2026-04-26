@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../AuthContext';
+import { THEMES } from '../utils/theme';
 
 export default function Admin() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, setTheme } = useAuth();
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,9 +81,14 @@ export default function Admin() {
         <button className={`ca-btn ${tab === 'teams' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setTab('teams')}>
           Teams ({teams.length})
         </button>
+        <button className={`ca-btn ${tab === 'appearance' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setTab('appearance')}>
+          Appearance
+        </button>
       </div>
 
-      {loading ? (
+      {tab === 'appearance' ? (
+        <AppearanceTab currentTheme={user?.theme || 'default'} onSelect={setTheme} />
+      ) : loading ? (
         <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
       ) : tab === 'users' ? (
         <div className="ca-card">
@@ -114,7 +120,7 @@ export default function Admin() {
                       <span style={{
                         display: 'inline-block', padding: '2px 8px', borderRadius: 4,
                         fontSize: 10, fontWeight: 600,
-                        background: u.is_super_admin ? 'rgba(79,255,176,.12)' : 'rgba(255,255,255,.05)',
+                        background: u.is_super_admin ? 'var(--success-bg)' : 'var(--neutral-bg)',
                         color: u.is_super_admin ? 'var(--accent)' : 'var(--muted)',
                       }}>
                         {u.is_super_admin ? 'SUPER ADMIN' : 'USER'}
@@ -184,6 +190,110 @@ export default function Admin() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+
+function AppearanceTab({ currentTheme, onSelect }) {
+  return (
+    <div className="ca-card">
+      <div className="ca-card-title">Theme</div>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 18, marginTop: -8 }}>
+        Picks a color palette for your account. Saved on your user, follows you across devices.
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+        {THEMES.map(t => (
+          <ThemePreview
+            key={t.id}
+            theme={t}
+            active={currentTheme === t.id}
+            onSelect={() => onSelect(t.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ThemePreview({ theme, active, onSelect }) {
+  return (
+    <div data-theme={theme.id} style={{
+      background: 'var(--surface)',
+      border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+      borderRadius: 'var(--radius-lg)',
+      padding: 18,
+      transition: 'border-color .2s',
+    }}>
+      {/* Mini preview pane, sits on the page background of the previewed theme */}
+      <div style={{
+        background: 'var(--bg)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius)',
+        padding: 14,
+        marginBottom: 14,
+      }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <span style={{ width: 18, height: 18, borderRadius: 4, background: 'var(--accent)' }} />
+          <span style={{ width: 18, height: 18, borderRadius: 4, background: 'var(--accent2)' }} />
+          <span style={{ width: 18, height: 18, borderRadius: 4, background: 'var(--accent3)' }} />
+          <span style={{ width: 18, height: 18, borderRadius: 4, background: 'var(--accent4)' }} />
+        </div>
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 6, padding: '8px 10px', marginBottom: 10,
+        }}>
+          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>
+            Sample card
+          </div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+            $12,480
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <span style={{
+            background: 'var(--accent)', color: 'var(--on-accent)',
+            fontSize: 9, fontWeight: 600, padding: '4px 10px',
+            borderRadius: 6, textTransform: 'uppercase', letterSpacing: 0.5,
+          }}>
+            Primary
+          </span>
+          <span style={{
+            background: 'var(--success-bg)', color: 'var(--accent)',
+            fontSize: 9, fontWeight: 600, padding: '4px 10px',
+            borderRadius: 6, textTransform: 'uppercase', letterSpacing: 0.5,
+          }}>
+            OK
+          </span>
+          <span style={{
+            background: 'var(--danger-bg)', color: 'var(--accent2)',
+            fontSize: 9, fontWeight: 600, padding: '4px 10px',
+            borderRadius: 6, textTransform: 'uppercase', letterSpacing: 0.5,
+          }}>
+            DRIFT
+          </span>
+        </div>
+      </div>
+      {/* Card label sits in the host theme so the active state is obvious */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>
+            {theme.label}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+            {theme.description}
+          </div>
+        </div>
+        {active ? (
+          <span className="ca-badge" style={{ background: 'var(--accent)', color: 'var(--on-accent)', alignSelf: 'center' }}>
+            Current
+          </span>
+        ) : (
+          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={onSelect} style={{ alignSelf: 'center' }}>
+            Use
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -264,7 +374,7 @@ function TeamCell({ userId, userTeams, allTeams, onChanged }) {
         <div style={{
           position: 'absolute', top: '100%', left: 0, zIndex: 50, marginTop: 4,
           background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: 6, minWidth: 220, boxShadow: '0 8px 24px rgba(0,0,0,.4)',
+          borderRadius: 8, padding: 6, minWidth: 220, boxShadow: 'var(--shadow-popover)',
         }}>
           <input
             ref={inputRef}

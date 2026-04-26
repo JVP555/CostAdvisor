@@ -136,8 +136,8 @@ export default function Dashboard() {
                             ${exposure.toLocaleString()}
                           </td>
                           <td className="center">
-                            {m.flag_index_moved && <span title="Index moved >5%" style={{ display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(116,185,255,.15)', color: 'var(--accent3)', marginRight: 4 }}>IDX</span>}
-                            {m.flag_price_drift && <span title="Price drift >10%" style={{ display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(232,65,24,.15)', color: 'var(--accent2)' }}>DRIFT</span>}
+                            {m.flag_index_moved && <span title="Index moved >5%" style={{ display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: 9, background: 'var(--info-bg)', color: 'var(--accent3)', marginRight: 4 }}>IDX</span>}
+                            {m.flag_price_drift && <span title="Price drift >10%" style={{ display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: 9, background: 'var(--danger-bg)', color: 'var(--accent2)' }}>DRIFT</span>}
                           </td>
                           <td className="center">
                             <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
@@ -170,8 +170,8 @@ export default function Dashboard() {
                         <div style={{ fontSize: 11, color: 'var(--muted)' }}>{m.supplier_name || 'No supplier'} \u00B7 {m.region}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 4 }}>
-                        {m.flag_index_moved && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(116,185,255,.15)', color: 'var(--accent3)' }}>IDX</span>}
-                        {m.flag_price_drift && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(232,65,24,.15)', color: 'var(--accent2)' }}>DRIFT</span>}
+                        {m.flag_index_moved && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, background: 'var(--info-bg)', color: 'var(--accent3)' }}>IDX</span>}
+                        {m.flag_price_drift && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, background: 'var(--danger-bg)', color: 'var(--accent2)' }}>DRIFT</span>}
                       </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>

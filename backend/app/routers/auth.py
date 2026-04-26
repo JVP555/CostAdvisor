@@ -169,6 +169,26 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+ALLOWED_THEMES = {"default", "light", "amber"}
+
+
+@router.put("/me/theme", response_model=UserOut)
+def set_my_theme(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update the current user's theme preference."""
+    theme = payload.get("theme")
+    if theme not in ALLOWED_THEMES:
+        raise HTTPException(status_code=400, detail="invalid theme")
+    current_user.theme = theme
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
 @router.post("/logout")
 def logout(response: Response):
     """Clear the auth cookie."""

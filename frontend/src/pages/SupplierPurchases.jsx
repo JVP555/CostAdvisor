@@ -160,7 +160,7 @@ export default function SupplierPurchases() {
                       <td className="center">
                         <span style={{
                           padding: '1px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-                          background: filledCount === q.products.length ? 'rgba(79,255,176,.12)' : 'rgba(255,200,50,.12)',
+                          background: filledCount === q.products.length ? 'var(--success-bg)' : 'var(--warn-bg)',
                           color: filledCount === q.products.length ? 'var(--accent)' : 'var(--accent2)',
                         }}>
                           {filledCount}

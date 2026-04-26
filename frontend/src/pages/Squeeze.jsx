@@ -172,7 +172,7 @@ export default function Squeeze() {
                 <td>Theoretical</td>
                 {periods.map((p, i) => <td key={i} className="center" style={{ color: 'var(--accent)' }}>{sym}{p.theoretical.toFixed(3)}</td>)}
               </tr>
-              <tr style={{ background: 'rgba(79,255,176,.03)' }}>
+              <tr style={{ background: 'var(--success-bg-soft)' }}>
                 <td>Actual</td>
                 {periods.map((p, i) => <td key={i} className="center" style={{ color: 'var(--accent4)' }}>{p.actual !== null ? `${sym}${p.actual.toFixed(3)}` : '\u2014'}</td>)}
               </tr>
@@ -194,7 +194,7 @@ export default function Squeeze() {
                   {p.impact !== null ? `${p.impact > 0 ? '+' : ''}${sym}${p.impact.toFixed(0)}` : '\u2014'}
                 </td>)}
               </tr>
-              <tr style={{ background: 'rgba(255,255,255,.02)' }}>
+              <tr style={{ background: 'var(--neutral-bg-soft)' }}>
                 <td>Cumulative</td>
                 {periods.map((p, i) => <td key={i} className="center" style={{ fontWeight: 600 }}>
                   {sym}{p.cumulative_impact.toFixed(0)}

@@ -53,7 +53,7 @@ export default function EvoChart({ periods, theoretical, actual, refCost, compon
     <svg width={W} height={H} style={{ display: 'block', width: '100%', height: 'auto' }} viewBox={`0 0 ${W} ${H}`}>
       {gridLines.map((v, i) => (
         <g key={i}>
-          <line x1={PAD.l} y1={yScale(v)} x2={W - PAD.r} y2={yScale(v)} stroke="rgba(38,45,66,.6)" strokeWidth="1" />
+          <line x1={PAD.l} y1={yScale(v)} x2={W - PAD.r} y2={yScale(v)} stroke="var(--chart-grid)" strokeWidth="1" />
           <text x={PAD.l - 6} y={yScale(v) + 3.5} fill="var(--muted)" fontSize="9" textAnchor="end" fontFamily="'JetBrains Mono', monospace">
             ${Math.round(v)}
           </text>
@@ -68,9 +68,9 @@ export default function EvoChart({ periods, theoretical, actual, refCost, compon
       ))}
       <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={H - PAD.b} stroke="var(--border)" strokeWidth="1" />
       <line x1={PAD.l} y1={H - PAD.b} x2={W - PAD.r} y2={H - PAD.b} stroke="var(--border)" strokeWidth="1" />
-      <line x1={PAD.l} y1={ry} x2={W - PAD.r} y2={ry} stroke="rgba(255,255,255,.08)" strokeDasharray="4,4" strokeWidth="1" />
-      <text x={W - PAD.r - 4} y={ry - 5} fill="rgba(255,255,255,.15)" fontSize="8" textAnchor="end" fontFamily="'JetBrains Mono', monospace">REF</text>
-      {fillPath && <path d={fillPath} fill="rgba(116,185,255,.07)" />}
+      <line x1={PAD.l} y1={ry} x2={W - PAD.r} y2={ry} stroke="var(--chart-ref-line)" strokeDasharray="4,4" strokeWidth="1" />
+      <text x={W - PAD.r - 4} y={ry - 5} fill="var(--chart-ref-text)" fontSize="8" textAnchor="end" fontFamily="'JetBrains Mono', monospace">REF</text>
+      {fillPath && <path d={fillPath} fill="var(--chart-fill)" />}
 
       {/* Stacked bars for components */}
       {showBars && periods.map((_, pi) => {

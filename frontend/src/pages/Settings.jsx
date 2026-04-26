@@ -82,7 +82,7 @@ export default function Settings() {
           padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 12,
           background: message.type === 'success' ? 'var(--accent-dim)' : 'var(--accent2-dim)',
           color: message.type === 'success' ? 'var(--accent)' : 'var(--accent2)',
-          border: `1px solid ${message.type === 'success' ? 'rgba(79,255,176,.3)' : 'rgba(255,107,107,.3)'}`,
+          border: `1px solid ${message.type === 'success' ? 'var(--success-bg-strong)' : 'var(--danger-bg-strong)'}`,
         }}>
           {message.text}
         </div>
@@ -146,7 +146,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <div className="ca-card" style={{ marginTop: 24, borderColor: 'rgba(255,107,107,.3)' }}>
+      <div className="ca-card" style={{ marginTop: 24, borderColor: 'var(--danger-bg-strong)' }}>
         <div className="ca-card-title" style={{ color: 'var(--accent2)' }}>Delete account</div>
         <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 12 }}>
           Teams where you are the sole member are permanently deleted along with all

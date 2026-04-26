@@ -72,8 +72,8 @@ export default function IndexPopupModal({
   });
 
   const categoryColors = {
-    Metal: '#5B8AF0', Energy: '#F0A35B', Chemical: '#A35BF0',
-    Labor: '#5BF0A3', PPI: '#F05B8A', Freight: '#8AF05B', FX: '#F0F05B',
+    Metal: 'var(--cat-metal)', Energy: 'var(--cat-energy)', Chemical: 'var(--cat-chemical)',
+    Labor: 'var(--cat-labor)', PPI: 'var(--cat-ppi)', Freight: 'var(--cat-freight)', FX: 'var(--cat-fx)',
   };
 
   return (
@@ -87,7 +87,7 @@ export default function IndexPopupModal({
               {commodity?.category && (
                 <span className="ca-badge" style={{
                   background: categoryColors[commodity.category] || 'var(--accent-dim)',
-                  color: '#fff', fontSize: 9,
+                  color: 'var(--on-danger)', fontSize: 9,
                 }}>
                   {commodity.category}
                 </span>

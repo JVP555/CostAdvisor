@@ -278,7 +278,7 @@ export default function Evolution() {
           <table className="ca-table">
             <thead><tr><th>Metric</th>{periods.map(p => <th key={p.period} className="center">{p.period}</th>)}</tr></thead>
             <tbody>
-              <tr style={{ background: 'rgba(79,255,176,.03)' }}>
+              <tr style={{ background: 'var(--success-bg-soft)' }}>
                 <td>Actual</td>
                 {periods.map((p, i) => <td key={i} className="center" style={{ color: 'var(--accent4)', fontWeight: 500 }}>{p.actual !== null ? `${sym}${p.actual.toFixed(3)}` : '\u2014'}</td>)}
               </tr>

@@ -90,7 +90,7 @@ function MembersTab() {
           padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 12,
           background: message.type === 'success' ? 'var(--accent-dim)' : 'var(--accent2-dim)',
           color: message.type === 'success' ? 'var(--accent)' : 'var(--accent2)',
-          border: `1px solid ${message.type === 'success' ? 'rgba(79,255,176,.3)' : 'rgba(255,107,107,.3)'}`,
+          border: `1px solid ${message.type === 'success' ? 'var(--success-bg-strong)' : 'var(--danger-bg-strong)'}`,
         }}>
           {message.text}
         </div>
@@ -246,7 +246,7 @@ function ActivityTab() {
                     <td>
                       <span style={{
                         display: 'inline-block', padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
-                        background: log.event_type === 'create' ? 'rgba(79,255,176,.12)' : log.event_type === 'delete' ? 'rgba(232,65,24,.15)' : 'rgba(116,185,255,.15)',
+                        background: log.event_type === 'create' ? 'var(--success-bg)' : log.event_type === 'delete' ? 'var(--danger-bg)' : 'var(--info-bg)',
                         color: log.event_type === 'create' ? 'var(--accent)' : log.event_type === 'delete' ? 'var(--accent2)' : 'var(--accent3)',
                       }}>
                         {log.event_type}

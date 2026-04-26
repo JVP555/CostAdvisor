@@ -128,7 +128,7 @@ export default function Suppliers() {
                       <td className="center" style={{ fontSize: 11 }}>
                         <span style={{
                           padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
-                          background: models.length > 0 ? 'rgba(79,255,176,.12)' : 'transparent',
+                          background: models.length > 0 ? 'var(--success-bg)' : 'transparent',
                           color: models.length > 0 ? 'var(--accent)' : 'var(--muted)',
                         }}>
                           {models.length}

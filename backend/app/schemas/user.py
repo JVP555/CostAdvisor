@@ -9,6 +9,7 @@ class UserOut(BaseModel):
     display_name: str | None
     avatar_url: str | None
     is_super_admin: bool = False
+    theme: str = "default"
     created_at: datetime
 
     model_config = {"from_attributes": True}

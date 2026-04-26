@@ -274,7 +274,7 @@ export default function Indexes() {
                 <span className={`idx-chevron${filtersOpen ? ' open' : ''}`} style={{ fontSize: 10 }}>&#9654;</span>
                 <span style={{ fontWeight: 500 }}>Filters</span>
                 {activeCount > 0 && (
-                  <span className="ca-badge" style={{ background: 'var(--accent)', color: '#000', fontSize: 9 }}>
+                  <span className="ca-badge" style={{ background: 'var(--accent)', color: 'var(--on-accent)', fontSize: 9 }}>
                     {activeCount} active
                   </span>
                 )}

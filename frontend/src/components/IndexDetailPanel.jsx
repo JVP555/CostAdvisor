@@ -106,7 +106,7 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
           padding: '10px 14px', background: 'var(--accent-dim)', borderRadius: 'var(--radius)',
-          border: '1px solid rgba(79,255,176,.15)',
+          border: '1px solid var(--success-bg-strong)',
         }}>
           <span className="idx-health idx-health-ok" />
           <span style={{ fontSize: 12, color: 'var(--accent)' }}>
