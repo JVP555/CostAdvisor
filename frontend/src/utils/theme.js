@@ -2,6 +2,7 @@ export const THEMES = [
   { id: 'default', label: 'Mint', description: 'The original — green-on-charcoal terminal vibe.' },
   { id: 'light', label: 'Paper', description: 'Black-on-white, clean and high-contrast.' },
   { id: 'amber', label: 'Amber', description: 'Warm sepia dark — easier on the eyes at night.' },
+  { id: 'staminachem', label: 'StaminaChem', description: 'Brand palette — teal and steel blue on soft white.' },
 ];
 
 const VALID = new Set(THEMES.map(t => t.id));

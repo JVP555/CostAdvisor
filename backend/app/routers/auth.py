@@ -169,7 +169,7 @@ def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-ALLOWED_THEMES = {"default", "light", "amber"}
+ALLOWED_THEMES = {"default", "light", "amber", "staminachem"}
 
 
 @router.put("/me/theme", response_model=UserOut)

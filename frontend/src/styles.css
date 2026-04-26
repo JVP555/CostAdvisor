@@ -479,6 +479,77 @@ input[type=range] { padding: 0; cursor: pointer; accent-color: var(--accent); }
   --pie-9: #f0c989;
 }
 
+/* === Theme: StaminaChem === */
+[data-theme="staminachem"] {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface2: #eef2f6;
+  --surface3: #e2e8ee;
+  --border: #d6dde4;
+  --border-light: #c7d0d8;
+
+  --accent: #00A99D;
+  --accent-dim: rgba(0,169,157,.10);
+  --accent2: #d64545;
+  --accent2-dim: rgba(214,69,69,.10);
+  --accent3: #c8911a;
+  --accent3-dim: rgba(200,145,26,.12);
+  --accent4: #2596be;
+  --accent4-dim: rgba(37,150,190,.12);
+
+  --text: #333333;
+  --text-secondary: #4a4a4a;
+  --muted: #666666;
+  --card-eyebrow: #666666;
+
+  --on-accent: #ffffff;
+  --on-danger: #ffffff;
+
+  --success-bg: rgba(0,169,157,.10);
+  --success-bg-soft: rgba(0,169,157,.04);
+  --success-bg-strong: rgba(0,169,157,.30);
+  --warn-bg: rgba(200,145,26,.14);
+  --danger-bg: rgba(214,69,69,.12);
+  --danger-bg-strong: rgba(214,69,69,.30);
+  --info-bg: rgba(37,150,190,.12);
+  --neutral-bg: rgba(51,51,51,.05);
+  --neutral-bg-soft: rgba(51,51,51,.025);
+
+  --row-stripe: rgba(51,51,51,.025);
+  --row-divider: rgba(214,221,228,.7);
+
+  --backdrop: rgba(51,51,51,.45);
+  --shadow-popover: 0 8px 24px rgba(51,51,51,.10);
+  --shadow-bar: 0 4px 20px rgba(51,51,51,.15);
+
+  --chart-grid: rgba(51,51,51,.08);
+  --chart-ref-line: rgba(51,51,51,.18);
+  --chart-ref-text: rgba(51,51,51,.35);
+  --chart-fill: rgba(37,150,190,.10);
+
+  --result-grad-from: rgba(0,169,157,.06);
+  --result-grad-to: rgba(37,150,190,.04);
+  --result-border: rgba(0,169,157,.20);
+
+  --cat-metal: #2596be;
+  --cat-energy: #c8911a;
+  --cat-chemical: #6a3aa0;
+  --cat-labor: #00A99D;
+  --cat-ppi: #b54a7c;
+  --cat-freight: #5b8a23;
+  --cat-fx: #897000;
+
+  --pie-1: #00A99D;
+  --pie-2: #2596be;
+  --pie-3: #c8911a;
+  --pie-4: #d64545;
+  --pie-5: #6a4ab8;
+  --pie-6: #c45e8a;
+  --pie-7: #2faa86;
+  --pie-8: #2a6e8a;
+  --pie-9: #c45e3a;
+}
+
 /* Print styles */
 @media print {
   body, #root { background: #fff; color: #111; }
