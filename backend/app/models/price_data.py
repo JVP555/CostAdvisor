@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Integer, SmallInteger, Numeric, String, DateTime, ForeignKey, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -23,6 +23,9 @@ class ActualPrice(Base):
     year: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     quarter: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     price: Mapped[float] = mapped_column(Numeric(12, 4), nullable=False)
+    incoterm: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    named_place: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    landed_cost_adjustments: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     source_file: Mapped[str | None] = mapped_column(String(255))
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

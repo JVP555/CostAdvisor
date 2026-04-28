@@ -14,7 +14,7 @@ init_sentry()
 from app.routers import (
     auth, teams, products, cost_models, indexes, prices,
     volumes, costing, scenarios, suppliers, chemical_families,
-    fx_rates, audit, portfolio, admin, ai, account,
+    fx_rates, audit, portfolio, admin, ai, account, freight_lanes,
 )
 
 
@@ -61,6 +61,7 @@ app.include_router(portfolio.router, prefix="/api/portfolio", tags=["portfolio"]
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
+app.include_router(freight_lanes.router, prefix="/api/freight-lanes", tags=["freight-lanes"])
 
 
 @app.get("/health")

@@ -2,7 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { OVC_ITEMS, RM_ITEMS, PIE_COLORS, INCOTERMS } from '../utils/constants';
 import DonutChart from '../components/DonutChart';
+import IncotermAdjustments from '../components/IncotermAdjustments';
 import api from '../api';
+
+const REGIONS = ['Europe', 'NA', 'Asia', 'Latam'];
 import { useAuth } from '../AuthContext';
 
 export default function CostModelBuilder() {
@@ -28,6 +31,7 @@ export default function CostModelBuilder() {
   const [supplierId, setSupplierId] = useState('');
   const [newSupplierName, setNewSupplierName] = useState('');
   const [destinationCountry, setDestinationCountry] = useState('');
+  const [destinationRegion, setDestinationRegion] = useState('');
   const [region, setRegion] = useState('Europe');
   const [currency, setCurrency] = useState('USD');
   const [incoterm, setIncoterm] = useState('');
@@ -38,6 +42,9 @@ export default function CostModelBuilder() {
   const [baseQuarter, setBaseQuarter] = useState(1);
   const [marginType, setMarginType] = useState('pct');
   const [marginValue, setMarginValue] = useState(20);
+  const [versionIncoterm, setVersionIncoterm] = useState('');
+  const [versionNamedPlace, setVersionNamedPlace] = useState('');
+  const [landedCostAdjustments, setLandedCostAdjustments] = useState(null);
   const [components, setComponents] = useState([]);
 
   // Snapshot for cancel
@@ -76,6 +83,7 @@ export default function CostModelBuilder() {
         setActiveContent(data.product_active_content ?? 0.65);
         setSupplierId(data.supplier_id || '');
         setDestinationCountry(data.destination_country || '');
+        setDestinationRegion(data.destination_region || '');
         setRegion(data.region);
         setCurrency(data.currency);
         setIncoterm(data.incoterm || '');
@@ -87,6 +95,9 @@ export default function CostModelBuilder() {
           setBaseQuarter(currentFv.base_quarter);
           setMarginType(currentFv.margin_type === 'pct' || currentFv.margin_type === 'fixed' ? currentFv.margin_type : 'pct');
           setMarginValue(currentFv.margin_value ?? 20);
+          setVersionIncoterm(currentFv.incoterm || '');
+          setVersionNamedPlace(currentFv.named_place || '');
+          setLandedCostAdjustments(currentFv.landed_cost_adjustments || null);
 
           setComponents(currentFv.components.map(c => ({
             label: c.label,
@@ -131,8 +142,9 @@ export default function CostModelBuilder() {
   const startEditing = () => {
     setSnapshot({
       productName, formula, activeContent, unit,
-      supplierId, newSupplierName, destinationCountry, region, currency, incoterm,
+      supplierId, newSupplierName, destinationCountry, destinationRegion, region, currency, incoterm,
       basePrice, baseYear, baseQuarter, marginType, marginValue,
+      versionIncoterm, versionNamedPlace, landedCostAdjustments,
       components: components.map(c => ({ ...c })),
     });
     setEditing(true);
@@ -147,6 +159,7 @@ export default function CostModelBuilder() {
       setSupplierId(snapshot.supplierId);
       setNewSupplierName(snapshot.newSupplierName);
       setDestinationCountry(snapshot.destinationCountry);
+      setDestinationRegion(snapshot.destinationRegion);
       setRegion(snapshot.region);
       setCurrency(snapshot.currency);
       setIncoterm(snapshot.incoterm);
@@ -155,6 +168,9 @@ export default function CostModelBuilder() {
       setBaseQuarter(snapshot.baseQuarter);
       setMarginType(snapshot.marginType);
       setMarginValue(snapshot.marginValue);
+      setVersionIncoterm(snapshot.versionIncoterm);
+      setVersionNamedPlace(snapshot.versionNamedPlace);
+      setLandedCostAdjustments(snapshot.landedCostAdjustments);
       setComponents(snapshot.components);
     }
     setEditing(false);
@@ -190,6 +206,7 @@ export default function CostModelBuilder() {
         product_id: pid,
         supplier_id: sid ? Number(sid) : null,
         destination_country: destinationCountry || null,
+        destination_region: destinationRegion || null,
         region,
         currency,
         incoterm: incoterm || null,
@@ -199,6 +216,9 @@ export default function CostModelBuilder() {
           base_quarter: baseQuarter,
           margin_type: marginType,
           margin_value: marginValue,
+          incoterm: versionIncoterm || null,
+          named_place: versionNamedPlace || null,
+          landed_cost_adjustments: landedCostAdjustments,
           components: components.map(c => ({
             label: c.label,
             commodity_name: c.commodity_name || null,
@@ -219,6 +239,7 @@ export default function CostModelBuilder() {
         await api.put(`/api/cost-models/${costModelId}`, {
           supplier_id: sid ? Number(sid) : null,
           destination_country: destinationCountry || null,
+          destination_region: destinationRegion || null,
           region,
           currency,
           incoterm: incoterm || null,
@@ -312,9 +333,16 @@ export default function CostModelBuilder() {
                   <input className="ca-input" value={destinationCountry} onChange={e => setDestinationCountry(e.target.value)} />
                 </div>
                 <div>
+                  <label className="ca-label">Destination Region</label>
+                  <select className="ca-select" value={destinationRegion} onChange={e => setDestinationRegion(e.target.value)}>
+                    <option value="">—</option>
+                    {REGIONS.map(r => <option key={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="ca-label">Producing Region</label>
                   <select className="ca-select" value={region} onChange={e => setRegion(e.target.value)}>
-                    {['Europe','NA','Asia','Latam'].map(r => <option key={r}>{r}</option>)}
+                    {REGIONS.map(r => <option key={r}>{r}</option>)}
                   </select>
                 </div>
                 <div>
@@ -324,7 +352,7 @@ export default function CostModelBuilder() {
                   </select>
                 </div>
                 <div>
-                  <label className="ca-label">Incoterm</label>
+                  <label className="ca-label">Default Incoterm</label>
                   <select className="ca-select" value={incoterm} onChange={e => setIncoterm(e.target.value)}>
                     <option value="">—</option>
                     {INCOTERMS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -342,6 +370,10 @@ export default function CostModelBuilder() {
                   <div style={{ fontSize: 13, padding: '7px 0' }}>{destinationCountry || '\u2014'}</div>
                 </div>
                 <div>
+                  <label className="ca-label">Destination Region</label>
+                  <div style={{ fontSize: 13, padding: '7px 0' }}>{destinationRegion || '\u2014'}</div>
+                </div>
+                <div>
                   <label className="ca-label">Producing Region</label>
                   <div style={{ fontSize: 13, padding: '7px 0' }}>{region}</div>
                 </div>
@@ -350,7 +382,7 @@ export default function CostModelBuilder() {
                   <div style={{ fontSize: 13, padding: '7px 0' }}>{currency}</div>
                 </div>
                 <div>
-                  <label className="ca-label">Incoterm</label>
+                  <label className="ca-label">Default Incoterm</label>
                   <div style={{ fontSize: 13, padding: '7px 0' }}>{incoterm || '\u2014'}</div>
                 </div>
               </div>
@@ -380,6 +412,33 @@ export default function CostModelBuilder() {
                       {[1,2,3,4].map(q => <option key={q} value={q}>Q{q}</option>)}
                     </select>
                   </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label className="ca-label">Incoterm (this version)</label>
+                    <select className="ca-select" value={versionIncoterm} onChange={e => setVersionIncoterm(e.target.value)}>
+                      <option value="">— use default ({incoterm || 'none'}) —</option>
+                      {INCOTERMS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="ca-label">Named Place</label>
+                    <input className="ca-input" placeholder="e.g. Rotterdam, Houston" value={versionNamedPlace}
+                      onChange={e => setVersionNamedPlace(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="ca-card" style={{ marginBottom: 12, padding: 10, background: 'var(--bg)' }}>
+                  <div className="ca-card-title" style={{ fontSize: 11, marginBottom: 8 }}>Landed-Cost Adjustments</div>
+                  <IncotermAdjustments
+                    value={landedCostAdjustments}
+                    onChange={setLandedCostAdjustments}
+                    editing={true}
+                    originRegion={region}
+                    destinationRegion={destinationRegion}
+                    currencySym={sym}
+                  />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 60px 80px 90px 30px', gap: 8, marginBottom: 6 }}>
@@ -427,7 +486,12 @@ export default function CostModelBuilder() {
                     <label className="ca-label">Base Period</label>
                     <div style={{ fontSize: 13, padding: '7px 0' }}>Q{baseQuarter}-{baseYear}</div>
                   </div>
-                  <div></div>
+                  <div>
+                    <label className="ca-label">Pricing Basis</label>
+                    <div style={{ fontSize: 13, padding: '7px 0' }}>
+                      {(versionIncoterm || incoterm) ? `${versionIncoterm || incoterm}${versionNamedPlace ? ' ' + versionNamedPlace : ''}` : '—'}
+                    </div>
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px 90px', gap: 8, marginBottom: 6 }}>
@@ -628,6 +692,9 @@ export default function CostModelBuilder() {
               setBaseQuarter(v.base_quarter);
               setMarginType(v.margin_type === 'pct' || v.margin_type === 'fixed' ? v.margin_type : 'pct');
               setMarginValue(v.margin_value ?? 20);
+              setVersionIncoterm(v.incoterm || '');
+              setVersionNamedPlace(v.named_place || '');
+              setLandedCostAdjustments(v.landed_cost_adjustments || null);
               setComponents(v.components.map(c => ({
                 label: c.label,
                 commodity_name: c.commodity_name || '',

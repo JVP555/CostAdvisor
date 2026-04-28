@@ -20,6 +20,8 @@ class CommodityIndex(Base):
     category: Mapped[str | None] = mapped_column(String(32))
     source_url: Mapped[str | None] = mapped_column(String(512))
     scrape_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    quoted_incoterm: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    quoted_named_place: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     # Relationships
     values = relationship("IndexValue", back_populates="commodity", lazy="dynamic")

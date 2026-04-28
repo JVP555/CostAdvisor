@@ -11,6 +11,9 @@ from app.services.volume_projector import project_volumes
 from app.services.narrative import generate_narrative
 from app.services.fx_converter import convert_price
 from app.services.unit_converter import convert_unit, convert_price_per_unit
+from app.services.incoterm_normalizer import normalize_with_lane
+from app.services.freight_lane_lookup import get_lane_adjustments
+from app.constants.incoterms import normalize as _norm_incoterm
 from app.schemas.costing import (
     ShouldCostResult, EvolutionRequest, EvolutionResult, EvolutionPeriod, ComponentInfo,
     SqueezeRequest, SqueezeResult, SqueezePeriod,
@@ -208,11 +211,35 @@ def _apply_margin(indexed_cost: float, margin_type: str, margin_value: float | N
 
 # ── Should-Cost ────────────────────────────────────────────────
 
+def _resolve_basis(cost_model: CostModel, fv) -> tuple[str | None, dict | None]:
+    """The Incoterm a price is *quoted under* and the price-level adjustments."""
+    incoterm = (fv.incoterm if fv and fv.incoterm else cost_model.incoterm)
+    adjustments = (fv.landed_cost_adjustments if fv else None) or cost_model.landed_cost_adjustments
+    return _norm_incoterm(incoterm), adjustments
+
+
+def _normalize_to(
+    db: Session, cost_model: CostModel, fv,
+    price: float, target_incoterm: str | None,
+    price_adjustments_override: dict | None = None,
+) -> float:
+    """Normalize `price` to `target_incoterm` using lane defaults as fallback."""
+    if not target_incoterm:
+        return price
+    from_inc, fv_adj = _resolve_basis(cost_model, fv)
+    price_adj = price_adjustments_override if price_adjustments_override is not None else fv_adj
+    lane_adj = get_lane_adjustments(db, cost_model.region, cost_model.destination_region)
+    return normalize_with_lane(
+        price, from_inc, target_incoterm, price_adj, lane_adj
+    )
+
+
 def calculate_should_cost(
     db: Session,
     cost_model: CostModel,
     target_year: int | None = None,
     target_quarter: int | None = None,
+    normalize_to_incoterm: str | None = None,
 ) -> ShouldCostResult:
     # Use period-aware formula selection
     if target_year and target_quarter:
@@ -244,6 +271,10 @@ def calculate_should_cost(
         indexed_cost, fv.margin_type, fv.margin_value, base_price
     )
 
+    target_inc = _norm_incoterm(normalize_to_incoterm)
+    if target_inc:
+        should_cost = _normalize_to(db, cost_model, fv, should_cost, target_inc)
+
     return ShouldCostResult(
         should_cost=round(should_cost, 4),
         cost_before_margin=round(indexed_cost, 4),
@@ -253,6 +284,8 @@ def calculate_should_cost(
         per_active_unit=round(should_cost / active, 4) if active else None,
         currency=cost_model.currency,
         unit=cost_model.product.unit,
+        incoterm=(fv.incoterm if fv and fv.incoterm else cost_model.incoterm),
+        normalized_to_incoterm=target_inc,
     )
 
 
@@ -293,9 +326,17 @@ def calculate_evolution(
 
     periods = generate_periods(from_y, from_q, to_y, to_q, request.granularity)
 
+    target_inc = _norm_incoterm(request.normalize_to_incoterm)
+    lane_adj = get_lane_adjustments(db, cost_model.region, cost_model.destination_region) if target_inc else None
+
     actuals = {}
+    actual_meta = {}  # (year, quarter) -> (incoterm, adjustments)
     for ap in db.query(ActualPrice).filter(ActualPrice.cost_model_id == cost_model.id).all():
         actuals[(ap.year, ap.quarter)] = float(ap.price)
+        actual_meta[(ap.year, ap.quarter)] = (
+            _norm_incoterm(ap.incoterm) if ap.incoterm else None,
+            ap.landed_cost_adjustments,
+        )
 
     # Convert reference cost for display (use current/latest formula)
     ref_cost_display = _apply_unit(
@@ -359,6 +400,18 @@ def calculate_evolution(
 
         actual = actuals.get((year, quarter))
 
+        # Normalize to target Incoterm before FX/unit. Use the *period*
+        # formula's basis for theoretical, and the actual price's own basis
+        # (with cost-model fallback) for actual — they can differ.
+        if target_inc:
+            from_inc, fv_adj = _resolve_basis(cost_model, period_fv)
+            theoretical = normalize_with_lane(theoretical, from_inc, target_inc, fv_adj, lane_adj)
+            if actual is not None:
+                a_inc, a_adj = actual_meta.get((year, quarter), (None, None))
+                a_inc = a_inc or from_inc
+                a_adj = a_adj or fv_adj
+                actual = normalize_with_lane(actual, a_inc, target_inc, a_adj, lane_adj)
+
         # Apply FX and unit conversions
         theoretical = _apply_unit(_apply_fx(db, theoretical, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
         if actual is not None:
@@ -389,7 +442,9 @@ def calculate_evolution(
         region=region,
         currency=out_ccy,
         unit=out_unit,
-        incoterm=cost_model.incoterm,
+        incoterm=(fv.incoterm if fv and fv.incoterm else cost_model.incoterm),
+        named_place=(fv.named_place if fv and fv.named_place else None),
+        normalized_to_incoterm=target_inc,
         periods=periods_out,
         components=comp_info,
         available_from_year=avail_min_y,

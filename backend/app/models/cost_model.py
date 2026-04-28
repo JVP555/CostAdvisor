@@ -4,7 +4,7 @@ from sqlalchemy import (
     Integer, SmallInteger, String, Numeric, Text,
     DateTime, ForeignKey, UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -26,6 +26,7 @@ class CostModel(Base):
         Integer, ForeignKey("suppliers.id"), nullable=True
     )
     destination_country: Mapped[str | None] = mapped_column(String(64))
+    destination_region: Mapped[str | None] = mapped_column(String(20), nullable=True)
     region: Mapped[str] = mapped_column(String(20), default="Europe")
     currency: Mapped[str] = mapped_column(String(3), default="USD")
     incoterm: Mapped[str | None] = mapped_column(String(8), nullable=True)
@@ -92,6 +93,9 @@ class FormulaVersion(Base):
     base_quarter: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     margin_type: Mapped[str] = mapped_column(String(10), default="pct")  # 'pct', 'fixed', 'unknown'
     margin_value: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
+    incoterm: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    named_place: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    landed_cost_adjustments: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

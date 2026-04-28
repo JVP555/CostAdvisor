@@ -77,6 +77,7 @@ def create_cost_model(
         product_id=data.product_id,
         supplier_id=data.supplier_id,
         destination_country=data.destination_country,
+        destination_region=data.destination_region,
         region=data.region,
         currency=data.currency,
         incoterm=data.incoterm,
@@ -85,7 +86,8 @@ def create_cost_model(
     db.add(cm)
     db.flush()
 
-    # Create first formula version
+    # Create first formula version. Version-level incoterm wins; otherwise the
+    # cost model's default flows in so existing callers don't regress.
     fv = FormulaVersion(
         cost_model_id=cm.id,
         base_price=data.formula.base_price,
@@ -93,6 +95,9 @@ def create_cost_model(
         base_quarter=data.formula.base_quarter,
         margin_type=data.formula.margin_type,
         margin_value=data.formula.margin_value,
+        incoterm=data.formula.incoterm or data.incoterm,
+        named_place=data.formula.named_place,
+        landed_cost_adjustments=data.formula.landed_cost_adjustments,
         notes=data.formula.notes,
     )
     db.add(fv)
@@ -141,7 +146,7 @@ def update_cost_model(
     require_team_access(db, current_user, cm.team_id)
 
     changes = {}
-    for field in ["supplier_id", "destination_country", "region", "currency", "incoterm"]:
+    for field in ["supplier_id", "destination_country", "destination_region", "region", "currency", "incoterm"]:
         val = getattr(data, field, None)
         if val is not None:
             changes[field] = {"old": str(getattr(cm, field)), "new": str(val)}
@@ -198,6 +203,9 @@ def renegotiate(
         existing.base_price = data.base_price
         existing.margin_type = data.margin_type
         existing.margin_value = data.margin_value
+        existing.incoterm = data.incoterm or cm.incoterm
+        existing.named_place = data.named_place
+        existing.landed_cost_adjustments = data.landed_cost_adjustments
         existing.notes = data.notes
         existing.updated_at = datetime.now(timezone.utc)
 
@@ -232,6 +240,9 @@ def renegotiate(
             base_quarter=data.base_quarter,
             margin_type=data.margin_type,
             margin_value=data.margin_value,
+            incoterm=data.incoterm or cm.incoterm,
+            named_place=data.named_place,
+            landed_cost_adjustments=data.landed_cost_adjustments,
             notes=data.notes,
         )
         db.add(fv)
@@ -323,6 +334,7 @@ def clone_cost_model(
         product_id=original.product_id,
         supplier_id=original.supplier_id,
         destination_country=original.destination_country,
+        destination_region=original.destination_region,
         region=original.region,
         currency=original.currency,
         incoterm=original.incoterm,
@@ -341,6 +353,9 @@ def clone_cost_model(
             base_quarter=current_fv.base_quarter,
             margin_type=current_fv.margin_type,
             margin_value=current_fv.margin_value,
+            incoterm=current_fv.incoterm,
+            named_place=current_fv.named_place,
+            landed_cost_adjustments=current_fv.landed_cost_adjustments,
         )
         db.add(fv)
         db.flush()

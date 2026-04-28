@@ -159,7 +159,7 @@ export default function Pricing() {
       </div>
       {model && (
         <p className="ca-subtitle">
-          {model.product_name}{model.supplier_name ? ` \u00B7 ${model.supplier_name}` : ''} \u00B7 {model.region} \u00B7 {model.currency}{model.incoterm ? ` \u00B7 ${model.incoterm}` : ''}
+          {model.product_name}{model.supplier_name ? ` \u00B7 ${model.supplier_name}` : ''} \u00B7 {model.region} \u00B7 {model.currency}{(() => { const fv = model.formula_versions?.[0]; const ic = fv?.incoterm || model.incoterm; const np = fv?.named_place; return ic ? ` \u00B7 ${ic}${np ? ' ' + np : ''}` : ''; })()}
         </p>
       )}
 

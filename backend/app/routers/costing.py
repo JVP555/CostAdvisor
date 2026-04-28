@@ -49,6 +49,7 @@ def should_cost(
         cost_model=cm,
         target_year=data.target_year,
         target_quarter=data.target_quarter,
+        normalize_to_incoterm=data.normalize_to_incoterm,
     )
 
 

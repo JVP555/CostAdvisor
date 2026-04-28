@@ -8,6 +8,7 @@ class ShouldCostRequest(BaseModel):
     target_quarter: int | None = None
     display_currency: str | None = None
     display_unit: str | None = None
+    normalize_to_incoterm: str | None = None
 
 
 class ShouldCostResult(BaseModel):
@@ -19,6 +20,8 @@ class ShouldCostResult(BaseModel):
     per_active_unit: float | None
     currency: str
     unit: str
+    incoterm: str | None = None
+    normalized_to_incoterm: str | None = None
 
 
 class EvolutionRequest(BaseModel):
@@ -33,6 +36,7 @@ class EvolutionRequest(BaseModel):
     formula_mode: str = "active"  # 'active' or 'versioned'
     display_currency: str | None = None
     display_unit: str | None = None
+    normalize_to_incoterm: str | None = None
 
 
 class EvolutionPeriod(BaseModel):
@@ -60,6 +64,8 @@ class EvolutionResult(BaseModel):
     currency: str
     unit: str
     incoterm: str | None = None
+    named_place: str | None = None
+    normalized_to_incoterm: str | None = None
     periods: list[EvolutionPeriod]
     components: list[ComponentInfo] = []
     available_from_year: int | None = None

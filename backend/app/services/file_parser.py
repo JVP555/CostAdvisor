@@ -71,6 +71,7 @@ def parse_price_upload(content: bytes, filename: str) -> list[dict]:
     """
     Parse actual price upload.
     Expected columns: period, price
+    Optional columns: incoterm, named_place
     """
     df = _read_file(content, filename)
 
@@ -78,14 +79,24 @@ def parse_price_upload(content: bytes, filename: str) -> list[dict]:
     if not required.issubset(set(df.columns)):
         raise ValueError(f"Missing columns. Required: {required}. Found: {set(df.columns)}")
 
+    has_incoterm = "incoterm" in df.columns
+    has_named_place = "named_place" in df.columns
+
     rows = []
     for _, row in df.iterrows():
         year, quarter = _parse_period(str(row["period"]))
-        rows.append({
+        entry = {
             "year": year,
             "quarter": quarter,
             "price": float(row["price"]),
-        })
+        }
+        if has_incoterm:
+            v = row["incoterm"]
+            entry["incoterm"] = str(v).strip().upper() if pd.notna(v) and str(v).strip() else None
+        if has_named_place:
+            v = row["named_place"]
+            entry["named_place"] = str(v).strip() if pd.notna(v) and str(v).strip() else None
+        rows.append(entry)
     return rows
 
 

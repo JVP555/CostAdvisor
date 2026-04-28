@@ -67,10 +67,17 @@ async def upload_prices(
             ActualPrice.quarter == row["quarter"],
         ).first()
 
+        # If the upload doesn't carry an incoterm, fall back to the cost model's default.
+        row_incoterm = row.get("incoterm") or cm.incoterm
+        row_named_place = row.get("named_place")
+
         if existing:
             existing.price = row["price"]
             existing.uploaded_by = current_user.id
             existing.source_file = filename
+            existing.incoterm = row_incoterm
+            if row_named_place is not None:
+                existing.named_place = row_named_place
         else:
             ap = ActualPrice(
                 cost_model_id=cost_model_id,
@@ -78,6 +85,8 @@ async def upload_prices(
                 year=row["year"],
                 quarter=row["quarter"],
                 price=row["price"],
+                incoterm=row_incoterm,
+                named_place=row_named_place,
                 source_file=filename,
             )
             db.add(ap)
@@ -111,9 +120,16 @@ def update_price(
     ).first()
 
     previous = float(existing.price) if existing else None
+    incoterm_value = data.incoterm or cm.incoterm
     if existing:
         existing.price = data.price
         existing.uploaded_by = current_user.id
+        if data.incoterm is not None:
+            existing.incoterm = data.incoterm
+        if data.named_place is not None:
+            existing.named_place = data.named_place
+        if data.landed_cost_adjustments is not None:
+            existing.landed_cost_adjustments = data.landed_cost_adjustments
     else:
         existing = ActualPrice(
             cost_model_id=cost_model_id,
@@ -121,6 +137,9 @@ def update_price(
             year=data.year,
             quarter=data.quarter,
             price=data.price,
+            incoterm=incoterm_value,
+            named_place=data.named_place,
+            landed_cost_adjustments=data.landed_cost_adjustments,
         )
         db.add(existing)
 

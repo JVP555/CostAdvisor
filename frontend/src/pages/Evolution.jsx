@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import EvoChart from '../components/EvoChart';
-import { PIE_COLORS } from '../utils/constants';
+import { PIE_COLORS, INCOTERMS } from '../utils/constants';
 import api from '../api';
 import exportCsv from '../utils/exportCsv';
 
@@ -31,6 +31,7 @@ export default function Evolution() {
   const [toYear, setToYear] = useState(null);
   const [toQuarter, setToQuarter] = useState(null);
   const [formulaMode, setFormulaMode] = useState('active');
+  const [showAsIncoterm, setShowAsIncoterm] = useState('');
 
   // Component visibility toggles
   const [visibleComponents, setVisibleComponents] = useState({});
@@ -43,6 +44,7 @@ export default function Evolution() {
       granularity: 'quarterly',
       formula_mode: formulaMode,
     };
+    if (showAsIncoterm) body.normalize_to_incoterm = showAsIncoterm;
     if (fy && fq) { body.from_year = fy; body.from_quarter = fq; }
     if (ty && tq) { body.to_year = ty; body.to_quarter = tq; }
 
@@ -69,7 +71,7 @@ export default function Evolution() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchEvolution(fromYear, fromQuarter, toYear, toQuarter); }, [costModelId, formulaMode]);
+  useEffect(() => { fetchEvolution(fromYear, fromQuarter, toYear, toQuarter); }, [costModelId, formulaMode, showAsIncoterm]);
 
   const onChangeFrom = (val) => {
     const [y, q] = val.split('-').map(Number);
@@ -127,7 +129,7 @@ export default function Evolution() {
   if (error) return <div className="ca-page" style={{ color: 'var(--accent2)' }}>Error: {error}</div>;
   if (!data) return null;
 
-  const { periods, product_name, supplier_name, reference_cost, region, currency, unit, incoterm } = data;
+  const { periods, product_name, supplier_name, reference_cost, region, currency, unit, incoterm, named_place, normalized_to_incoterm } = data;
   const theoretical = periods.map(p => p.theoretical);
   const actual = periods.map(p => p.actual ?? 0);
   const periodLabels = periods.map(p => p.period);
@@ -154,7 +156,14 @@ export default function Evolution() {
           )}>Export CSV</button>
         </div>
       </div>
-      <p className="ca-subtitle">{product_name}{supplier_name ? ` · ${supplier_name}` : ''} · {region}{incoterm ? ` · ${incoterm}` : ''} · Ref: {sym}{reference_cost?.toFixed(2)}</p>
+      <p className="ca-subtitle">
+        {product_name}{supplier_name ? ` · ${supplier_name}` : ''} · {region}{incoterm ? ` · ${incoterm}${named_place ? ' ' + named_place : ''}` : ''} · Ref: {sym}{reference_cost?.toFixed(2)}
+        {normalized_to_incoterm && (
+          <span style={{ marginLeft: 8, padding: '2px 8px', background: 'var(--accent3)', color: '#fff', borderRadius: 4, fontSize: 10, textTransform: 'uppercase' }}>
+            normalized to {normalized_to_incoterm}
+          </span>
+        )}
+      </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 16 }}>
         <div className="ca-metric">
@@ -206,6 +215,16 @@ export default function Evolution() {
               >
                 <option value="active">Active Model</option>
                 <option value="versioned">Versioned</option>
+              </select>
+              <select
+                className="ca-select"
+                style={{ fontSize: 11, padding: '4px 8px', width: 'auto' }}
+                value={showAsIncoterm}
+                onChange={e => setShowAsIncoterm(e.target.value)}
+                title="Normalize displayed prices to a target Incoterm"
+              >
+                <option value="">As-quoted</option>
+                {INCOTERMS.map(t => <option key={t} value={t}>Show as {t}</option>)}
               </select>
             </div>
           )}
