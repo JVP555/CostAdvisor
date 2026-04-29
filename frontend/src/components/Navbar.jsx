@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import TeamSelector from './TeamSelector';
@@ -6,6 +7,22 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   const tabs = [
     { path: '/dashboard', label: 'Dashboard' },
@@ -14,6 +31,9 @@ export default function Navbar() {
     { path: '/team', label: 'Team' },
     ...(user?.is_super_admin ? [{ path: '/admin', label: 'Admin' }] : []),
   ];
+
+  const goProfile = () => { setOpen(false); navigate('/profile'); };
+  const handleLogout = async () => { setOpen(false); await logout(); };
 
   return (
     <nav className="ca-nav">
@@ -31,26 +51,86 @@ export default function Navbar() {
       ))}
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
         <TeamSelector />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {user?.avatar_url && (
-            <img
-              src={user.avatar_url}
-              alt=""
-              style={{ width: 28, height: 28, borderRadius: '50%' }}
-            />
+        <div ref={menuRef} style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'transparent', border: '1px solid transparent',
+              borderRadius: 999, padding: '4px 10px 4px 4px', cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              borderColor: open ? 'var(--border)' : 'transparent',
+            }}
+          >
+            {user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt=""
+                style={{ width: 28, height: 28, borderRadius: '50%' }}
+              />
+            ) : (
+              <span style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: 'var(--surface2)', display: 'inline-flex',
+                alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 600, color: 'var(--text)',
+              }}>
+                {(user?.display_name || user?.email || '?').slice(0, 1).toUpperCase()}
+              </span>
+            )}
+            <span style={{ fontSize: 11 }}>{user?.display_name}</span>
+            <span style={{ fontSize: 9, opacity: 0.6 }}>▾</span>
+          </button>
+          {open && (
+            <div
+              role="menu"
+              style={{
+                position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+                minWidth: 200, background: 'var(--surface)',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.18)', padding: 6, zIndex: 50,
+              }}
+            >
+              <div style={{
+                padding: '8px 10px', borderBottom: '1px solid var(--border)',
+                marginBottom: 4,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>
+                  {user?.display_name}
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                  {user?.email}
+                </div>
+              </div>
+              <MenuItem onClick={goProfile} label="Profile" />
+              <MenuItem onClick={handleLogout} label="Logout" />
+            </div>
           )}
-          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-            {user?.display_name}
-          </span>
         </div>
-        <button
-          className="ca-btn ca-btn-ghost"
-          style={{ padding: '6px 12px', fontSize: 10 }}
-          onClick={logout}
-        >
-          Logout
-        </button>
       </div>
     </nav>
+  );
+}
+
+function MenuItem({ onClick, label }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      style={{
+        display: 'block', width: '100%', textAlign: 'left',
+        background: 'transparent', border: 'none', cursor: 'pointer',
+        padding: '8px 10px', borderRadius: 6, fontSize: 11,
+        color: 'var(--text)',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface2)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+    >
+      {label}
+    </button>
   );
 }

@@ -17,6 +17,7 @@ import Products from './pages/Products';
 import Admin from './pages/Admin';
 import Team from './pages/Team';
 import Privacy from './pages/Privacy';
+import Profile from './pages/Profile';
 import Terms from './pages/Terms';
 import { useAuth } from './AuthContext';
 
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/suppliers" element={<Suppliers />} />
           <Route path="/suppliers/:supplierId/purchases" element={<SupplierPurchases />} />
           <Route path="/team" element={<Team />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
         </Route>
       </Routes>

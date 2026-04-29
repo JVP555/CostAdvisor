@@ -142,7 +142,10 @@ async def callback(request: Request, db: Session = Depends(get_db)):
         db.add(membership)
     else:
         user.last_login_at = datetime.now(timezone.utc)
-        user.display_name = display_name
+        # Don't overwrite display_name on returning users — they may have set
+        # their own in /profile. Only seed it if it was never populated.
+        if not user.display_name:
+            user.display_name = display_name
         user.avatar_url = avatar_url
 
     db.commit()
@@ -166,6 +169,26 @@ async def callback(request: Request, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserWithTeams)
 def get_me(current_user: User = Depends(get_current_user)):
     """Return the current authenticated user with their team memberships."""
+    return current_user
+
+
+@router.put("/me", response_model=UserOut)
+def update_me(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update the current user's editable profile fields."""
+    if "display_name" in payload:
+        name = (payload.get("display_name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="display_name cannot be empty")
+        if len(name) > 128:
+            raise HTTPException(status_code=400, detail="display_name too long")
+        current_user.display_name = name
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 
