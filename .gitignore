@@ -1,0 +1,47 @@
+# Secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/.env.local
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Celery
+celerybeat-schedule
+celerybeat-schedule.*
+celerybeat.pid
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Licensed / customer data — never commit
+*.xlsx
+*.xls
+*.csv
+!**/fixtures/*.csv
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+
+# Local SQLite (if any)
+*.db
+*.sqlite
+*.sqlite3
+
+/docs/
