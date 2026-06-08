@@ -75,7 +75,7 @@ a {
 
 .lp-btn-primary {
   background: var(--accent);
-  color: #060c09;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 .lp-btn-primary:hover {

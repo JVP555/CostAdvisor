@@ -1,3 +1,34 @@
+// ─── Theme system ─── mirrors frontend/src/utils/theme.js
+// Add new themes here and the landing page will pick them up automatically.
+const THEMES = [
+  { id: 'default',     label: 'Mint'        },
+  { id: 'light',       label: 'Paper'       },
+  { id: 'amber',       label: 'Amber'       },
+  { id: 'staminachem', label: 'StaminaChem' },
+];
+
+function applyTheme(id) {
+  if (!id || id === 'default') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.dataset.theme = id;
+  }
+  try { localStorage.setItem('ca_theme', id || 'default'); } catch {}
+  document.querySelectorAll('.lp-swatch').forEach((sw) => {
+    sw.classList.toggle('active', sw.dataset.themeId === (id || 'default'));
+  });
+}
+
+// Apply saved theme immediately — before DOMContentLoaded to avoid a flash.
+(function () {
+  let saved = 'default';
+  try { saved = localStorage.getItem('ca_theme') || 'default'; } catch {}
+  if (saved && saved !== 'default') {
+    document.documentElement.dataset.theme = saved;
+  }
+}());
+
+// ─── Auth probe ───
 // Check auth status — swap sign-in buttons to Dashboard if already signed in.
 // ca_token is HttpOnly so we probe /auth/me instead of reading the cookie.
 fetch('http://localhost:8000/auth/me', { credentials: 'include' })
@@ -30,6 +61,13 @@ fetch('http://localhost:8000/auth/me', { credentials: 'include' })
 // renders fully without JS (Googlebot sees all content), and animations are
 // treated as enhancement only.
 document.addEventListener('DOMContentLoaded', () => {
+  // Mark the current theme swatch as active and wire click handlers.
+  let currentTheme = 'default';
+  try { currentTheme = localStorage.getItem('ca_theme') || 'default'; } catch {}
+  document.querySelectorAll('.lp-swatch').forEach((sw) => {
+    sw.classList.toggle('active', sw.dataset.themeId === currentTheme);
+    sw.addEventListener('click', () => applyTheme(sw.dataset.themeId));
+  });
   const selectors = [
     '.lp-how-step',
     '.lp-feature-card',
