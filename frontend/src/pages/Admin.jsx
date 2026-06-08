@@ -214,26 +214,22 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
                   </td>
                   <td className="center">
                     <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                      {!u.deleted_at && (
+                      {!u.deleted_at && u.id !== currentUser?.id && (
                         <>
                           <button className="ca-btn ca-btn-ghost ca-btn-sm"
                             onClick={() => onToggleSuperAdmin(u.id, u.is_super_admin)}>
                             {u.is_super_admin ? 'Revoke Admin' : 'Make Admin'}
                           </button>
-                          {u.id !== currentUser?.id && (
-                            <>
-                              <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                                style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)' }}
-                                onClick={() => onImpersonate(u.id)}>
-                                Impersonate
-                              </button>
-                              <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                                style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
-                                onClick={() => onDelete(u)}>
-                                Delete
-                              </button>
-                            </>
-                          )}
+                          <button className="ca-btn ca-btn-ghost ca-btn-sm"
+                            style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)' }}
+                            onClick={() => onImpersonate(u.id)}>
+                            Impersonate
+                          </button>
+                          <button className="ca-btn ca-btn-ghost ca-btn-sm"
+                            style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                            onClick={() => onDelete(u)}>
+                            Delete
+                          </button>
                         </>
                       )}
                       {u.deleted_at && (

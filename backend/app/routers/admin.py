@@ -7,7 +7,7 @@ from sqlalchemy import or_
 from pydantic import BaseModel
 from jose import jwt, JWTError
 
-from app.database import get_db
+from app.database import get_db, bypass_rls_var
 from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.models.audit_log import AuditLog
@@ -61,7 +61,7 @@ def list_all_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_super_admin),
 ):
-    query = db.query(User)
+    query = db.query(User).filter(User.id != current_user.id)
     if not include_deleted:
         query = query.filter(User.deleted_at == None)  # noqa: E711
     if search:
@@ -105,6 +105,9 @@ def update_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_super_admin),
 ):
+    if user_id == current_user.id and data.is_super_admin is False:
+        raise HTTPException(status_code=400, detail="Cannot revoke your own super admin privileges")
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -237,6 +240,8 @@ def stop_impersonate(
         except (JWTError, KeyError, ValueError):
             pass
 
+    # Bypass RLS so the audit log insert can succeed without a user context set
+    bypass_rls_var.set(True)
     if admin_user_id and impersonated_user_id:
         team_id = _first_team_id(db, impersonated_user_id) or _first_team_id(db, admin_user_id)
         if team_id:
@@ -246,10 +251,12 @@ def stop_impersonate(
         db.commit()
 
     is_prod = settings.environment != "development"
+    samesite = "none" if is_prod else "lax"
     response.set_cookie("ca_token", admin_token, httponly=True, secure=is_prod,
-                        samesite="none" if is_prod else "lax", max_age=3600 * 24)
-    response.delete_cookie("ca_admin_token")
-    response.delete_cookie("ca_impersonating")
+                        samesite=samesite, max_age=3600 * 24)
+    # Must pass the same samesite/secure params used when setting, otherwise browsers ignore the delete
+    response.delete_cookie("ca_admin_token", httponly=True, secure=is_prod, samesite=samesite)
+    response.delete_cookie("ca_impersonating", httponly=False, secure=is_prod, samesite=samesite)
 
     return {"status": "restored"}
 
