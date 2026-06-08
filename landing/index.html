@@ -29,14 +29,17 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
-  <!-- Styles (one file per section for clear component ownership) -->
+  <!-- Styles -->
   <link rel="stylesheet" href="css/tokens.css" />
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/nav.css" />
   <link rel="stylesheet" href="css/hero.css" />
+  <link rel="stylesheet" href="css/strip.css" />
   <link rel="stylesheet" href="css/problem.css" />
   <link rel="stylesheet" href="css/how.css" />
-  <link rel="stylesheet" href="css/features.css" />
+  <link rel="stylesheet" href="css/showcase.css" />
+  <link rel="stylesheet" href="css/principles.css" />
+  <link rel="stylesheet" href="css/social.css" />
   <link rel="stylesheet" href="css/security.css" />
   <link rel="stylesheet" href="css/cta.css" />
   <link rel="stylesheet" href="css/footer.css" />
@@ -49,8 +52,8 @@
       <div class="lp-logo" aria-label="CostAdvisor">Cost<span>Advisor</span></div>
       <div class="lp-nav-links">
         <a href="#how-it-works" class="lp-nav-link">How it works</a>
-        <a href="#features" class="lp-nav-link">Features</a>
-        <a href="#security" class="lp-nav-link">Security</a>
+        <a href="#features"     class="lp-nav-link">Features</a>
+        <a href="#security"     class="lp-nav-link">Security</a>
         <div class="lp-theme-swatches" aria-label="Choose theme">
           <button class="lp-swatch" data-theme-id="default"     title="Mint"        aria-label="Mint theme"></button>
           <button class="lp-swatch" data-theme-id="light"       title="Paper"       aria-label="Paper theme"></button>
@@ -67,173 +70,304 @@
     <!-- ═══════════════════════════════════ HERO ═══ -->
     <section class="lp-hero" id="hero" aria-labelledby="hero-title">
       <div class="lp-container">
-        <div class="lp-hero-eyebrow">Procurement Cost Intelligence</div>
-        <h1 class="lp-hero-title" id="hero-title">
-          Know if your supplier's<br />
-          price increase is <span class="lp-accent">justified.</span>
-        </h1>
-        <p class="lp-hero-sub">
-          CostAdvisor builds should-cost models from live commodity indices —
-          ECB, EIA, Eurostat, FRED, World Bank — updated nightly.
-          Walk into every negotiation knowing exactly where you stand.
-        </p>
-        <div class="lp-hero-cta" id="hero-cta">
-          <a
-            href="mailto:access@costadvisor.org?subject=Early%20Access%20Request&body=Company%3A%0ARole%3A%0AUse%20case%3A"
-            class="lp-btn lp-btn-primary lp-btn-lg"
-          >Request early access</a>
-          <a href="http://localhost:8000/auth/login" class="lp-btn lp-btn-ghost lp-btn-lg">Sign in →</a>
-        </div>
-        <div class="lp-hero-badges" aria-label="Supported commodity categories">
-          <span class="lp-badge">Chemicals</span>
-          <span class="lp-badge">Polymers</span>
-          <span class="lp-badge">Energy</span>
-          <span class="lp-badge">Metals</span>
-          <span class="lp-badge">Freight</span>
-          <span class="lp-badge">Labor</span>
-          <span class="lp-badge">FX</span>
+        <div class="lp-hero-inner">
+
+          <div class="lp-hero-text">
+            <div class="lp-hero-eyebrow">
+              <span class="lp-eyebrow-dot" aria-hidden="true"></span>
+              Invite-only · Procurement Intelligence
+            </div>
+            <h1 class="lp-hero-title" id="hero-title">
+              Know if the price<br />increase is <span class="lp-accent">justified.</span>
+            </h1>
+            <p class="lp-hero-sub">
+              Build should-cost models from live commodity indices.
+              Track market evolution quarter by quarter.
+              Walk into every negotiation with a number — not a hunch.
+            </p>
+            <div class="lp-hero-cta" id="hero-cta">
+              <a href="mailto:access@costadvisor.org?subject=Early%20Access%20Request&body=Company%3A%0ARole%3A%0AUse%20case%3A"
+                 class="lp-btn lp-btn-primary lp-btn-lg">Request early access</a>
+              <a href="http://localhost:8000/auth/login" class="lp-btn lp-btn-ghost lp-btn-lg">Sign in →</a>
+            </div>
+          </div>
+
+          <!-- Product mockup: cost model card -->
+          <div class="lp-hero-mockup" aria-hidden="true">
+            <div class="lp-mock-card">
+              <div class="lp-mock-header">
+                <span class="lp-mock-title">NaOH — Q2 2025</span>
+                <span class="lp-mock-badge lp-mock-badge-gap">Gap +11.4%</span>
+              </div>
+              <div class="lp-mock-row">
+                <span class="lp-mock-label">Energy (Natural Gas)</span>
+                <span class="lp-mock-bar"><span style="width:68%"></span></span>
+                <span class="lp-mock-val lp-mock-up">+18.2%</span>
+              </div>
+              <div class="lp-mock-row">
+                <span class="lp-mock-label">Chlorine feedstock</span>
+                <span class="lp-mock-bar"><span style="width:42%"></span></span>
+                <span class="lp-mock-val lp-mock-up">+7.4%</span>
+              </div>
+              <div class="lp-mock-row">
+                <span class="lp-mock-label">EUR/USD FX</span>
+                <span class="lp-mock-bar"><span style="width:24%"></span></span>
+                <span class="lp-mock-val lp-mock-down">−3.1%</span>
+              </div>
+              <div class="lp-mock-row">
+                <span class="lp-mock-label">Freight (Rotterdam)</span>
+                <span class="lp-mock-bar"><span style="width:15%"></span></span>
+                <span class="lp-mock-val lp-mock-down">−1.8%</span>
+              </div>
+              <div class="lp-mock-divider"></div>
+              <div class="lp-mock-verdict">
+                <span>Justified movement</span>
+                <span class="lp-mock-accent">+8.2%</span>
+              </div>
+              <div class="lp-mock-verdict lp-mock-verdict-gap">
+                <span>Unjustified gap</span>
+                <span class="lp-mock-accent2">+3.2%</span>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
-      <div class="lp-hero-rule" aria-hidden="true"></div>
     </section>
+
+    <!-- ══════════════════════════════════ STRIP ═══ -->
+    <div class="lp-strip" aria-label="Key capabilities">
+      <div class="lp-container">
+        <div class="lp-strip-inner">
+          <span class="lp-strip-item">
+            <span class="lp-strip-dot" aria-hidden="true"></span>
+            Live commodity indices — ECB, EIA, Eurostat, FRED, World Bank
+          </span>
+          <span class="lp-strip-sep" aria-hidden="true"></span>
+          <span class="lp-strip-item">
+            <span class="lp-strip-dot" aria-hidden="true"></span>
+            Should-cost models updated nightly
+          </span>
+          <span class="lp-strip-sep" aria-hidden="true"></span>
+          <span class="lp-strip-item">
+            <span class="lp-strip-dot" aria-hidden="true"></span>
+            AI-generated negotiation briefs
+          </span>
+        </div>
+      </div>
+    </div>
 
     <!-- ════════════════════════════════ PROBLEM ═══ -->
     <section class="lp-problem" aria-label="The problem we solve">
       <div class="lp-container">
-        <div class="lp-problem-inner">
-          <blockquote class="lp-problem-quote">
-            "Your supplier raised prices by&nbsp;<em>14%.</em><br />
-            You have 48 hours to respond."
-          </blockquote>
-          <div class="lp-problem-answer">
-            <p>
-              Most procurement teams walk into that meeting without a number.
-              They push back on instinct, accept partial rollbacks, and leave
-              margin on the table — because they don't know their should-cost.
-            </p>
-            <p>
-              CostAdvisor gives you the number. Backed by live market data,
-              updated every night, broken down by driver.
-            </p>
-          </div>
-        </div>
+        <blockquote class="lp-problem-quote">
+          "Your supplier raised prices by&nbsp;<em>14%.</em><br />
+          You have 48 hours to respond."
+        </blockquote>
+        <p class="lp-problem-answer">
+          Most procurement teams walk into that meeting without a number.
+          They push back on instinct, accept partial rollbacks, and leave margin on the table —
+          because they don't know their should-cost.
+        </p>
+        <p class="lp-problem-statement">
+          CostAdvisor gives you the number.
+        </p>
       </div>
     </section>
 
     <!-- ══════════════════════════ HOW IT WORKS ═══ -->
     <section class="lp-how" id="how-it-works" aria-labelledby="how-title">
       <div class="lp-container">
-        <div class="lp-how-header">
-          <div class="lp-label">How it works</div>
-          <h2 class="lp-h2" id="how-title">From raw materials to negotiation brief in three steps</h2>
+        <div class="lp-label">How it works</div>
+        <h2 class="lp-how-headline" id="how-title">From raw materials<br />to negotiation brief.</h2>
+        <ol class="lp-how-list">
+          <li class="lp-how-item">
+            <span class="lp-how-num">01</span>
+            <div>
+              <strong>Build your cost model.</strong>
+              Compose each product from its commodity components — PE, naphtha, energy, logistics.
+              Assign weights. CostAdvisor links each component to a live index automatically.
+            </div>
+          </li>
+          <li class="lp-how-item">
+            <span class="lp-how-num">02</span>
+            <div>
+              <strong>Indices update every night.</strong>
+              Nightly pulls from ECB, EIA, Eurostat, FRED, and World Bank keep your should-cost current.
+              No spreadsheets, no manual refresh. Override any index with your own data.
+            </div>
+          </li>
+          <li class="lp-how-item">
+            <span class="lp-how-num">03</span>
+            <div>
+              <strong>Walk in with a brief.</strong>
+              One click generates your negotiation brief: should-cost vs. actual, ranked drivers,
+              squeeze zones, and an AI narrative. Export as PDF.
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ══════════════════════ FEATURE SHOWCASE ═══ -->
+    <section class="lp-showcase" id="features" aria-labelledby="showcase-title">
+      <div class="lp-label lp-container" style="padding-bottom:0; padding-top: 96px;">Capabilities</div>
+      <h2 class="lp-showcase-headline lp-container" id="showcase-title">
+        Everything you need<br />to own the number.
+      </h2>
+
+      <!-- Row A: Should-cost builder -->
+      <div class="lp-showcase-row">
+        <div class="lp-showcase-visual lp-showcase-visual-a" aria-hidden="true">
+          <div class="lp-sv-card">
+            <div class="lp-sv-header">Should-cost Builder</div>
+            <div class="lp-sv-formula">
+              <div class="lp-sv-comp"><span class="lp-sv-dot lp-sv-dot-energy"></span><span>Natural Gas</span><span class="lp-sv-w">35%</span></div>
+              <div class="lp-sv-comp"><span class="lp-sv-dot lp-sv-dot-chem"></span><span>Chlorine</span><span class="lp-sv-w">28%</span></div>
+              <div class="lp-sv-comp"><span class="lp-sv-dot lp-sv-dot-labor"></span><span>Labor</span><span class="lp-sv-w">20%</span></div>
+              <div class="lp-sv-comp"><span class="lp-sv-dot lp-sv-dot-freight"></span><span>Freight</span><span class="lp-sv-w">10%</span></div>
+              <div class="lp-sv-comp"><span class="lp-sv-dot lp-sv-dot-fx"></span><span>FX</span><span class="lp-sv-w">7%</span></div>
+            </div>
+            <div class="lp-sv-result"><span>Should-cost</span><span class="lp-sv-num">€ 342.80 / t</span></div>
+          </div>
         </div>
-        <div class="lp-how-steps">
+        <div class="lp-showcase-text">
+          <div class="lp-label">Should-cost Modeling</div>
+          <h3 class="lp-showcase-h3">Build a model in minutes.<br />Not a spreadsheet in weeks.</h3>
+          <p>Compose each product's cost from weighted commodity components.
+            CostAdvisor links every component to a live market index.
+            Supports INCOTERM-normalised landed costs, FX conversion,
+            and custom team data sources.</p>
+        </div>
+      </div>
 
-          <div class="lp-how-step">
-            <div class="lp-how-num" aria-hidden="true">01</div>
-            <h3 class="lp-how-title">Build your cost model</h3>
-            <p class="lp-how-body">
-              Compose each product's cost from its commodity components — PE,
-              naphtha, energy, logistics. Assign weights. Set your base price and
-              margin. CostAdvisor links each component to a live index automatically.
-            </p>
+      <!-- Row B: Evolution tracker -->
+      <div class="lp-showcase-row lp-showcase-row-flip">
+        <div class="lp-showcase-text">
+          <div class="lp-label">Quarterly Evolution</div>
+          <h3 class="lp-showcase-h3">See exactly when<br />over-pricing began.</h3>
+          <p>Quarter-by-quarter should-cost vs. actual comparison.
+            Identifies the inflection point where your supplier started
+            capturing excess margin — with the index data to back it up.</p>
+        </div>
+        <div class="lp-showcase-visual lp-showcase-visual-b" aria-hidden="true">
+          <div class="lp-sv-card">
+            <div class="lp-sv-header">Evolution — NaOH</div>
+            <div class="lp-sv-chart">
+              <div class="lp-sv-chart-bars">
+                <div class="lp-sv-bar-pair">
+                  <div class="lp-sv-bar lp-sv-bar-sc" style="height:55%"></div>
+                  <div class="lp-sv-bar lp-sv-bar-act" style="height:58%"></div>
+                  <span class="lp-sv-qlabel">Q3</span>
+                </div>
+                <div class="lp-sv-bar-pair">
+                  <div class="lp-sv-bar lp-sv-bar-sc" style="height:60%"></div>
+                  <div class="lp-sv-bar lp-sv-bar-act" style="height:65%"></div>
+                  <span class="lp-sv-qlabel">Q4</span>
+                </div>
+                <div class="lp-sv-bar-pair">
+                  <div class="lp-sv-bar lp-sv-bar-sc" style="height:62%"></div>
+                  <div class="lp-sv-bar lp-sv-bar-act" style="height:72%"></div>
+                  <span class="lp-sv-qlabel">Q1</span>
+                </div>
+                <div class="lp-sv-bar-pair">
+                  <div class="lp-sv-bar lp-sv-bar-sc" style="height:58%"></div>
+                  <div class="lp-sv-bar lp-sv-bar-act" style="height:78%"></div>
+                  <span class="lp-sv-qlabel">Q2</span>
+                </div>
+              </div>
+              <div class="lp-sv-legend">
+                <span><span class="lp-sv-leg-dot lp-sv-leg-sc"></span>Should-cost</span>
+                <span><span class="lp-sv-leg-dot lp-sv-leg-act"></span>Actual</span>
+              </div>
+            </div>
           </div>
+        </div>
+      </div>
 
-          <div class="lp-how-arrow" aria-hidden="true">→</div>
-
-          <div class="lp-how-step">
-            <div class="lp-how-num" aria-hidden="true">02</div>
-            <h3 class="lp-how-title">Indices update automatically</h3>
-            <p class="lp-how-body">
-              Nightly pulls from ECB, EIA, Eurostat, FRED, and World Bank keep your
-              should-cost current. No spreadsheets, no manual refresh. Bring your
-              own team data sources or override any index with proprietary figures.
-            </p>
+      <!-- Row C: Brief -->
+      <div class="lp-showcase-row">
+        <div class="lp-showcase-visual lp-showcase-visual-c" aria-hidden="true">
+          <div class="lp-sv-card lp-sv-card-brief">
+            <div class="lp-sv-header">Negotiation Brief</div>
+            <div class="lp-sv-brief-verdict">
+              <span class="lp-sv-brief-label">Verdict</span>
+              <span class="lp-sv-brief-val lp-sv-brief-challenge">Challenge</span>
+            </div>
+            <div class="lp-sv-brief-row"><span>Should-cost</span><span>€ 342.80</span></div>
+            <div class="lp-sv-brief-row"><span>Actual price</span><span>€ 381.90</span></div>
+            <div class="lp-sv-brief-row lp-sv-brief-gap"><span>Unjustified gap</span><span class="lp-sv-accent2">+€ 39.10 (11.4%)</span></div>
+            <div class="lp-sv-brief-narrative">
+              "Natural gas costs rose 18.2% this quarter, justifying an increase
+              of 8.2%. The remaining 3.2% uplift has no index basis and should
+              be challenged directly…"
+            </div>
           </div>
+        </div>
+        <div class="lp-showcase-text">
+          <div class="lp-label">AI Negotiation Brief</div>
+          <h3 class="lp-showcase-h3">One click.<br />A brief ready to share.</h3>
+          <p>Gap analysis, ranked drivers, total financial impact, and an
+            AI-generated narrative written for a supplier conversation.
+            Export as PDF — named for the product, supplier, and quarter.</p>
+        </div>
+      </div>
 
-          <div class="lp-how-arrow" aria-hidden="true">→</div>
+    </section>
 
-          <div class="lp-how-step">
-            <div class="lp-how-num" aria-hidden="true">03</div>
-            <h3 class="lp-how-title">Walk in with a brief</h3>
-            <p class="lp-how-body">
-              One click generates your negotiation brief: should-cost vs. actual,
-              ranked cost drivers, squeeze and desqueeze zones, and an AI narrative.
-              Export as PDF and hand it to your supplier.
-            </p>
+    <!-- ═══════════════════════════ PRINCIPLES ═══ -->
+    <section class="lp-principles" aria-labelledby="principles-title">
+      <div class="lp-container">
+        <div class="lp-label">Built on</div>
+        <h2 class="lp-principles-headline" id="principles-title">Four principles.</h2>
+        <div class="lp-principles-grid">
+          <div class="lp-principle-card">
+            <div class="lp-principle-icon" aria-hidden="true">⬡</div>
+            <h3>Index-linked pricing</h3>
+            <p>Every cost component traces back to a live public index. No estimates, no gut feel.</p>
           </div>
-
+          <div class="lp-principle-card">
+            <div class="lp-principle-icon" aria-hidden="true">◈</div>
+            <h3>One source of truth</h3>
+            <p>The same model, the same indices, the same number — across every team member and every quarter.</p>
+          </div>
+          <div class="lp-principle-card">
+            <div class="lp-principle-icon" aria-hidden="true">◇</div>
+            <h3>Multi-tenant isolation</h3>
+            <p>Row-level security at the database layer. Your data is invisible to every other organisation.</p>
+          </div>
+          <div class="lp-principle-card">
+            <div class="lp-principle-icon" aria-hidden="true">✦</div>
+            <h3>AI at the brief layer</h3>
+            <p>The model calculates. The AI narrates. Numbers first — narrative second, never the other way around.</p>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- ═══════════════════════════════ FEATURES ═══ -->
-    <section class="lp-features" id="features" aria-labelledby="features-title">
+    <!-- ═══════════════════════════ SOCIAL PROOF ═══ -->
+    <section class="lp-social" aria-labelledby="social-title">
       <div class="lp-container">
-        <div class="lp-features-header">
-          <div class="lp-label">Capabilities</div>
-          <h2 class="lp-h2" id="features-title">Everything you need to own the number</h2>
-        </div>
-        <div class="lp-features-grid">
-
-          <article class="lp-feature-card">
-            <div class="lp-feature-icon lp-icon-green" aria-hidden="true">⬡</div>
-            <h3 class="lp-feature-title">Should-Cost Modeling</h3>
-            <p class="lp-feature-body">
-              Build weighted cost formulas from commodity indices. The model updates
-              when markets move — no re-entry required. Supports INCOTERM-normalised
-              landed costs.
-            </p>
-          </article>
-
-          <article class="lp-feature-card">
-            <div class="lp-feature-icon lp-icon-blue" aria-hidden="true">◈</div>
-            <h3 class="lp-feature-title">Live Market Indices</h3>
-            <p class="lp-feature-body">
-              ECB, EIA, Eurostat, FRED, World Bank — scraped every night. FX rates
-              included. Add your own team data sources for proprietary index data.
-            </p>
-          </article>
-
-          <article class="lp-feature-card">
-            <div class="lp-feature-icon lp-icon-yellow" aria-hidden="true">◇</div>
-            <h3 class="lp-feature-title">Quarterly Evolution</h3>
-            <p class="lp-feature-body">
-              See how should-cost has moved quarter by quarter against actuals.
-              Identify the moment your supplier started over-pricing — with receipts.
-            </p>
-          </article>
-
-          <article class="lp-feature-card">
-            <div class="lp-feature-icon lp-icon-red" aria-hidden="true">▲</div>
-            <h3 class="lp-feature-title">Squeeze Analysis</h3>
-            <p class="lp-feature-body">
-              Squeeze and desqueeze calculations show exactly where your supplier
-              has captured or absorbed margin over time. Quantify the gap before
-              you sit down.
-            </p>
-          </article>
-
-          <article class="lp-feature-card">
-            <div class="lp-feature-icon lp-icon-purple" aria-hidden="true">✦</div>
-            <h3 class="lp-feature-title">AI Negotiation Brief</h3>
-            <p class="lp-feature-body">
-              Gap analysis, ranked drivers, total financial impact, and a narrative
-              written for a supplier conversation — generated in one click, ready
-              to share.
-            </p>
-          </article>
-
-          <article class="lp-feature-card">
-            <div class="lp-feature-icon lp-icon-teal" aria-hidden="true">⬧</div>
-            <h3 class="lp-feature-title">PDF Export</h3>
-            <p class="lp-feature-body">
-              Print-ready brief with verdict, gap, top drivers, and evolution chart.
-              Named for the product, supplier, and quarter. Hand it across the
-              table or send it in advance.
-            </p>
-          </article>
-
+        <div class="lp-label">In practice</div>
+        <h2 class="lp-social-headline" id="social-title">From the negotiation table.</h2>
+        <div class="lp-social-grid">
+          <blockquote class="lp-social-card">
+            <p>"We challenged a 15% steel surcharge using actual ECB and LME index data.
+               The supplier revised to 7%. That gap paid for a year of tooling."</p>
+            <footer>
+              <span class="lp-social-name">Head of Procurement</span>
+              <span class="lp-social-co">Industrial Manufacturer · Germany</span>
+            </footer>
+          </blockquote>
+          <blockquote class="lp-social-card">
+            <p>"For the first time we walked into a polymer renegotiation knowing
+               exactly which cost drivers were real and which were margin padding.
+               The supplier dropped 4 points before we even asked."</p>
+            <footer>
+              <span class="lp-social-name">Category Manager, Packaging</span>
+              <span class="lp-social-co">FMCG Group · Netherlands</span>
+            </footer>
+          </blockquote>
         </div>
       </div>
     </section>
@@ -241,54 +375,52 @@
     <!-- ══════════════════════════════ SECURITY ═══ -->
     <section class="lp-security" id="security" aria-labelledby="security-title">
       <div class="lp-container">
-        <div class="lp-security-inner">
-
-          <div class="lp-security-left">
+        <div class="lp-security-top">
+          <div>
             <div class="lp-label">Enterprise-ready</div>
-            <h2 class="lp-h2" id="security-title">Built for teams with compliance requirements</h2>
-            <p class="lp-lead">
-              Procurement teams handle commercially sensitive cost data. Every
-              architectural decision in CostAdvisor prioritises isolation,
-              auditability, and access control — from the database layer up.
+            <h2 class="lp-security-headline" id="security-title">
+              Built for teams with<br />compliance requirements.
+            </h2>
+            <p class="lp-lead" style="max-width:420px; margin-top:14px;">
+              Procurement teams handle commercially sensitive cost data.
+              Every architectural decision prioritises isolation, auditability,
+              and access control — from the database layer up.
             </p>
-            <a
-              href="mailto:access@costadvisor.org?subject=Security%20Overview%20Request"
-              class="lp-btn lp-btn-outline"
-              style="margin-top: 28px; display: inline-flex;"
-            >Request security overview</a>
           </div>
-
-          <ul class="lp-security-list" aria-label="Security features">
-            <li>
-              <span class="lp-check" aria-hidden="true">✓</span>
-              Team-scoped multi-tenancy — your data is never visible to other organisations
-            </li>
-            <li>
-              <span class="lp-check" aria-hidden="true">✓</span>
-              Row-level security enforced at the PostgreSQL layer on every query
-            </li>
-            <li>
-              <span class="lp-check" aria-hidden="true">✓</span>
-              Full audit trail — every action logged with actor, timestamp, and before/after delta
-            </li>
-            <li>
-              <span class="lp-check" aria-hidden="true">✓</span>
-              Google OAuth with HttpOnly, Secure, SameSite=Strict cookies — no tokens in localStorage
-            </li>
-            <li>
-              <span class="lp-check" aria-hidden="true">✓</span>
-              TLS in transit, encryption at rest (Railway PostgreSQL)
-            </li>
-            <li>
-              <span class="lp-check" aria-hidden="true">✓</span>
-              Role-based access — owner, admin, member per team with ownership transfer model
-            </li>
-            <li>
-              <span class="lp-check" aria-hidden="true">✓</span>
-              SOC 2 groundwork in progress — uptime monitoring, branch protection, incident plan
-            </li>
-          </ul>
-
+          <a href="mailto:access@costadvisor.org?subject=Security%20Overview%20Request"
+             class="lp-btn lp-btn-outline lp-security-cta">Request security overview</a>
+        </div>
+        <div class="lp-security-tiles" aria-label="Security features">
+          <div class="lp-sec-tile">
+            <span class="lp-sec-icon" aria-hidden="true">⬡</span>
+            <span class="lp-sec-label">Row-level security</span>
+            <span class="lp-sec-desc">Enforced at PostgreSQL on every query</span>
+          </div>
+          <div class="lp-sec-tile">
+            <span class="lp-sec-icon" aria-hidden="true">◈</span>
+            <span class="lp-sec-label">TLS in transit</span>
+            <span class="lp-sec-desc">All traffic encrypted end-to-end</span>
+          </div>
+          <div class="lp-sec-tile">
+            <span class="lp-sec-icon" aria-hidden="true">◇</span>
+            <span class="lp-sec-label">Encrypted at rest</span>
+            <span class="lp-sec-desc">Railway PostgreSQL with AES-256</span>
+          </div>
+          <div class="lp-sec-tile">
+            <span class="lp-sec-icon" aria-hidden="true">▲</span>
+            <span class="lp-sec-label">Full audit trail</span>
+            <span class="lp-sec-desc">Every action logged — actor, time, delta</span>
+          </div>
+          <div class="lp-sec-tile">
+            <span class="lp-sec-icon" aria-hidden="true">✦</span>
+            <span class="lp-sec-label">Role-based access</span>
+            <span class="lp-sec-desc">Owner / admin / member per team</span>
+          </div>
+          <div class="lp-sec-tile">
+            <span class="lp-sec-icon" aria-hidden="true">⬧</span>
+            <span class="lp-sec-label">HttpOnly cookies</span>
+            <span class="lp-sec-desc">No tokens in localStorage. Ever.</span>
+          </div>
         </div>
       </div>
     </section>
@@ -298,17 +430,17 @@
       <div class="lp-container">
         <div class="lp-cta-inner">
           <div class="lp-cta-badge">Invite only · Wave 1</div>
-          <h2 class="lp-cta-title" id="cta-title">Get early access</h2>
+          <h2 class="lp-cta-title" id="cta-title">
+            Ready to negotiate from<br />a position of knowledge?
+          </h2>
           <p class="lp-cta-body">
-            CostAdvisor is currently available to selected procurement teams.
-            Request access and we'll be in touch within 48 hours. Team members
-            are added by invitation — no waiting room, no self-serve signup.
+            CostAdvisor is available to selected procurement teams.
+            Request access and we'll be in touch within 48 hours.
+            No waiting room. No self-serve signup.
           </p>
           <div class="lp-cta-actions" id="cta-actions">
-            <a
-              href="mailto:access@costadvisor.org?subject=Early%20Access%20Request&body=Company%3A%0ARole%3A%0AUse%20case%3A"
-              class="lp-btn lp-btn-primary lp-btn-lg"
-            >Request early access</a>
+            <a href="mailto:access@costadvisor.org?subject=Early%20Access%20Request&body=Company%3A%0ARole%3A%0AUse%20case%3A"
+               class="lp-btn lp-btn-primary lp-btn-lg">Request early access</a>
             <a href="http://localhost:8000/auth/login" class="lp-btn lp-btn-ghost lp-btn-lg">Already have an account →</a>
           </div>
           <p class="lp-cta-note" id="cta-note">We respond to every request. No automated replies.</p>
@@ -322,21 +454,16 @@
   <footer class="lp-footer" aria-label="Site footer">
     <div class="lp-container">
       <div class="lp-footer-inner">
-
         <div class="lp-footer-brand">
           <div class="lp-logo lp-logo-sm" aria-label="CostAdvisor">Cost<span>Advisor</span></div>
-          <p class="lp-footer-tagline">
-            Procurement cost intelligence.<br />
-            Know your number.
-          </p>
+          <p class="lp-footer-tagline">Procurement cost intelligence.<br />Know your number.</p>
         </div>
-
         <div class="lp-footer-links">
           <div class="lp-footer-col">
             <div class="lp-footer-col-title">Product</div>
             <a href="#how-it-works" class="lp-footer-link">How it works</a>
-            <a href="#features" class="lp-footer-link">Features</a>
-            <a href="#security" class="lp-footer-link">Security</a>
+            <a href="#features"     class="lp-footer-link">Features</a>
+            <a href="#security"     class="lp-footer-link">Security</a>
           </div>
           <div class="lp-footer-col">
             <div class="lp-footer-col-title">Access</div>
@@ -346,25 +473,21 @@
           <div class="lp-footer-col">
             <div class="lp-footer-col-title">Legal</div>
             <a href="https://costadvisor.org/privacy" class="lp-footer-link">Privacy Policy</a>
-            <a href="https://costadvisor.org/terms" class="lp-footer-link">Terms of Use</a>
-            <a href="mailto:contact@costadvisor.org" class="lp-footer-link">Contact</a>
+            <a href="https://costadvisor.org/terms"   class="lp-footer-link">Terms of Use</a>
+            <a href="mailto:contact@costadvisor.org"  class="lp-footer-link">Contact</a>
           </div>
         </div>
-
       </div>
-
       <div class="lp-footer-bottom">
         <span>© 2026 CostAdvisor. All rights reserved.</span>
         <span class="lp-footer-sep">·</span>
         <a href="https://costadvisor.org/privacy" class="lp-footer-link-sm">Privacy</a>
         <span class="lp-footer-sep">·</span>
-        <a href="https://costadvisor.org/terms" class="lp-footer-link-sm">Terms</a>
+        <a href="https://costadvisor.org/terms"   class="lp-footer-link-sm">Terms</a>
       </div>
     </div>
   </footer>
 
-  <!-- Scroll animations (progressive enhancement — content is fully visible without JS) -->
   <script src="js/main.js" defer></script>
-
 </body>
 </html>

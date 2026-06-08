@@ -1,0 +1,269 @@
+.lp-showcase {
+  padding-bottom: 120px;
+  border-bottom: 1px solid var(--border);
+}
+
+.lp-showcase-headline {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(32px, 4.5vw, 56px);
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  line-height: 1.08;
+  margin: 14px 0 72px;
+}
+
+/* ─── Alternating rows ─── */
+.lp-showcase-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+  padding: 80px 0;
+  border-top: 1px solid var(--border);
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding-left: 40px;
+  padding-right: 40px;
+}
+
+.lp-showcase-row-flip {
+  direction: rtl;
+}
+.lp-showcase-row-flip > * {
+  direction: ltr;
+}
+
+/* ─── Text side ─── */
+.lp-showcase-text p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.9;
+  margin-top: 16px;
+  max-width: 400px;
+}
+
+.lp-showcase-h3 {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(22px, 2.8vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.15;
+  margin-top: 10px;
+}
+
+/* ─── Visual cards ─── */
+.lp-showcase-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.lp-sv-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px 26px;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+
+.lp-sv-header {
+  font-family: 'Syne', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ─── Card A: formula builder ─── */
+.lp-sv-formula {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.lp-sv-comp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.lp-sv-comp span:nth-child(2) { flex: 1; }
+
+.lp-sv-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.lp-sv-dot-energy  { background: var(--accent3); }
+.lp-sv-dot-chem    { background: var(--accent);  }
+.lp-sv-dot-labor   { background: var(--accent4); }
+.lp-sv-dot-freight { background: var(--accent2); }
+.lp-sv-dot-fx      { background: var(--accent5); }
+
+.lp-sv-w {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  text-align: right;
+  min-width: 28px;
+}
+
+.lp-sv-result {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.lp-sv-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* ─── Card B: evolution chart ─── */
+.lp-sv-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lp-sv-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  height: 100px;
+}
+
+.lp-sv-bar-pair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.lp-sv-bar-pair {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 3px;
+  flex: 1;
+  position: relative;
+}
+
+.lp-sv-bar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  min-height: 8px;
+}
+
+.lp-sv-bar-sc  { background: var(--accent-dim); border: 1px solid var(--accent); }
+.lp-sv-bar-act { background: rgba(255,107,107,0.15); border: 1px solid var(--accent2); }
+
+.lp-sv-qlabel {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.lp-sv-legend {
+  display: flex;
+  gap: 18px;
+  font-size: 10px;
+  color: var(--muted);
+  padding-top: 8px;
+  margin-top: 10px;
+}
+
+.lp-sv-legend span { display: flex; align-items: center; gap: 6px; }
+
+.lp-sv-leg-dot {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.lp-sv-leg-sc  { background: var(--accent);  opacity: 0.4; }
+.lp-sv-leg-act { background: var(--accent2); opacity: 0.5; }
+
+/* ─── Card C: brief ─── */
+.lp-sv-brief-verdict {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-radius: 8px;
+}
+
+.lp-sv-brief-label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.lp-sv-brief-challenge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent2);
+  background: rgba(255,107,107,0.1);
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+
+.lp-sv-brief-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.lp-sv-brief-gap span:first-child { color: var(--text); font-weight: 600; }
+
+.lp-sv-accent2 { color: var(--accent2); font-weight: 700; }
+
+.lp-sv-brief-narrative {
+  margin-top: 14px;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.7;
+  font-style: italic;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+}
+
+@media (max-width: 900px) {
+  .lp-showcase-row,
+  .lp-showcase-row-flip {
+    grid-template-columns: 1fr;
+    direction: ltr;
+    gap: 40px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .lp-sv-card { max-width: 100%; }
+}

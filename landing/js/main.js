@@ -69,12 +69,16 @@ document.addEventListener('DOMContentLoaded', () => {
     sw.addEventListener('click', () => applyTheme(sw.dataset.themeId));
   });
   const selectors = [
-    '.lp-how-step',
-    '.lp-feature-card',
-    '.lp-security-list li',
+    '.lp-how-item',
+    '.lp-showcase-row',
+    '.lp-principle-card',
+    '.lp-social-card',
+    '.lp-sec-tile',
     '.lp-cta-inner',
     '.lp-problem-quote',
     '.lp-problem-answer',
+    '.lp-problem-statement',
+    '.lp-strip',
   ];
 
   const elements = document.querySelectorAll(selectors.join(', '));
@@ -82,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
   elements.forEach((el) => el.classList.add('lp-reveal'));
 
   // Stagger siblings inside the same parent
-  document.querySelectorAll('.lp-features-grid, .lp-how-steps, .lp-security-list').forEach((container) => {
+  document.querySelectorAll('.lp-principles-grid, .lp-social-grid, .lp-security-tiles, .lp-how-list').forEach((container) => {
     Array.from(container.children).forEach((child, i) => {
       child.style.transitionDelay = `${i * 60}ms`;
     });

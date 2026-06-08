@@ -1,5 +1,5 @@
 .lp-cta {
-  padding: var(--section-pad);
+  padding: 120px 0;
   position: relative;
   overflow: hidden;
 }
@@ -12,7 +12,7 @@
   transform: translateX(-50%);
   width: 800px;
   height: 500px;
-  background: radial-gradient(ellipse, rgba(79, 255, 176, 0.05) 0%, transparent 65%);
+  background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 65%);
   pointer-events: none;
 }
 
@@ -39,6 +39,7 @@
   font-weight: 600;
   margin-bottom: 24px;
 }
+
 .lp-cta-badge::before {
   content: '';
   width: 6px;
@@ -50,11 +51,11 @@
 
 .lp-cta-title {
   font-family: 'Syne', sans-serif;
-  font-size: clamp(36px, 5vw, 52px);
+  font-size: clamp(32px, 4.5vw, 52px);
   font-weight: 800;
   letter-spacing: -1.2px;
-  line-height: 1.05;
-  margin-bottom: 18px;
+  line-height: 1.1;
+  margin-bottom: 20px;
 }
 
 .lp-cta-body {
