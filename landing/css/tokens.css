@@ -16,6 +16,13 @@
   --on-accent: #0d1117;
   --nav-glass-bg: rgba(10, 12, 16, 0.85);
   --accent-glow: rgba(79, 255, 176, 0.07);
+  --cat-energy:   #F0A35B;
+  --cat-chemical: #A35BF0;
+  --cat-labor:    #5BF0A3;
+  --cat-fx:       #F0F05B;
+  --cat-metal:    #5B8AF0;
+  --cat-ppi:      #F05B8A;
+  --cat-freight:  #8AF05B;
   --radius: 12px;
   --radius-lg: 16px;
   --max-w: 1180px;
@@ -23,6 +30,13 @@
 }
 
 [data-theme="light"] {
+  --cat-energy:   #b86a1a;
+  --cat-chemical: #6a3aa0;
+  --cat-labor:    #1f8a5b;
+  --cat-fx:       #897000;
+  --cat-metal:    #2a6ebf;
+  --cat-ppi:      #a83660;
+  --cat-freight:  #5b8a23;
   --bg: #f6f7f9;
   --surface: #ffffff;
   --surface2: #f0f1f5;
@@ -43,6 +57,13 @@
 }
 
 [data-theme="amber"] {
+  --cat-energy:   #ffa55c;
+  --cat-chemical: #c79bf0;
+  --cat-labor:    #9bf0c7;
+  --cat-fx:       #f0e68c;
+  --cat-metal:    #8a9af0;
+  --cat-ppi:      #f08aac;
+  --cat-freight:  #b0e07a;
   --bg: #1a130d;
   --surface: #221a12;
   --surface2: #2c2218;
@@ -63,6 +84,13 @@
 }
 
 [data-theme="staminachem"] {
+  --cat-energy:   #c8911a;
+  --cat-chemical: #6a3aa0;
+  --cat-labor:    #00A99D;
+  --cat-fx:       #897000;
+  --cat-metal:    #2596be;
+  --cat-ppi:      #b54a7c;
+  --cat-freight:  #5b8a23;
   --bg: #f5f7fa;
   --surface: #ffffff;
   --surface2: #eef2f6;

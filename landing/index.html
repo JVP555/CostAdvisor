@@ -92,41 +92,58 @@
             </div>
           </div>
 
-          <!-- Product mockup: cost model card -->
+          <!-- Product mockup: brief summary card -->
           <div class="lp-hero-mockup" aria-hidden="true">
             <div class="lp-mock-card">
               <div class="lp-mock-header">
-                <span class="lp-mock-title">NaOH — Q2 2025</span>
-                <span class="lp-mock-badge lp-mock-badge-gap">Gap +11.4%</span>
+                <div>
+                  <span class="lp-mock-title">Sodium Hydroxide (NaOH)</span>
+                  <span class="lp-mock-period">Q2 2025 · EUR · /t · CIF Rotterdam</span>
+                </div>
+                <span class="lp-mock-badge lp-mock-badge-challenge">Challenge</span>
               </div>
+
+              <div class="lp-mock-kpis">
+                <div class="lp-mock-kpi">
+                  <span class="lp-mock-kpi-label">Should-cost</span>
+                  <span class="lp-mock-kpi-val">€342.80</span>
+                </div>
+                <div class="lp-mock-kpi">
+                  <span class="lp-mock-kpi-label">Actual price</span>
+                  <span class="lp-mock-kpi-val lp-mock-up">€381.90</span>
+                </div>
+                <div class="lp-mock-kpi">
+                  <span class="lp-mock-kpi-label">Gap</span>
+                  <span class="lp-mock-kpi-val lp-mock-up">+€39.10 · +11.4%</span>
+                </div>
+              </div>
+
+              <div class="lp-mock-divider"></div>
+              <div class="lp-mock-drivers-label">Top drivers · index change %</div>
+
               <div class="lp-mock-row">
-                <span class="lp-mock-label">Energy (Natural Gas)</span>
-                <span class="lp-mock-bar"><span style="width:68%"></span></span>
+                <span class="lp-mock-cat" style="background:var(--cat-energy)"></span>
+                <span class="lp-mock-label">Natural Gas <span class="lp-mock-src">INSEE</span></span>
+                <span class="lp-mock-bar"><span style="width:74%"></span></span>
                 <span class="lp-mock-val lp-mock-up">+18.2%</span>
               </div>
               <div class="lp-mock-row">
-                <span class="lp-mock-label">Chlorine feedstock</span>
-                <span class="lp-mock-bar"><span style="width:42%"></span></span>
+                <span class="lp-mock-cat" style="background:var(--cat-ppi)"></span>
+                <span class="lp-mock-label">PPI Chlorine USA <span class="lp-mock-src">FRED</span></span>
+                <span class="lp-mock-bar"><span style="width:44%"></span></span>
                 <span class="lp-mock-val lp-mock-up">+7.4%</span>
               </div>
               <div class="lp-mock-row">
-                <span class="lp-mock-label">EUR/USD FX</span>
-                <span class="lp-mock-bar"><span style="width:24%"></span></span>
-                <span class="lp-mock-val lp-mock-down">−3.1%</span>
+                <span class="lp-mock-cat" style="background:var(--cat-labor)"></span>
+                <span class="lp-mock-label">Labor Europe <span class="lp-mock-src">Eurostat</span></span>
+                <span class="lp-mock-bar"><span style="width:28%"></span></span>
+                <span class="lp-mock-val lp-mock-up">+4.8%</span>
               </div>
               <div class="lp-mock-row">
-                <span class="lp-mock-label">Freight (Rotterdam)</span>
-                <span class="lp-mock-bar"><span style="width:15%"></span></span>
-                <span class="lp-mock-val lp-mock-down">−1.8%</span>
-              </div>
-              <div class="lp-mock-divider"></div>
-              <div class="lp-mock-verdict">
-                <span>Justified movement</span>
-                <span class="lp-mock-accent">+8.2%</span>
-              </div>
-              <div class="lp-mock-verdict lp-mock-verdict-gap">
-                <span>Unjustified gap</span>
-                <span class="lp-mock-accent2">+3.2%</span>
+                <span class="lp-mock-cat" style="background:var(--cat-fx)"></span>
+                <span class="lp-mock-label">EUR/USD <span class="lp-mock-src">ECB</span></span>
+                <span class="lp-mock-bar"><span style="width:18%"></span></span>
+                <span class="lp-mock-val lp-mock-down">−3.1%</span>
               </div>
             </div>
           </div>
@@ -220,15 +237,43 @@
       <div class="lp-showcase-row">
         <div class="lp-showcase-visual lp-showcase-visual-a" aria-hidden="true">
           <div class="lp-sv-card">
-            <div class="lp-sv-header">Should-cost Builder</div>
+            <div class="lp-sv-header">Cost Model · Sodium Hydroxide (NaOH)</div>
             <div class="lp-sv-formula">
-              <div class="lp-sv-comp"><span class="lp-sv-dot lp-sv-dot-energy"></span><span>Natural Gas</span><span class="lp-sv-w">35%</span></div>
-              <div class="lp-sv-comp"><span class="lp-sv-dot lp-sv-dot-chem"></span><span>Chlorine</span><span class="lp-sv-w">28%</span></div>
-              <div class="lp-sv-comp"><span class="lp-sv-dot lp-sv-dot-labor"></span><span>Labor</span><span class="lp-sv-w">20%</span></div>
-              <div class="lp-sv-comp"><span class="lp-sv-dot lp-sv-dot-freight"></span><span>Freight</span><span class="lp-sv-w">10%</span></div>
-              <div class="lp-sv-comp"><span class="lp-sv-dot lp-sv-dot-fx"></span><span>FX</span><span class="lp-sv-w">7%</span></div>
+              <div class="lp-sv-comp">
+                <span class="lp-sv-dot" style="background:var(--cat-energy)"></span>
+                <span class="lp-sv-comp-label">Natural Gas</span>
+                <span class="lp-sv-index-src">Natural Gas · INSEE</span>
+                <span class="lp-sv-w">35%</span>
+              </div>
+              <div class="lp-sv-comp">
+                <span class="lp-sv-dot" style="background:var(--cat-ppi)"></span>
+                <span class="lp-sv-comp-label">Chlorine</span>
+                <span class="lp-sv-index-src">PPI Chlorine USA · FRED</span>
+                <span class="lp-sv-w">28%</span>
+              </div>
+              <div class="lp-sv-comp">
+                <span class="lp-sv-dot" style="background:var(--cat-labor)"></span>
+                <span class="lp-sv-comp-label">Labor</span>
+                <span class="lp-sv-index-src">Labor Europe · Eurostat</span>
+                <span class="lp-sv-w">22%</span>
+              </div>
+              <div class="lp-sv-comp">
+                <span class="lp-sv-dot" style="background:var(--cat-fx)"></span>
+                <span class="lp-sv-comp-label">FX</span>
+                <span class="lp-sv-index-src">EUR/USD · ECB</span>
+                <span class="lp-sv-w">10%</span>
+              </div>
+              <div class="lp-sv-comp lp-sv-comp-margin">
+                <span class="lp-sv-dot" style="background:var(--accent2)"></span>
+                <span class="lp-sv-comp-label">Margin</span>
+                <span class="lp-sv-index-src">—</span>
+                <span class="lp-sv-w">5%</span>
+              </div>
             </div>
-            <div class="lp-sv-result"><span>Should-cost</span><span class="lp-sv-num">€ 342.80 / t</span></div>
+            <div class="lp-sv-result">
+              <span>Should-cost · Q2 2025 · CIF Rotterdam</span>
+              <span class="lp-sv-num">€ 342.80 / t</span>
+            </div>
           </div>
         </div>
         <div class="lp-showcase-text">
@@ -252,32 +297,51 @@
         </div>
         <div class="lp-showcase-visual lp-showcase-visual-b" aria-hidden="true">
           <div class="lp-sv-card">
-            <div class="lp-sv-header">Evolution — NaOH</div>
+            <div class="lp-sv-header">Evolution · Sodium Hydroxide · 4 quarters</div>
             <div class="lp-sv-chart">
-              <div class="lp-sv-chart-bars">
-                <div class="lp-sv-bar-pair">
-                  <div class="lp-sv-bar lp-sv-bar-sc" style="height:55%"></div>
-                  <div class="lp-sv-bar lp-sv-bar-act" style="height:58%"></div>
-                  <span class="lp-sv-qlabel">Q3</span>
+              <!-- Stacked bar chart — each bar = stacked components; dot = actual price -->
+              <div class="lp-sv-chart-area">
+                <div class="lp-sv-col">
+                  <div class="lp-sv-stack">
+                    <div class="lp-sv-seg" style="height:32%;background:var(--cat-energy)"></div>
+                    <div class="lp-sv-seg" style="height:18%;background:var(--cat-ppi)"></div>
+                    <div class="lp-sv-seg" style="height:14%;background:var(--cat-labor)"></div>
+                  </div>
+                  <div class="lp-sv-act-dot lp-sv-act-match"></div>
+                  <span class="lp-sv-qlabel">Q3 '24</span>
                 </div>
-                <div class="lp-sv-bar-pair">
-                  <div class="lp-sv-bar lp-sv-bar-sc" style="height:60%"></div>
-                  <div class="lp-sv-bar lp-sv-bar-act" style="height:65%"></div>
-                  <span class="lp-sv-qlabel">Q4</span>
+                <div class="lp-sv-col">
+                  <div class="lp-sv-stack">
+                    <div class="lp-sv-seg" style="height:36%;background:var(--cat-energy)"></div>
+                    <div class="lp-sv-seg" style="height:19%;background:var(--cat-ppi)"></div>
+                    <div class="lp-sv-seg" style="height:15%;background:var(--cat-labor)"></div>
+                  </div>
+                  <div class="lp-sv-act-dot lp-sv-act-above"></div>
+                  <span class="lp-sv-qlabel">Q4 '24</span>
                 </div>
-                <div class="lp-sv-bar-pair">
-                  <div class="lp-sv-bar lp-sv-bar-sc" style="height:62%"></div>
-                  <div class="lp-sv-bar lp-sv-bar-act" style="height:72%"></div>
-                  <span class="lp-sv-qlabel">Q1</span>
+                <div class="lp-sv-col">
+                  <div class="lp-sv-stack">
+                    <div class="lp-sv-seg" style="height:40%;background:var(--cat-energy)"></div>
+                    <div class="lp-sv-seg" style="height:20%;background:var(--cat-ppi)"></div>
+                    <div class="lp-sv-seg" style="height:15%;background:var(--cat-labor)"></div>
+                  </div>
+                  <div class="lp-sv-act-dot lp-sv-act-above"></div>
+                  <span class="lp-sv-qlabel">Q1 '25</span>
                 </div>
-                <div class="lp-sv-bar-pair">
-                  <div class="lp-sv-bar lp-sv-bar-sc" style="height:58%"></div>
-                  <div class="lp-sv-bar lp-sv-bar-act" style="height:78%"></div>
-                  <span class="lp-sv-qlabel">Q2</span>
+                <div class="lp-sv-col">
+                  <div class="lp-sv-stack">
+                    <div class="lp-sv-seg" style="height:44%;background:var(--cat-energy)"></div>
+                    <div class="lp-sv-seg" style="height:21%;background:var(--cat-ppi)"></div>
+                    <div class="lp-sv-seg" style="height:16%;background:var(--cat-labor)"></div>
+                  </div>
+                  <div class="lp-sv-act-dot lp-sv-act-gap"></div>
+                  <span class="lp-sv-qlabel">Q2 '25</span>
                 </div>
               </div>
               <div class="lp-sv-legend">
-                <span><span class="lp-sv-leg-dot lp-sv-leg-sc"></span>Should-cost</span>
+                <span><span class="lp-sv-leg-swatch" style="background:var(--cat-energy)"></span>Natural Gas</span>
+                <span><span class="lp-sv-leg-swatch" style="background:var(--cat-ppi)"></span>PPI Chlorine</span>
+                <span><span class="lp-sv-leg-swatch" style="background:var(--cat-labor)"></span>Labor</span>
                 <span><span class="lp-sv-leg-dot lp-sv-leg-act"></span>Actual</span>
               </div>
             </div>
@@ -289,18 +353,50 @@
       <div class="lp-showcase-row">
         <div class="lp-showcase-visual lp-showcase-visual-c" aria-hidden="true">
           <div class="lp-sv-card lp-sv-card-brief">
-            <div class="lp-sv-header">Negotiation Brief</div>
+            <div class="lp-sv-header">Brief · Sodium Hydroxide · Q2 2025</div>
+
             <div class="lp-sv-brief-verdict">
               <span class="lp-sv-brief-label">Verdict</span>
-              <span class="lp-sv-brief-val lp-sv-brief-challenge">Challenge</span>
+              <span class="lp-sv-brief-challenge">Above should-cost · Challenge</span>
             </div>
-            <div class="lp-sv-brief-row"><span>Should-cost</span><span>€ 342.80</span></div>
-            <div class="lp-sv-brief-row"><span>Actual price</span><span>€ 381.90</span></div>
-            <div class="lp-sv-brief-row lp-sv-brief-gap"><span>Unjustified gap</span><span class="lp-sv-accent2">+€ 39.10 (11.4%)</span></div>
+
+            <div class="lp-sv-brief-metrics">
+              <div class="lp-sv-brief-row"><span>Should-cost</span><span>€ 342.80 / t</span></div>
+              <div class="lp-sv-brief-row"><span>Actual price</span><span>€ 381.90 / t</span></div>
+              <div class="lp-sv-brief-row lp-sv-brief-gap">
+                <span>Gap</span>
+                <span class="lp-sv-accent2">+€ 39.10 · +11.4%</span>
+              </div>
+            </div>
+
+            <!-- Cost drivers table — mirrors the app's Brief page -->
+            <div class="lp-sv-drivers">
+              <div class="lp-sv-drivers-head">
+                <span>Component</span><span>Index</span><span>Δ%</span><span>Contribution</span>
+              </div>
+              <div class="lp-sv-driver-row">
+                <span><span class="lp-sv-dot" style="background:var(--cat-energy)"></span>Natural Gas</span>
+                <span class="lp-sv-muted">Natural Gas</span>
+                <span class="lp-sv-up">+18.2%</span>
+                <span class="lp-sv-up">+€12.40</span>
+              </div>
+              <div class="lp-sv-driver-row">
+                <span><span class="lp-sv-dot" style="background:var(--cat-ppi)"></span>Chlorine</span>
+                <span class="lp-sv-muted">PPI Chlorine USA</span>
+                <span class="lp-sv-up">+7.4%</span>
+                <span class="lp-sv-up">+€6.20</span>
+              </div>
+              <div class="lp-sv-driver-row">
+                <span><span class="lp-sv-dot" style="background:var(--cat-fx)"></span>FX</span>
+                <span class="lp-sv-muted">EUR/USD</span>
+                <span class="lp-sv-down">−3.1%</span>
+                <span class="lp-sv-down">−€3.80</span>
+              </div>
+            </div>
+
             <div class="lp-sv-brief-narrative">
-              "Natural gas costs rose 18.2% this quarter, justifying an increase
-              of 8.2%. The remaining 3.2% uplift has no index basis and should
-              be challenged directly…"
+              "Natural gas (INSEE) rose 18.2% this quarter, justifying +8.2%.
+              The remaining +3.2% uplift has no index basis — challenge directly."
             </div>
           </div>
         </div>
