@@ -37,7 +37,7 @@ app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.app_url],
+    allow_origins=[settings.app_url, "http://localhost:3333"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,3 +1,41 @@
+const apiBase =
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000'
+    : 'https://api.costadvisor.org';
+
+const appBase =
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5173'
+    : 'https://costadvisor.org';
+
+// Check auth status — swap sign-in buttons to Dashboard if already signed in.
+// ca_token is HttpOnly so we probe /auth/me instead of reading the cookie.
+fetch(`${apiBase}/auth/me`, { credentials: 'include' })
+  .then((r) => {
+    if (!r.ok) return; // 401 = not signed in, leave everything as-is
+
+    const dashboardBtn = `<a href="${appBase}" class="lp-btn lp-btn-primary lp-btn-lg">Go to Dashboard →</a>`;
+
+    // Nav button
+    const navBtn = document.getElementById('nav-auth-btn');
+    if (navBtn) {
+      navBtn.textContent = 'Dashboard →';
+      navBtn.href = appBase;
+      navBtn.classList.replace('lp-btn-outline', 'lp-btn-primary');
+    }
+
+    // Hero CTA — replace both buttons with a single dashboard link
+    const heroCta = document.getElementById('hero-cta');
+    if (heroCta) heroCta.innerHTML = dashboardBtn;
+
+    // Bottom CTA section — replace buttons and hide the "no automated replies" note
+    const ctaActions = document.getElementById('cta-actions');
+    if (ctaActions) ctaActions.innerHTML = dashboardBtn;
+    const ctaNote = document.getElementById('cta-note');
+    if (ctaNote) ctaNote.style.display = 'none';
+  })
+  .catch(() => {/* network error — leave page as-is */});
+
 // Progressive scroll-reveal: add .lp-reveal to elements via JS so the page
 // renders fully without JS (Googlebot sees all content), and animations are
 // treated as enhancement only.
