@@ -1,0 +1,9 @@
+{
+  // Cloudflare Workers static assets — deploys landing/ as a static site
+  // Push to `main` triggers production deploy at www.costadvisor.org (configure in CF dashboard)
+  "name": "costadvisor-landing",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "."
+  }
+}

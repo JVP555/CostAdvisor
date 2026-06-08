@@ -1,0 +1,73 @@
+.lp-how {
+  padding: var(--section-pad);
+  border-bottom: 1px solid var(--border);
+}
+
+.lp-how-header {
+  max-width: 600px;
+  margin-bottom: 60px;
+}
+
+.lp-how-steps {
+  display: grid;
+  grid-template-columns: 1fr 48px 1fr 48px 1fr;
+  align-items: start;
+  gap: 0;
+}
+
+/* Arrow connector between steps */
+.lp-how-arrow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 38px;
+  color: var(--border);
+  font-size: 20px;
+  user-select: none;
+}
+
+.lp-how-step {
+  padding: 32px 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  position: relative;
+  transition: border-color 0.2s;
+}
+.lp-how-step:hover {
+  border-color: var(--muted);
+}
+
+.lp-how-num {
+  font-family: 'Syne', sans-serif;
+  font-size: 52px;
+  font-weight: 800;
+  color: var(--border);
+  line-height: 1;
+  margin-bottom: 18px;
+  letter-spacing: -3px;
+}
+
+.lp-how-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+
+.lp-how-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.85;
+}
+
+@media (max-width: 900px) {
+  .lp-how-steps {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .lp-how-arrow {
+    display: none;
+  }
+}

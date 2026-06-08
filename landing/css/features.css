@@ -1,0 +1,77 @@
+.lp-features {
+  padding: var(--section-pad);
+  border-bottom: 1px solid var(--border);
+}
+
+.lp-features-header {
+  max-width: 640px;
+  margin-bottom: 52px;
+}
+
+.lp-features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.lp-feature-card {
+  padding: 36px 30px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+.lp-feature-card:hover {
+  background: var(--surface2);
+}
+/* Remove trailing borders */
+.lp-feature-card:nth-child(3n) { border-right: none; }
+.lp-feature-card:nth-child(n+4) { border-bottom: none; }
+
+.lp-feature-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  margin-bottom: 20px;
+  font-style: normal;
+}
+.lp-icon-green  { background: rgba(79,  255, 176, 0.1); color: var(--accent);  }
+.lp-icon-blue   { background: rgba(116, 185, 255, 0.1); color: var(--accent4); }
+.lp-icon-yellow { background: rgba(255, 209, 102, 0.1); color: var(--accent3); }
+.lp-icon-red    { background: rgba(255, 107, 107, 0.1); color: var(--accent2); }
+.lp-icon-purple { background: rgba(162, 155, 254, 0.1); color: var(--accent5); }
+.lp-icon-teal   { background: rgba( 85, 239, 196, 0.1); color: var(--accent6); }
+
+.lp-feature-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+.lp-feature-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+@media (max-width: 900px) {
+  .lp-features-grid { grid-template-columns: repeat(2, 1fr); }
+  .lp-feature-card:nth-child(3n) { border-right: 1px solid var(--border); }
+  .lp-feature-card:nth-child(2n) { border-right: none; }
+  .lp-feature-card:nth-last-child(-n+2) { border-bottom: none; }
+}
+
+@media (max-width: 560px) {
+  .lp-features-grid { grid-template-columns: 1fr; }
+  .lp-feature-card { border-right: none !important; }
+  .lp-feature-card:last-child { border-bottom: none; }
+  .lp-feature-card:nth-last-child(-n+2) { border-bottom: 1px solid var(--border); }
+}
