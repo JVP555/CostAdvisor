@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../AuthContext';
+import { useConfirm, useAlert } from '../components/ConfirmDialog';
 
 export default function Products() {
   const { activeTeamId } = useAuth();
   const navigate = useNavigate();
+  const confirm = useConfirm();
+  const showAlert = useAlert();
   const [products, setProducts] = useState([]);
   const [families, setFamilies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -71,19 +74,25 @@ export default function Products() {
       resetForm();
       fetchData();
     } catch (err) {
-      alert('Error: ' + (err.response?.data?.detail || err.message));
+      showAlert({ title: 'Error', message: err.response?.data?.detail || err.message });
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this product? This will also delete all associated cost models.')) return;
+    const ok = await confirm({
+      title: 'Delete this product?',
+      message: 'This will also delete all associated cost models.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/products/${id}`);
       fetchData();
     } catch (err) {
-      alert('Error: ' + (err.response?.data?.detail || err.message));
+      showAlert({ title: 'Error', message: err.response?.data?.detail || err.message });
     }
   };
 

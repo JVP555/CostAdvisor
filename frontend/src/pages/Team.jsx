@@ -3,6 +3,7 @@ import FileUpload from '../components/FileUpload';
 import api from '../api';
 import { useAuth } from '../AuthContext';
 import exportCsv from '../utils/exportCsv';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function Team() {
   const [tab, setTab] = useState('members');
@@ -30,10 +31,18 @@ export default function Team() {
 
 function MembersTab() {
   const { activeTeamId, teams, refreshUser } = useAuth();
+  const confirm = useConfirm();
   const [members, setMembers] = useState([]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
   const [message, setMessage] = useState(null);
+
+  // Staged changes — nothing fires until Save is confirmed
+  const [pendingRoles, setPendingRoles] = useState({});
+  const [pendingRemovals, setPendingRemovals] = useState(new Set());
+  const [pendingInvites, setPendingInvites] = useState([]);
+
+  const hasPending = Object.keys(pendingRoles).length > 0 || pendingRemovals.size > 0 || pendingInvites.length > 0;
 
   const fetchMembers = async () => {
     if (!activeTeamId) return;
@@ -45,18 +54,78 @@ function MembersTab() {
     }
   };
 
-  useEffect(() => { fetchMembers(); }, [activeTeamId]);
+  useEffect(() => {
+    fetchMembers();
+    // Clear pending changes when team switches
+    setPendingRoles({});
+    setPendingRemovals(new Set());
+    setPendingInvites([]);
+  }, [activeTeamId]);
 
-  const handleInvite = async () => {
-    if (!inviteEmail.trim()) return;
-    try {
-      await api.post(`/api/teams/${activeTeamId}/invite`, { email: inviteEmail });
-      setMessage({ type: 'success', text: `Invited ${inviteEmail}` });
-      setInviteEmail('');
-      fetchMembers();
-    } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to invite' });
+  const stageRole = (userId, role) => {
+    const committed = members.find(m => m.user_id === userId);
+    if (committed?.role === role) {
+      // Revert to committed value — remove from pending
+      setPendingRoles(p => { const n = { ...p }; delete n[userId]; return n; });
+    } else {
+      setPendingRoles(p => ({ ...p, [userId]: role }));
     }
+  };
+
+  const stageRemove = (userId) => setPendingRemovals(p => new Set([...p, userId]));
+  const unstageRemove = (userId) => setPendingRemovals(p => { const n = new Set(p); n.delete(userId); return n; });
+
+  const stageInvite = () => {
+    if (!inviteEmail.trim()) return;
+    setPendingInvites(p => [...p, inviteEmail.trim()]);
+    setInviteEmail('');
+  };
+
+  const handleSave = async () => {
+    const lines = [];
+    for (const [uid, role] of Object.entries(pendingRoles)) {
+      const m = members.find(m => m.user_id === uid);
+      lines.push(`· ${m?.display_name || m?.email}: ${m?.role} → ${role}`);
+    }
+    for (const uid of pendingRemovals) {
+      const m = members.find(m => m.user_id === uid);
+      lines.push(`· Remove ${m?.display_name || m?.email}`);
+    }
+    for (const email of pendingInvites) {
+      lines.push(`· Invite ${email}`);
+    }
+
+    const ok = await confirm({
+      title: 'Save changes?',
+      message: lines.join('\n'),
+      confirmLabel: 'Save changes',
+    });
+    if (!ok) return;
+
+    const errors = [];
+    for (const [uid, role] of Object.entries(pendingRoles)) {
+      try { await api.patch(`/api/teams/${activeTeamId}/members/${uid}`, { role }); }
+      catch (e) { errors.push(e.response?.data?.detail || 'Role update failed'); }
+    }
+    for (const uid of pendingRemovals) {
+      try { await api.delete(`/api/teams/${activeTeamId}/members/${uid}`); }
+      catch (e) { errors.push(e.response?.data?.detail || 'Remove failed'); }
+    }
+    for (const email of pendingInvites) {
+      try { await api.post(`/api/teams/${activeTeamId}/invite`, { email }); }
+      catch (e) { errors.push(e.response?.data?.detail || `Invite ${email} failed`); }
+    }
+
+    setPendingRoles({});
+    setPendingRemovals(new Set());
+    setPendingInvites([]);
+    await fetchMembers();
+    await refreshUser();
+
+    setMessage(errors.length
+      ? { type: 'error', text: errors.join('; ') }
+      : { type: 'success', text: 'Changes saved.' }
+    );
   };
 
   const handleCreateTeam = async () => {
@@ -71,32 +140,14 @@ function MembersTab() {
     }
   };
 
-  const handleRoleChange = async (userId, role) => {
-    try {
-      await api.patch(`/api/teams/${activeTeamId}/members/${userId}`, { role });
-      setMessage({ type: 'success', text: role === 'owner' ? 'Ownership transferred' : 'Role updated' });
-      fetchMembers();
-    } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to update role' });
-    }
-  };
-
-  const handleRemoveMember = async (userId, role) => {
-    if (role === 'owner') {
-      setMessage({ type: 'error', text: 'Transfer ownership to another member before removing the owner.' });
-      return;
-    }
-    if (!confirm('Remove this member?')) return;
-    try {
-      await api.delete(`/api/teams/${activeTeamId}/members/${userId}`);
-      fetchMembers();
-    } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to remove' });
-    }
-  };
-
   const currentTeam = teams.find(t => t.id === activeTeamId);
   const isOwner = currentTeam?.role === 'owner';
+  const isAdmin = currentTeam?.role === 'admin';
+  const canManage = isOwner || isAdmin;
+
+  const effectiveRole = (m) => pendingRoles[m.user_id] ?? m.role;
+  const isPendingRemoval = (uid) => pendingRemovals.has(uid);
+  const isPendingChange = (uid) => uid in pendingRoles;
 
   return (
     <>
@@ -118,51 +169,119 @@ function MembersTab() {
           <div className="ca-card-title">
             Team Members — {currentTeam?.name || 'Select a team'}
           </div>
-          {members.map(m => (
-            <div key={m.user_id} style={{
+
+          {members.map(m => {
+            const pendingRemoval = isPendingRemoval(m.user_id);
+            const pendingChange = isPendingChange(m.user_id);
+            const effRole = effectiveRole(m);
+            const isOwnerRow = m.role === 'owner';
+
+            return (
+              <div key={m.user_id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 0', borderBottom: '1px solid var(--border)',
+                opacity: pendingRemoval ? 0.4 : 1,
+                borderLeft: pendingChange ? '2px solid var(--accent3)' : pendingRemoval ? '2px solid var(--accent2)' : '2px solid transparent',
+                paddingLeft: 8,
+                transition: 'opacity 0.2s',
+              }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 500 }}>{m.display_name || m.email}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.email}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {canManage && !pendingRemoval ? (
+                    <select
+                      value={effRole}
+                      className="ca-input"
+                      style={{
+                        fontSize: 11, padding: '3px 6px', width: 'auto',
+                        borderColor: pendingChange ? 'var(--accent3)' : undefined,
+                      }}
+                      onChange={e => {
+                        if (isOwnerRow && !isOwner) return; // admins can't touch owner
+                        if (e.target.value === 'owner' && !isOwner) return;
+                        stageRole(m.user_id, e.target.value);
+                      }}
+                    >
+                      {isOwner && <option value="owner">owner</option>}
+                      <option value="admin">admin</option>
+                      <option value="member">member</option>
+                    </select>
+                  ) : (
+                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>{effRole}</span>
+                  )}
+
+                  {canManage && !isOwnerRow && !pendingRemoval && (
+                    <button
+                      className="ca-btn ca-btn-ghost ca-btn-sm"
+                      style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)', fontSize: 11 }}
+                      onClick={() => stageRemove(m.user_id)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                  {pendingRemoval && (
+                    <button
+                      className="ca-btn ca-btn-ghost ca-btn-sm"
+                      style={{ fontSize: 11 }}
+                      onClick={() => unstageRemove(m.user_id)}
+                    >
+                      Undo
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Pending invites (staged, not yet sent) */}
+          {pendingInvites.map((email, i) => (
+            <div key={email} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 0', borderBottom: '1px solid var(--border)',
+              padding: '8px 0 8px 8px', borderBottom: '1px solid var(--border)',
+              borderLeft: '2px solid var(--accent)',
+              opacity: 0.7,
             }}>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 500 }}>{m.display_name || m.email}</div>
-                <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.email}</div>
+                <div style={{ fontSize: 12 }}>{email}</div>
+                <div style={{ fontSize: 10, color: 'var(--accent)' }}>pending invite</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {isOwner ? (
-                  <select
-                    value={m.role}
-                    className="ca-input"
-                    style={{ fontSize: 11, padding: '3px 6px', width: 'auto' }}
-                    onChange={e => handleRoleChange(m.user_id, e.target.value)}
-                  >
-                    <option value="owner">owner</option>
-                    <option value="admin">admin</option>
-                    <option value="member">member</option>
-                  </select>
-                ) : (
-                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>{m.role}</span>
-                )}
-                {isOwner && m.role !== 'owner' && (
-                  <button className="ca-btn-danger" style={{ fontSize: 11 }}
-                    onClick={() => handleRemoveMember(m.user_id, m.role)}>
-                    Remove
-                  </button>
-                )}
-              </div>
+              <button
+                className="ca-btn ca-btn-ghost ca-btn-sm"
+                style={{ fontSize: 11 }}
+                onClick={() => setPendingInvites(p => p.filter((_, j) => j !== i))}
+              >
+                Undo
+              </button>
             </div>
           ))}
 
-          {isOwner && (
+          {canManage && (
             <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
               <input
                 className="ca-input"
                 placeholder="Add member by email…"
                 value={inviteEmail}
                 onChange={e => setInviteEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleInvite()}
+                onKeyDown={e => e.key === 'Enter' && stageInvite()}
               />
-              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleInvite}>
-                Add
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={stageInvite}>
+                + Add
+              </button>
+            </div>
+          )}
+
+          {hasPending && (
+            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+              <button
+                className="ca-btn ca-btn-ghost ca-btn-sm"
+                onClick={() => { setPendingRoles({}); setPendingRemovals(new Set()); setPendingInvites([]); }}
+              >
+                Discard
+              </button>
+              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleSave}>
+                Save {Object.keys(pendingRoles).length + pendingRemovals.size + pendingInvites.length} change{Object.keys(pendingRoles).length + pendingRemovals.size + pendingInvites.length !== 1 ? 's' : ''}
               </button>
             </div>
           )}

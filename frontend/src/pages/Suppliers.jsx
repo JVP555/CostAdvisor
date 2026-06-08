@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../AuthContext';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function Suppliers() {
   const { activeTeamId } = useAuth();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [suppliers, setSuppliers] = useState([]);
   const [portfolio, setPortfolio] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,11 +43,10 @@ export default function Suppliers() {
       .finally(() => setSaving(false));
   };
 
-  const handleDelete = (id) => {
-    if (!confirm('Delete this supplier?')) return;
-    api.delete(`/api/suppliers/${id}`)
-      .then(fetchData)
-      .catch(console.error);
+  const handleDelete = async (id) => {
+    const ok = await confirm({ title: 'Delete this supplier?', confirmLabel: 'Delete', danger: true });
+    if (!ok) return;
+    api.delete(`/api/suppliers/${id}`).then(fetchData).catch(console.error);
   };
 
   const handleExportExcel = (id, name) => {

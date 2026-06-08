@@ -1,5 +1,10 @@
 import axios from 'axios';
 
+// ConfirmProvider registers itself here so the 429 interceptor can use the
+// custom dialog instead of window.alert (which is blocked in some browsers).
+let _alertFn = (msg) => window.alert(msg);
+export const registerAlertFn = (fn) => { _alertFn = fn; };
+
 // In dev: empty baseURL → Vite proxy forwards /api and /auth to the backend.
 // In prod: VITE_API_BASE_URL points at the deployed backend (e.g. https://api.yourdomain.com).
 const api = axios.create({
@@ -21,8 +26,7 @@ api.interceptors.response.use(
       const msg = retryAfter
         ? `Too many requests. Try again in ${retryAfter}s.`
         : 'Too many requests. Please slow down.';
-      // eslint-disable-next-line no-alert
-      window.alert(msg);
+      _alertFn(msg);
     }
     return Promise.reject(error);
   }

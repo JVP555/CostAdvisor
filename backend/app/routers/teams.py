@@ -117,7 +117,7 @@ def update_member_role(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_team_role(db, current_user, team_id, ["owner"])
+    caller = require_team_role(db, current_user, team_id, ["owner", "admin"])
     if data.role not in ("owner", "admin", "member"):
         raise HTTPException(status_code=400, detail="Role must be owner, admin, or member")
 
@@ -129,6 +129,11 @@ def update_member_role(
         raise HTTPException(status_code=404, detail="Membership not found")
     if membership.role == data.role:
         return {"status": "no change"}
+
+    # Admins may only toggle between admin and member — never touch owner
+    if caller.role == "admin":
+        if data.role == "owner" or membership.role == "owner":
+            raise HTTPException(status_code=403, detail="Only the owner can transfer ownership or change the owner's role")
 
     if data.role == "owner":
         # Transfer: demote current owner to admin first

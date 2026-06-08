@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../AuthContext';
+import { useConfirm, useAlert } from '../components/ConfirmDialog';
 
 export default function Admin() {
   const { user, refreshUser } = useAuth();
+  const confirm = useConfirm();
+  const showAlert = useAlert();
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -53,7 +56,13 @@ export default function Admin() {
   };
 
   const deleteUser = async (u) => {
-    if (!window.confirm(`Delete ${u.email}? They will be soft-deleted and can be restored.`)) return;
+    const ok = await confirm({
+      title: `Delete ${u.email}?`,
+      message: 'They will be soft-deleted and can be restored.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     await api.delete(`/api/admin/users/${u.id}`);
     fetchData();
   };
@@ -70,7 +79,7 @@ export default function Admin() {
       await refreshUser();
       window.location.href = '/';
     } catch (err) {
-      alert('Failed to impersonate: ' + (err.response?.data?.detail || err.message));
+      showAlert({ title: 'Impersonation failed', message: err.response?.data?.detail || err.message });
     }
   };
 
@@ -253,32 +262,96 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
 
 
 function TeamsTab({ teams, allUsers, onRefresh }) {
+  const confirm = useConfirm();
   const [expanded, setExpanded] = useState(null);
   const [error, setError] = useState(null);
 
-  const err = (e) => setError(e.response?.data?.detail || e.message || 'Error');
+  // Staged changes scoped to the currently expanded team
+  const [pendingRoles, setPendingRoles] = useState({});
+  const [pendingRemovals, setPendingRemovals] = useState(new Set());
+  const [pendingAdditions, setPendingAdditions] = useState([]); // [{ userId, email }]
+
+  const hasPending = Object.keys(pendingRoles).length > 0 || pendingRemovals.size > 0 || pendingAdditions.length > 0;
+
+  const clearPending = () => {
+    setPendingRoles({});
+    setPendingRemovals(new Set());
+    setPendingAdditions([]);
+  };
+
+  const handleExpand = (teamId) => {
+    if (expanded !== teamId) clearPending();
+    setExpanded(prev => prev === teamId ? null : teamId);
+    setError(null);
+  };
+
+  const stageRole = (userId, role, currentRole) => {
+    if (role === currentRole) {
+      setPendingRoles(p => { const n = { ...p }; delete n[userId]; return n; });
+    } else {
+      setPendingRoles(p => ({ ...p, [userId]: role }));
+    }
+  };
+
+  const stageRemove = (userId) => setPendingRemovals(p => new Set([...p, userId]));
+  const unstageRemove = (userId) => setPendingRemovals(p => { const n = new Set(p); n.delete(userId); return n; });
+
+  const stageAdd = (user) => {
+    if (!pendingAdditions.find(a => a.userId === user.id)) {
+      setPendingAdditions(p => [...p, { userId: user.id, email: user.email }]);
+    }
+  };
+
+  const handleSave = async (team) => {
+    const lines = [];
+    for (const [uid, role] of Object.entries(pendingRoles)) {
+      const m = team.members.find(m => m.user_id === uid);
+      lines.push(`· ${m?.email}: ${m?.role} → ${role}`);
+    }
+    for (const uid of pendingRemovals) {
+      const m = team.members.find(m => m.user_id === uid);
+      lines.push(`· Remove ${m?.email}`);
+    }
+    for (const { email } of pendingAdditions) {
+      lines.push(`· Add ${email}`);
+    }
+
+    const ok = await confirm({
+      title: `Save changes to "${team.name}"?`,
+      message: lines.join('\n'),
+      confirmLabel: 'Save changes',
+    });
+    if (!ok) return;
+
+    const errors = [];
+    for (const [uid, role] of Object.entries(pendingRoles)) {
+      try { await api.patch(`/api/admin/teams/${team.id}/members/${uid}`, { role }); }
+      catch (e) { errors.push(e.response?.data?.detail || 'Role update failed'); }
+    }
+    for (const uid of pendingRemovals) {
+      try { await api.delete(`/api/admin/teams/${team.id}/members/${uid}`); }
+      catch (e) { errors.push(e.response?.data?.detail || 'Remove failed'); }
+    }
+    for (const { userId } of pendingAdditions) {
+      try { await api.post(`/api/admin/users/${userId}/add-team`, { team_id: team.id, role: 'member' }); }
+      catch (e) { errors.push(e.response?.data?.detail || 'Add failed'); }
+    }
+
+    clearPending();
+    if (errors.length) setError(errors.join('; '));
+    onRefresh();
+  };
 
   const deleteTeam = async (t) => {
-    if (!confirm(`Delete team "${t.name}"? All data will be lost.`)) return;
+    const ok = await confirm({
+      title: `Delete team "${t.name}"?`,
+      message: 'All team data will be permanently lost. This cannot be undone.',
+      confirmLabel: 'Delete team',
+      danger: true,
+    });
+    if (!ok) return;
     try { await api.delete(`/api/admin/teams/${t.id}`); onRefresh(); }
-    catch (e) { err(e); }
-  };
-
-  const updateRole = async (teamId, userId, role) => {
-    try { await api.patch(`/api/admin/teams/${teamId}/members/${userId}`, { role }); onRefresh(); }
-    catch (e) { err(e); }
-  };
-
-  const removeMember = async (teamId, userId, role) => {
-    if (role === 'owner') { setError('Transfer ownership before removing the owner.'); return; }
-    if (!confirm('Remove this member?')) return;
-    try { await api.delete(`/api/admin/teams/${teamId}/members/${userId}`); onRefresh(); }
-    catch (e) { err(e); }
-  };
-
-  const addMember = async (teamId, userId) => {
-    try { await api.post(`/api/admin/users/${userId}/add-team`, { team_id: teamId, role: 'member' }); onRefresh(); }
-    catch (e) { err(e); }
+    catch (e) { setError(e.response?.data?.detail || e.message || 'Error'); }
   };
 
   return (
@@ -301,11 +374,10 @@ function TeamsTab({ teams, allUsers, onRefresh }) {
       {teams.map(t => {
         const isOpen = expanded === t.id;
         const memberIds = new Set(t.members.map(m => m.user_id));
-        const addable = allUsers.filter(u => !memberIds.has(u.id) && !u.deleted_at);
+        const addable = allUsers.filter(u => !memberIds.has(u.id) && !u.deleted_at && !pendingAdditions.find(a => a.userId === u.id));
 
         return (
           <div key={t.id} className="ca-card" style={{ marginBottom: 10 }}>
-            {/* ── Header row ── */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ flex: 1 }}>
                 <span style={{ fontWeight: 600, fontSize: 14 }}>{t.name}</span>
@@ -313,18 +385,18 @@ function TeamsTab({ teams, allUsers, onRefresh }) {
                   {t.member_count} member{t.member_count !== 1 ? 's' : ''} · created {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
                 </span>
               </div>
-              <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                onClick={() => setExpanded(isOpen ? null : t.id)}>
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => handleExpand(t.id)}>
                 {isOpen ? 'Close' : 'Manage'}
               </button>
-              <button className="ca-btn ca-btn-ghost ca-btn-sm"
+              <button
+                className="ca-btn ca-btn-ghost ca-btn-sm"
                 style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
-                onClick={() => deleteTeam(t)}>
+                onClick={() => deleteTeam(t)}
+              >
                 Delete Team
               </button>
             </div>
 
-            {/* ── Expanded member management ── */}
             {isOpen && (
               <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
                 <table className="ca-table" style={{ marginBottom: 14 }}>
@@ -336,56 +408,104 @@ function TeamsTab({ teams, allUsers, onRefresh }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {t.members.map(m => (
-                      <tr key={m.user_id}>
-                        <td style={{ fontSize: 12 }}>{m.email || m.user_id.slice(0, 8)}</td>
+                    {t.members.map(m => {
+                      const pendingRole = pendingRoles[m.user_id];
+                      const pendingRemoval = pendingRemovals.has(m.user_id);
+                      const effRole = pendingRole ?? m.role;
+
+                      return (
+                        <tr key={m.user_id} style={{
+                          opacity: pendingRemoval ? 0.4 : 1,
+                          borderLeft: pendingRole ? '2px solid var(--accent3)' : pendingRemoval ? '2px solid var(--accent2)' : undefined,
+                        }}>
+                          <td style={{ fontSize: 12 }}>{m.email || m.user_id.slice(0, 8)}</td>
+                          <td className="center">
+                            {!pendingRemoval ? (
+                              <select
+                                value={effRole}
+                                className="ca-input"
+                                style={{
+                                  fontSize: 11, padding: '3px 6px', width: 'auto',
+                                  borderColor: pendingRole ? 'var(--accent3)' : undefined,
+                                }}
+                                onChange={e => stageRole(m.user_id, e.target.value, m.role)}
+                              >
+                                <option value="owner">owner</option>
+                                <option value="admin">admin</option>
+                                <option value="member">member</option>
+                              </select>
+                            ) : (
+                              <span style={{ fontSize: 10, color: 'var(--accent2)' }}>removing</span>
+                            )}
+                          </td>
+                          <td className="center">
+                            {m.role !== 'owner' && !pendingRemoval && (
+                              <button
+                                className="ca-btn ca-btn-ghost ca-btn-sm"
+                                style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                                onClick={() => stageRemove(m.user_id)}
+                              >
+                                Remove
+                              </button>
+                            )}
+                            {pendingRemoval && (
+                              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => unstageRemove(m.user_id)}>
+                                Undo
+                              </button>
+                            )}
+                            {m.role === 'owner' && !pendingRemoval && (
+                              <span style={{ fontSize: 10, color: 'var(--muted)' }}>transfer to remove</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                    {/* Staged additions */}
+                    {pendingAdditions.map(({ userId, email }) => (
+                      <tr key={userId} style={{ borderLeft: '2px solid var(--accent)', opacity: 0.75 }}>
+                        <td style={{ fontSize: 12 }}>{email}</td>
+                        <td className="center"><span style={{ fontSize: 10, color: 'var(--accent)' }}>member (pending)</span></td>
                         <td className="center">
-                          <select
-                            value={m.role}
-                            className="ca-input"
-                            style={{ fontSize: 11, padding: '3px 6px', width: 'auto' }}
-                            onChange={e => updateRole(t.id, m.user_id, e.target.value)}
+                          <button
+                            className="ca-btn ca-btn-ghost ca-btn-sm"
+                            onClick={() => setPendingAdditions(p => p.filter(a => a.userId !== userId))}
                           >
-                            <option value="owner">owner</option>
-                            <option value="admin">admin</option>
-                            <option value="member">member</option>
-                          </select>
-                        </td>
-                        <td className="center">
-                          {m.role !== 'owner' ? (
-                            <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                              style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
-                              onClick={() => removeMember(t.id, m.user_id, m.role)}>
-                              Remove
-                            </button>
-                          ) : (
-                            <span style={{ fontSize: 10, color: 'var(--muted)' }}>transfer to remove</span>
-                          )}
+                            Undo
+                          </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
 
-                {/* ── Add member ── */}
                 {addable.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
                     <span style={{ fontSize: 11, color: 'var(--muted)' }}>Add:</span>
                     <select
                       className="ca-input"
                       style={{ fontSize: 11, padding: '4px 8px' }}
-                      defaultValue=""
-                      onChange={e => { if (e.target.value) { addMember(t.id, e.target.value); e.target.value = ''; } }}
+                      value=""
+                      onChange={e => {
+                        const u = allUsers.find(u => u.id === e.target.value);
+                        if (u) stageAdd(u);
+                      }}
                     >
                       <option value="" disabled>Select user…</option>
                       {addable.map(u => (
-                        <option key={u.id} value={u.id}>{u.email} {u.display_name ? `(${u.display_name})` : ''}</option>
+                        <option key={u.id} value={u.id}>{u.email}{u.display_name ? ` (${u.display_name})` : ''}</option>
                       ))}
                     </select>
                   </div>
                 )}
-                {addable.length === 0 && (
-                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>All platform users are already on this team.</span>
+
+                {hasPending && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                    <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={clearPending}>Discard</button>
+                    <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => handleSave(t)}>
+                      Save {Object.keys(pendingRoles).length + pendingRemovals.size + pendingAdditions.length} change{Object.keys(pendingRoles).length + pendingRemovals.size + pendingAdditions.length !== 1 ? 's' : ''}
+                    </button>
+                  </div>
                 )}
               </div>
             )}

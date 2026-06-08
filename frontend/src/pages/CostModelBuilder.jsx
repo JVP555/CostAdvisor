@@ -4,6 +4,7 @@ import { OVC_ITEMS, RM_ITEMS, PIE_COLORS, INCOTERMS } from '../utils/constants';
 import DonutChart from '../components/DonutChart';
 import IncotermAdjustments from '../components/IncotermAdjustments';
 import api from '../api';
+import { useConfirm, useAlert } from '../components/ConfirmDialog';
 
 const REGIONS = ['Europe', 'NA', 'Asia', 'Latam'];
 import { useAuth } from '../AuthContext';
@@ -12,6 +13,8 @@ export default function CostModelBuilder() {
   const { costModelId } = useParams();
   const navigate = useNavigate();
   const { activeTeamId } = useAuth();
+  const confirm = useConfirm();
+  const showAlert = useAlert();
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(!costModelId);
   const [editing, setEditing] = useState(!costModelId);
@@ -254,7 +257,7 @@ export default function CostModelBuilder() {
         navigate(`/cost-models/${data.id}`, { replace: true });
       }
     } catch (err) {
-      alert('Error saving: ' + (err.response?.data?.detail || err.message));
+      showAlert({ title: 'Error saving', message: err.response?.data?.detail || err.message });
     } finally {
       setSaving(false);
     }
@@ -712,6 +715,8 @@ export default function CostModelBuilder() {
 function VersionHistory({ costModelId, editing, onLoadVersion }) {
   const [versions, setVersions] = useState([]);
   const [open, setOpen] = useState(false);
+  const confirm = useConfirm();
+  const showAlert = useAlert();
 
   const fetchVersions = () => {
     api.get(`/api/cost-models/${costModelId}/versions`)
@@ -721,11 +726,16 @@ function VersionHistory({ costModelId, editing, onLoadVersion }) {
 
   useEffect(fetchVersions, [costModelId]);
 
-  const deleteVersion = (v) => {
-    if (!confirm(`Delete formula for Q${v.base_quarter}-${v.base_year}?`)) return;
+  const deleteVersion = async (v) => {
+    const ok = await confirm({
+      title: `Delete formula for Q${v.base_quarter}-${v.base_year}?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     api.delete(`/api/cost-models/${costModelId}/versions/${v.id}`)
       .then(fetchVersions)
-      .catch(err => alert('Error: ' + (err.response?.data?.detail || err.message)));
+      .catch(err => showAlert({ title: 'Error', message: err.response?.data?.detail || err.message }));
   };
 
   if (versions.length === 0) return null;

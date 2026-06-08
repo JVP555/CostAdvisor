@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
+import { useConfirm } from './ConfirmDialog';
 
 export default function IndexDetailPanel({ commodity_id, commodity_name, region, teamId, source, globalScraper, onSourceChanged, onRemoved }) {
   const [editing, setEditing] = useState(false);
@@ -12,6 +13,7 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
   const [scraping, setScraping] = useState(false);
   const [message, setMessage] = useState(null);
   const [detectedSource, setDetectedSource] = useState(null);
+  const confirm = useConfirm();
 
   // Detect source type when URL changes
   useEffect(() => {
@@ -75,7 +77,8 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
   };
 
   const handleResetAll = async () => {
-    if (!confirm(`Reset ALL overrides for ${commodity_name} / ${region}? This cannot be undone.`)) return;
+    const ok = await confirm({ title: `Reset ALL overrides for ${commodity_name} / ${region}?`, message: 'This cannot be undone.', confirmLabel: 'Reset', danger: true });
+    if (!ok) return;
     setMessage(null);
     try {
       const res = await api.delete('/api/indexes/overrides/bulk', {
@@ -90,7 +93,8 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
 
   const handleRemove = async () => {
     if (!source) return;
-    if (!confirm(`Remove index source for ${commodity_name} / ${region}? This will delete the source configuration.`)) return;
+    const ok = await confirm({ title: `Remove index source for ${commodity_name} / ${region}?`, message: 'This will delete the source configuration.', confirmLabel: 'Remove', danger: true });
+    if (!ok) return;
     try {
       await api.delete(`/api/indexes/sources/${source.id}`);
       onRemoved();
