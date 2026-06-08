@@ -11,6 +11,8 @@ export default function Profile() {
   const [showDelete, setShowDelete] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
 
+  const isImpersonating = document.cookie.split(';').some(c => c.trim().startsWith('ca_impersonating='));
+
   const nameDirty = (displayName || '').trim() !== (user?.display_name || '').trim();
 
   const handleSaveName = async () => {
@@ -49,6 +51,16 @@ export default function Profile() {
       <div className="ca-h1">Profile</div>
       <p className="ca-subtitle">Your personal preferences. Team-level settings live on the Team page.</p>
 
+      {isImpersonating && (
+        <div style={{
+          padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 12,
+          background: 'var(--accent2-dim)', color: 'var(--accent2)',
+          border: '1px solid var(--danger-bg-strong)',
+        }}>
+          You are currently impersonating another user. Profile edits are disabled until you stop impersonation.
+        </div>
+      )}
+
       {message && (
         <div style={{
           padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 12,
@@ -84,13 +96,14 @@ export default function Profile() {
             className="ca-input"
             value={displayName}
             onChange={e => setDisplayName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && nameDirty && handleSaveName()}
+            onKeyDown={e => e.key === 'Enter' && nameDirty && !isImpersonating && handleSaveName()}
             placeholder="Your name"
+            disabled={isImpersonating}
           />
           <button
             className="ca-btn ca-btn-primary ca-btn-sm"
             onClick={handleSaveName}
-            disabled={!nameDirty || savingName}
+            disabled={!nameDirty || savingName || isImpersonating}
           >
             {savingName ? 'Saving...' : 'Save'}
           </button>
@@ -121,7 +134,7 @@ export default function Profile() {
           For teams with other members, only your membership is removed. This cannot be undone.
         </p>
         {!showDelete ? (
-          <button className="ca-btn-danger" onClick={() => setShowDelete(true)}>
+          <button className="ca-btn-danger" onClick={() => setShowDelete(true)} disabled={isImpersonating}>
             Delete my account
           </button>
         ) : (

@@ -140,6 +140,7 @@ export default function Admin() {
           onDelete={deleteUser}
           onRestore={restoreUser}
           onChanged={fetchData}
+          isImpersonating={impersonating}
         />
       ) : tab === 'teams' ? (
         <TeamsTab teams={teams} allUsers={users} onRefresh={fetchData} />
@@ -157,7 +158,7 @@ export default function Admin() {
 
 
 function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDeleted,
-  currentUser, onToggleSuperAdmin, onImpersonate, onDelete, onRestore, onChanged }) {
+  currentUser, onToggleSuperAdmin, onImpersonate, onDelete, onRestore, onChanged, isImpersonating }) {
   return (
     <>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
@@ -230,8 +231,10 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
                             {u.is_super_admin ? 'Revoke Admin' : 'Make Admin'}
                           </button>
                           <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                            style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)' }}
-                            onClick={() => onImpersonate(u.id)}>
+                            style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)', opacity: isImpersonating ? 0.4 : 1 }}
+                            onClick={() => onImpersonate(u.id)}
+                            disabled={isImpersonating}
+                            title={isImpersonating ? 'Stop current impersonation first' : undefined}>
                             Impersonate
                           </button>
                           <button className="ca-btn ca-btn-ghost ca-btn-sm"

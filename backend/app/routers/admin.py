@@ -180,10 +180,13 @@ def restore_user(
 @router.post("/impersonate/{user_id}")
 def impersonate(
     user_id: uuid.UUID,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_super_admin),
 ):
+    if request.cookies.get("ca_impersonating"):
+        raise HTTPException(status_code=400, detail="Already impersonating a user — stop current session first")
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
