@@ -31,7 +31,12 @@ def list_audit_logs(
         if not membership:
             raise HTTPException(status_code=403, detail="Not a member of this team")
 
-    query = db.query(AuditLog).filter(AuditLog.team_id == team_id)
+    # Exclude platform-level admin actions — those are only visible in /api/admin/audit-logs
+    query = (
+        db.query(AuditLog)
+        .filter(AuditLog.team_id == team_id)
+        .filter(~AuditLog.event_type.startswith("admin_"))
+    )
 
     if entity_type:
         query = query.filter(AuditLog.entity_type == entity_type)

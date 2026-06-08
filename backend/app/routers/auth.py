@@ -11,7 +11,6 @@ from app.config import get_settings
 from app.database import get_db, current_user_id_var, bypass_rls_var
 from app.models.user import User
 from app.rate_limit import limiter
-from app.models.team import Team, TeamMembership
 from app.schemas.user import UserOut, UserWithTeams
 
 router = APIRouter()
@@ -114,8 +113,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
     display_name = userinfo.get("name", email.split("@")[0])
     avatar_url = userinfo.get("picture")
 
-    # Upsert user. Team-scoped queries below need RLS bypass: no user identity
-    # is established yet, and the new-user branch creates a team on their behalf.
+    # RLS bypass: no user identity is established yet during the OAuth callback.
     bypass_rls_var.set(True)
     user = db.query(User).filter(User.google_id == google_id).first()
     if user is None:
@@ -132,14 +130,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
         )
         db.add(user)
         db.flush()
-
-        # Create a default personal team for new users
-        team = Team(name=f"{display_name}'s Team", created_by=user.id)
-        db.add(team)
-        db.flush()
-
-        membership = TeamMembership(user_id=user.id, team_id=team.id, role="owner")
-        db.add(membership)
+        # No auto-team: super admin assigns users to teams via the admin console
     else:
         user.last_login_at = datetime.now(timezone.utc)
         # Don't overwrite display_name on returning users — they may have set
