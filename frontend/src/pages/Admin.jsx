@@ -133,7 +133,7 @@ export default function Admin() {
           onChanged={fetchData}
         />
       ) : tab === 'teams' ? (
-        <TeamsTab teams={teams} />
+        <TeamsTab teams={teams} allUsers={users} onRefresh={fetchData} />
       ) : (
         <AuditTab
           logs={auditLogs}
@@ -252,43 +252,147 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
 }
 
 
-function TeamsTab({ teams }) {
+function TeamsTab({ teams, allUsers, onRefresh }) {
+  const [expanded, setExpanded] = useState(null);
+  const [error, setError] = useState(null);
+
+  const err = (e) => setError(e.response?.data?.detail || e.message || 'Error');
+
+  const deleteTeam = async (t) => {
+    if (!confirm(`Delete team "${t.name}"? All data will be lost.`)) return;
+    try { await api.delete(`/api/admin/teams/${t.id}`); onRefresh(); }
+    catch (e) { err(e); }
+  };
+
+  const updateRole = async (teamId, userId, role) => {
+    try { await api.patch(`/api/admin/teams/${teamId}/members/${userId}`, { role }); onRefresh(); }
+    catch (e) { err(e); }
+  };
+
+  const removeMember = async (teamId, userId, role) => {
+    if (role === 'owner') { setError('Transfer ownership before removing the owner.'); return; }
+    if (!confirm('Remove this member?')) return;
+    try { await api.delete(`/api/admin/teams/${teamId}/members/${userId}`); onRefresh(); }
+    catch (e) { err(e); }
+  };
+
+  const addMember = async (teamId, userId) => {
+    try { await api.post(`/api/admin/users/${userId}/add-team`, { team_id: teamId, role: 'member' }); onRefresh(); }
+    catch (e) { err(e); }
+  };
+
   return (
-    <div className="ca-card">
-      <div className="ca-scroll-x">
-        <table className="ca-table">
-          <thead>
-            <tr>
-              <th>Team Name</th>
-              <th className="center">Members</th>
-              <th>Member Details</th>
-              <th className="center">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {teams.map(t => (
-              <tr key={t.id}>
-                <td style={{ fontWeight: 600 }}>{t.name}</td>
-                <td className="center">{t.member_count}</td>
-                <td>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {t.members.map((m, i) => (
-                      <span key={i} className="ca-tag">
-                        {m.email || m.user_id.slice(0, 8)}
-                        <span style={{ color: 'var(--accent3)', marginLeft: 4 }}>{m.role}</span>
-                      </span>
+    <>
+      {error && (
+        <div style={{
+          padding: '10px 16px', marginBottom: 12, borderRadius: 8, fontSize: 12,
+          background: 'var(--accent2-dim)', color: 'var(--accent2)',
+          border: '1px solid var(--danger-bg-strong)', display: 'flex', justifyContent: 'space-between',
+        }}>
+          {error}
+          <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent2)', fontWeight: 700 }}>×</button>
+        </div>
+      )}
+
+      {teams.length === 0 && (
+        <div className="ca-card" style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No teams yet.</div>
+      )}
+
+      {teams.map(t => {
+        const isOpen = expanded === t.id;
+        const memberIds = new Set(t.members.map(m => m.user_id));
+        const addable = allUsers.filter(u => !memberIds.has(u.id) && !u.deleted_at);
+
+        return (
+          <div key={t.id} className="ca-card" style={{ marginBottom: 10 }}>
+            {/* ── Header row ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{t.name}</span>
+                <span style={{ marginLeft: 10, fontSize: 11, color: 'var(--muted)' }}>
+                  {t.member_count} member{t.member_count !== 1 ? 's' : ''} · created {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
+                </span>
+              </div>
+              <button className="ca-btn ca-btn-ghost ca-btn-sm"
+                onClick={() => setExpanded(isOpen ? null : t.id)}>
+                {isOpen ? 'Close' : 'Manage'}
+              </button>
+              <button className="ca-btn ca-btn-ghost ca-btn-sm"
+                style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                onClick={() => deleteTeam(t)}>
+                Delete Team
+              </button>
+            </div>
+
+            {/* ── Expanded member management ── */}
+            {isOpen && (
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+                <table className="ca-table" style={{ marginBottom: 14 }}>
+                  <thead>
+                    <tr>
+                      <th>Member</th>
+                      <th className="center">Role</th>
+                      <th className="center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {t.members.map(m => (
+                      <tr key={m.user_id}>
+                        <td style={{ fontSize: 12 }}>{m.email || m.user_id.slice(0, 8)}</td>
+                        <td className="center">
+                          <select
+                            value={m.role}
+                            className="ca-input"
+                            style={{ fontSize: 11, padding: '3px 6px', width: 'auto' }}
+                            onChange={e => updateRole(t.id, m.user_id, e.target.value)}
+                          >
+                            <option value="owner">owner</option>
+                            <option value="admin">admin</option>
+                            <option value="member">member</option>
+                          </select>
+                        </td>
+                        <td className="center">
+                          {m.role !== 'owner' ? (
+                            <button className="ca-btn ca-btn-ghost ca-btn-sm"
+                              style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                              onClick={() => removeMember(t.id, m.user_id, m.role)}>
+                              Remove
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: 10, color: 'var(--muted)' }}>transfer to remove</span>
+                          )}
+                        </td>
+                      </tr>
                     ))}
+                  </tbody>
+                </table>
+
+                {/* ── Add member ── */}
+                {addable.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>Add:</span>
+                    <select
+                      className="ca-input"
+                      style={{ fontSize: 11, padding: '4px 8px' }}
+                      defaultValue=""
+                      onChange={e => { if (e.target.value) { addMember(t.id, e.target.value); e.target.value = ''; } }}
+                    >
+                      <option value="" disabled>Select user…</option>
+                      {addable.map(u => (
+                        <option key={u.id} value={u.id}>{u.email} {u.display_name ? `(${u.display_name})` : ''}</option>
+                      ))}
+                    </select>
                   </div>
-                </td>
-                <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                  {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                )}
+                {addable.length === 0 && (
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>All platform users are already on this team.</span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
   );
 }
 

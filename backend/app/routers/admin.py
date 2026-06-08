@@ -342,6 +342,17 @@ def remove_user_from_team(
 
 # ── Teams ─────────────────────────────────────────────────────────────────────
 
+class AdminRoleUpdate(BaseModel):
+    role: str
+
+
+def _get_owner(db: Session, team_id: uuid.UUID) -> TeamMembership | None:
+    return db.query(TeamMembership).filter(
+        TeamMembership.team_id == team_id,
+        TeamMembership.role == "owner",
+    ).first()
+
+
 @router.get("/teams", response_model=list[dict])
 def list_all_teams(
     db: Session = Depends(get_db),
@@ -366,6 +377,83 @@ def list_all_teams(
             ],
         })
     return result
+
+
+@router.patch("/teams/{team_id}/members/{user_id}")
+def admin_update_member_role(
+    team_id: uuid.UUID,
+    user_id: uuid.UUID,
+    data: AdminRoleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    if data.role not in ("owner", "admin", "member"):
+        raise HTTPException(status_code=400, detail="Role must be owner, admin, or member")
+
+    membership = db.query(TeamMembership).filter(
+        TeamMembership.user_id == user_id,
+        TeamMembership.team_id == team_id,
+    ).first()
+    if not membership:
+        raise HTTPException(status_code=404, detail="Membership not found")
+    if membership.role == data.role:
+        return {"status": "no change"}
+
+    if data.role == "owner":
+        # Transfer: demote the current owner to admin first
+        current_owner = _get_owner(db, team_id)
+        if current_owner and current_owner.user_id != user_id:
+            current_owner.role = "admin"
+            log_event(db, team_id, current_user.id, "admin_update_role", "team_member",
+                      str(current_owner.user_id),
+                      previous_value={"role": "owner"}, new_value={"role": "admin", "by": current_user.email})
+    elif membership.role == "owner":
+        raise HTTPException(status_code=400, detail="Transfer ownership to another member before changing the owner's role")
+
+    previous_role = membership.role
+    membership.role = data.role
+    log_event(db, team_id, current_user.id, "admin_update_role", "team_member", str(user_id),
+              previous_value={"role": previous_role}, new_value={"role": data.role, "by": current_user.email})
+    db.commit()
+    return {"status": "updated"}
+
+
+@router.delete("/teams/{team_id}/members/{user_id}")
+def admin_remove_member(
+    team_id: uuid.UUID,
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    membership = db.query(TeamMembership).filter(
+        TeamMembership.user_id == user_id,
+        TeamMembership.team_id == team_id,
+    ).first()
+    if not membership:
+        raise HTTPException(status_code=404, detail="Membership not found")
+    if membership.role == "owner":
+        raise HTTPException(status_code=400, detail="Transfer ownership before removing the owner")
+
+    log_event(db, team_id, current_user.id, "admin_remove_member", "team_member", str(user_id),
+              previous_value={"role": membership.role}, new_value={"by": current_user.email})
+    db.delete(membership)
+    db.commit()
+    return {"status": "removed"}
+
+
+@router.delete("/teams/{team_id}")
+def admin_delete_team(
+    team_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    # Audit log is cascade-deleted with the team, so we just delete
+    db.delete(team)
+    db.commit()
+    return {"status": "deleted"}
 
 
 # ── Audit logs (cross-team admin view) ────────────────────────────────────────

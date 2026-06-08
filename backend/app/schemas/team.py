@@ -40,4 +40,4 @@ class InviteRequest(BaseModel):
 
 
 class RoleUpdate(BaseModel):
-    role: str  # 'admin' or 'member'
+    role: str  # 'owner' (transfer), 'admin', or 'member'

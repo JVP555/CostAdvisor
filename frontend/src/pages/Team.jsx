@@ -71,7 +71,21 @@ function MembersTab() {
     }
   };
 
-  const handleRemoveMember = async (userId) => {
+  const handleRoleChange = async (userId, role) => {
+    try {
+      await api.patch(`/api/teams/${activeTeamId}/members/${userId}`, { role });
+      setMessage({ type: 'success', text: role === 'owner' ? 'Ownership transferred' : 'Role updated' });
+      fetchMembers();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to update role' });
+    }
+  };
+
+  const handleRemoveMember = async (userId, role) => {
+    if (role === 'owner') {
+      setMessage({ type: 'error', text: 'Transfer ownership to another member before removing the owner.' });
+      return;
+    }
     if (!confirm('Remove this member?')) return;
     try {
       await api.delete(`/api/teams/${activeTeamId}/members/${userId}`);
@@ -82,6 +96,7 @@ function MembersTab() {
   };
 
   const currentTeam = teams.find(t => t.id === activeTeamId);
+  const isOwner = currentTeam?.role === 'owner';
 
   return (
     <>
@@ -91,8 +106,10 @@ function MembersTab() {
           background: message.type === 'success' ? 'var(--accent-dim)' : 'var(--accent2-dim)',
           color: message.type === 'success' ? 'var(--accent)' : 'var(--accent2)',
           border: `1px solid ${message.type === 'success' ? 'var(--success-bg-strong)' : 'var(--danger-bg-strong)'}`,
+          display: 'flex', justifyContent: 'space-between',
         }}>
           {message.text}
+          <button onClick={() => setMessage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}>×</button>
         </div>
       )}
 
@@ -108,28 +125,47 @@ function MembersTab() {
             }}>
               <div>
                 <div style={{ fontSize: 12, fontWeight: 500 }}>{m.display_name || m.email}</div>
-                <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.email} · {m.role}</div>
+                <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.email}</div>
               </div>
-              {m.role !== 'owner' && (
-                <button className="ca-btn-danger" onClick={() => handleRemoveMember(m.user_id)}>
-                  Remove
-                </button>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {isOwner ? (
+                  <select
+                    value={m.role}
+                    className="ca-input"
+                    style={{ fontSize: 11, padding: '3px 6px', width: 'auto' }}
+                    onChange={e => handleRoleChange(m.user_id, e.target.value)}
+                  >
+                    <option value="owner">owner</option>
+                    <option value="admin">admin</option>
+                    <option value="member">member</option>
+                  </select>
+                ) : (
+                  <span style={{ fontSize: 10, color: 'var(--muted)' }}>{m.role}</span>
+                )}
+                {isOwner && m.role !== 'owner' && (
+                  <button className="ca-btn-danger" style={{ fontSize: 11 }}
+                    onClick={() => handleRemoveMember(m.user_id, m.role)}>
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
           ))}
 
-          <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-            <input
-              className="ca-input"
-              placeholder="Invite by email..."
-              value={inviteEmail}
-              onChange={e => setInviteEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleInvite()}
-            />
-            <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleInvite}>
-              Invite
-            </button>
-          </div>
+          {isOwner && (
+            <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+              <input
+                className="ca-input"
+                placeholder="Add member by email…"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleInvite()}
+              />
+              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleInvite}>
+                Add
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="ca-card">
