@@ -6,14 +6,18 @@ export default function Admin() {
   const { user, refreshUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('users');
   const [impersonating, setImpersonating] = useState(false);
+  const [search, setSearch] = useState('');
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [auditEventType, setAuditEventType] = useState('');
 
   const fetchData = () => {
     setLoading(true);
     Promise.all([
-      api.get('/api/admin/users'),
+      api.get('/api/admin/users', { params: { include_deleted: showDeleted } }),
       api.get('/api/admin/teams'),
     ])
       .then(([uRes, tRes]) => {
@@ -24,14 +28,38 @@ export default function Admin() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(fetchData, []);
+  const fetchAuditLogs = () => {
+    setLoading(true);
+    api.get('/api/admin/audit-logs', {
+      params: { limit: 200, event_type: auditEventType || undefined },
+    })
+      .then(r => setAuditLogs(r.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
-    setImpersonating(document.cookie.includes('ca_admin_token'));
+    if (tab === 'audit') fetchAuditLogs();
+    else fetchData();
+  }, [tab, showDeleted]);
+
+  useEffect(() => {
+    setImpersonating(document.cookie.split(';').some(c => c.trim().startsWith('ca_impersonating=')));
   }, []);
 
   const toggleSuperAdmin = async (userId, current) => {
     await api.put(`/api/admin/users/${userId}`, { is_super_admin: !current });
+    fetchData();
+  };
+
+  const deleteUser = async (u) => {
+    if (!window.confirm(`Delete ${u.email}? They will be soft-deleted and can be restored.`)) return;
+    await api.delete(`/api/admin/users/${u.id}`);
+    fetchData();
+  };
+
+  const restoreUser = async (u) => {
+    await api.post(`/api/admin/users/${u.id}/restore`);
     fetchData();
   };
 
@@ -46,16 +74,14 @@ export default function Admin() {
     }
   };
 
-  const stopImpersonating = async () => {
-    try {
-      await api.post('/api/admin/stop-impersonate');
-      setImpersonating(false);
-      await refreshUser();
-      window.location.href = '/admin';
-    } catch (err) {
-      alert('Failed to stop impersonating: ' + (err.response?.data?.detail || err.message));
-    }
-  };
+  const filtered = users.filter(u => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      u.email?.toLowerCase().includes(q) ||
+      u.display_name?.toLowerCase().includes(q)
+    );
+  });
 
   if (!user?.is_super_admin && !impersonating) {
     return (
@@ -69,122 +95,286 @@ export default function Admin() {
   return (
     <div className="ca-page ca-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <div className="ca-h1">Admin Panel</div>
+        <div className="ca-h1">Admin Console</div>
       </div>
-      <p className="ca-subtitle">Manage users, teams, and impersonate accounts.</p>
+      <p className="ca-subtitle">Manage users, teams, and platform activity.</p>
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-        <button className={`ca-btn ${tab === 'users' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setTab('users')}>
-          Users ({users.length})
-        </button>
-        <button className={`ca-btn ${tab === 'teams' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setTab('teams')}>
-          Teams ({teams.length})
-        </button>
+        {[
+          { key: 'users', label: `Users (${users.length})` },
+          { key: 'teams', label: `Teams (${teams.length})` },
+          { key: 'audit', label: 'Audit Log' },
+        ].map(t => (
+          <button
+            key={t.key}
+            className={`ca-btn ${tab === t.key ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
-        <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
+        <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
       ) : tab === 'users' ? (
-        <div className="ca-card">
-          <div className="ca-scroll-x">
-            <table className="ca-table">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Email</th>
-                  <th className="center">Role</th>
-                  <th>Teams</th>
-                  <th className="center">Last Login</th>
-                  <th className="center">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(u => (
-                  <tr key={u.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {u.avatar_url && (
-                          <img src={u.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%' }} />
-                        )}
-                        <span style={{ fontWeight: 600 }}>{u.display_name || 'No name'}</span>
-                      </div>
-                    </td>
-                    <td style={{ fontSize: 11, color: 'var(--muted)' }}>{u.email}</td>
-                    <td className="center">
-                      <span style={{
-                        display: 'inline-block', padding: '2px 8px', borderRadius: 4,
-                        fontSize: 10, fontWeight: 600,
-                        background: u.is_super_admin ? 'var(--success-bg)' : 'var(--neutral-bg)',
-                        color: u.is_super_admin ? 'var(--accent)' : 'var(--muted)',
-                      }}>
-                        {u.is_super_admin ? 'SUPER ADMIN' : 'USER'}
-                      </span>
-                    </td>
-                    <td>
-                      <TeamCell userId={u.id} userTeams={u.teams} allTeams={teams} onChanged={fetchData} />
-                    </td>
-                    <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : '\u2014'}
-                    </td>
-                    <td className="center">
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                        <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                          onClick={() => toggleSuperAdmin(u.id, u.is_super_admin)}>
-                          {u.is_super_admin ? 'Revoke Admin' : 'Make Admin'}
-                        </button>
-                        {u.id !== user?.id && (
-                          <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                            style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)' }}
-                            onClick={() => impersonate(u.id)}>
-                            Impersonate
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <UsersTab
+          users={filtered}
+          allTeams={teams}
+          search={search}
+          setSearch={setSearch}
+          showDeleted={showDeleted}
+          setShowDeleted={setShowDeleted}
+          currentUser={user}
+          onToggleSuperAdmin={toggleSuperAdmin}
+          onImpersonate={impersonate}
+          onDelete={deleteUser}
+          onRestore={restoreUser}
+          onChanged={fetchData}
+        />
+      ) : tab === 'teams' ? (
+        <TeamsTab teams={teams} />
       ) : (
-        <div className="ca-card">
-          <div className="ca-scroll-x">
-            <table className="ca-table">
-              <thead>
-                <tr>
-                  <th>Team Name</th>
-                  <th className="center">Members</th>
-                  <th>Member Details</th>
-                  <th className="center">Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teams.map(t => (
-                  <tr key={t.id}>
-                    <td style={{ fontWeight: 600 }}>{t.name}</td>
-                    <td className="center">{t.member_count}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        {t.members.map((m, i) => (
-                          <span key={i} className="ca-tag">
-                            {m.email || m.user_id.slice(0, 8)}
-                            <span style={{ color: 'var(--accent3)', marginLeft: 4 }}>{m.role}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      {t.created_at ? new Date(t.created_at).toLocaleDateString() : '\u2014'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <AuditTab
+          logs={auditLogs}
+          eventType={auditEventType}
+          setEventType={setAuditEventType}
+          onRefresh={fetchAuditLogs}
+        />
       )}
     </div>
+  );
+}
+
+
+function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDeleted,
+  currentUser, onToggleSuperAdmin, onImpersonate, onDelete, onRestore, onChanged }) {
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+        <input
+          className="ca-input"
+          placeholder="Search by name or email…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ maxWidth: 280 }}
+        />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={showDeleted}
+            onChange={e => setShowDeleted(e.target.checked)}
+          />
+          Show deleted
+        </label>
+      </div>
+
+      <div className="ca-card">
+        <div className="ca-scroll-x">
+          <table className="ca-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Email</th>
+                <th className="center">Role</th>
+                <th>Teams</th>
+                <th className="center">Last Login</th>
+                <th className="center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>No users found.</td></tr>
+              )}
+              {users.map(u => (
+                <tr key={u.id} style={{ opacity: u.deleted_at ? 0.5 : 1 }}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {u.avatar_url && <img src={u.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%' }} />}
+                      <span style={{ fontWeight: 600 }}>{u.display_name || 'No name'}</span>
+                      {u.deleted_at && <span style={{ fontSize: 9, color: 'var(--accent2)', fontWeight: 700 }}>DELETED</span>}
+                    </div>
+                  </td>
+                  <td style={{ fontSize: 11, color: 'var(--muted)' }}>{u.email}</td>
+                  <td className="center">
+                    <span style={{
+                      display: 'inline-block', padding: '2px 8px', borderRadius: 4,
+                      fontSize: 10, fontWeight: 600,
+                      background: u.is_super_admin ? 'var(--success-bg)' : 'var(--neutral-bg)',
+                      color: u.is_super_admin ? 'var(--accent)' : 'var(--muted)',
+                    }}>
+                      {u.is_super_admin ? 'SUPER ADMIN' : 'USER'}
+                    </span>
+                  </td>
+                  <td>
+                    <TeamCell userId={u.id} userTeams={u.teams} allTeams={allTeams} onChanged={onChanged} />
+                  </td>
+                  <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : '—'}
+                  </td>
+                  <td className="center">
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                      {!u.deleted_at && (
+                        <>
+                          <button className="ca-btn ca-btn-ghost ca-btn-sm"
+                            onClick={() => onToggleSuperAdmin(u.id, u.is_super_admin)}>
+                            {u.is_super_admin ? 'Revoke Admin' : 'Make Admin'}
+                          </button>
+                          {u.id !== currentUser?.id && (
+                            <>
+                              <button className="ca-btn ca-btn-ghost ca-btn-sm"
+                                style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)' }}
+                                onClick={() => onImpersonate(u.id)}>
+                                Impersonate
+                              </button>
+                              <button className="ca-btn ca-btn-ghost ca-btn-sm"
+                                style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                                onClick={() => onDelete(u)}>
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </>
+                      )}
+                      {u.deleted_at && (
+                        <button className="ca-btn ca-btn-ghost ca-btn-sm"
+                          style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                          onClick={() => onRestore(u)}>
+                          Restore
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
+function TeamsTab({ teams }) {
+  return (
+    <div className="ca-card">
+      <div className="ca-scroll-x">
+        <table className="ca-table">
+          <thead>
+            <tr>
+              <th>Team Name</th>
+              <th className="center">Members</th>
+              <th>Member Details</th>
+              <th className="center">Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {teams.map(t => (
+              <tr key={t.id}>
+                <td style={{ fontWeight: 600 }}>{t.name}</td>
+                <td className="center">{t.member_count}</td>
+                <td>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {t.members.map((m, i) => (
+                      <span key={i} className="ca-tag">
+                        {m.email || m.user_id.slice(0, 8)}
+                        <span style={{ color: 'var(--accent3)', marginLeft: 4 }}>{m.role}</span>
+                      </span>
+                    ))}
+                  </div>
+                </td>
+                <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
+const AUDIT_EVENT_TYPES = [
+  '', 'admin_impersonate_start', 'admin_impersonate_stop',
+  'admin_update_user', 'admin_delete_user', 'admin_restore_user',
+  'admin_set_team', 'admin_add_team', 'admin_remove_team',
+  'create', 'update', 'delete',
+];
+
+function AuditTab({ logs, eventType, setEventType, onRefresh }) {
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+        <select
+          className="ca-input"
+          value={eventType}
+          onChange={e => setEventType(e.target.value)}
+          style={{ maxWidth: 240 }}
+        >
+          {AUDIT_EVENT_TYPES.map(t => (
+            <option key={t} value={t}>{t || 'All event types'}</option>
+          ))}
+        </select>
+        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={onRefresh}>Refresh</button>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{logs.length} entries</span>
+      </div>
+
+      <div className="ca-card">
+        <div className="ca-scroll-x">
+          <table className="ca-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Actor</th>
+                <th>Event</th>
+                <th>Entity</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>No log entries.</td></tr>
+              )}
+              {logs.map(log => (
+                <tr key={log.id}>
+                  <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                    {new Date(log.timestamp).toLocaleString()}
+                  </td>
+                  <td style={{ fontSize: 11 }}>{log.user_email || log.user_id?.slice(0, 8)}</td>
+                  <td>
+                    <span style={{
+                      display: 'inline-block', padding: '2px 8px', borderRadius: 4,
+                      fontSize: 10, fontWeight: 600,
+                      background: log.event_type.startsWith('admin') ? 'var(--neutral-bg)' : 'var(--surface2)',
+                      color: log.event_type.includes('delete') ? 'var(--accent2)'
+                        : log.event_type.includes('impersonate') ? 'var(--accent3)'
+                          : 'var(--muted)',
+                    }}>
+                      {log.event_type}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 11 }}>
+                    <span style={{ color: 'var(--muted)' }}>{log.entity_type}/</span>{log.entity_id?.slice(0, 12)}…
+                  </td>
+                  <td style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 300 }}>
+                    {log.new_value ? (
+                      <span title={JSON.stringify(log.new_value, null, 2)}>
+                        {Object.entries(log.new_value).map(([k, v]) =>
+                          `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`
+                        ).join(' · ')}
+                      </span>
+                    ) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -199,7 +389,6 @@ function TeamCell({ userId, userTeams, allTeams, onChanged }) {
     if (picking && inputRef.current) inputRef.current.focus();
   }, [picking]);
 
-  // Close picker on outside click
   useEffect(() => {
     if (!picking) return;
     const handler = (e) => {
@@ -242,9 +431,7 @@ function TeamCell({ userId, userTeams, allTeams, onChanged }) {
               fontSize: 11, padding: '0 2px', lineHeight: 1, opacity: 0.6,
             }}
             title="Remove from team"
-          >
-            x
-          </button>
+          >×</button>
         </span>
       ))}
       {!picking ? (
@@ -257,9 +444,7 @@ function TeamCell({ userId, userTeams, allTeams, onChanged }) {
           }}
           onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
           onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-        >
-          + team
-        </button>
+        >+ team</button>
       ) : (
         <div style={{
           position: 'absolute', top: '100%', left: 0, zIndex: 50, marginTop: 4,
@@ -269,7 +454,7 @@ function TeamCell({ userId, userTeams, allTeams, onChanged }) {
           <input
             ref={inputRef}
             className="ca-input"
-            placeholder="Search teams..."
+            placeholder="Search teams…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ fontSize: 11, padding: '6px 8px', marginBottom: 4 }}
@@ -288,8 +473,6 @@ function TeamCell({ userId, userTeams, allTeams, onChanged }) {
                       padding: '5px 8px', fontSize: 11, borderRadius: 4,
                       cursor: alreadyIn ? 'default' : 'pointer',
                       color: alreadyIn ? 'var(--muted)' : 'var(--text)',
-                      background: 'transparent',
-                      transition: 'background .1s',
                     }}
                     onMouseEnter={e => { if (!alreadyIn) e.currentTarget.style.background = 'var(--surface2)'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
