@@ -94,7 +94,12 @@ body, #root {
   min-height: 100vh;
   font-size: 13px;
   line-height: 1.5;
+  display: flex;
+  flex-direction: column;
 }
+
+/* Ensure root fills body */
+#root { flex: 1; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -229,6 +234,8 @@ body, #root {
   color: var(--muted); padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   text-align: left; font-weight: 500;
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface);
 }
 .ca-table td {
   padding: 9px 10px;
@@ -287,7 +294,7 @@ body, #root {
 .ca-sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
 /* Scroll */
-.ca-scroll-x { overflow-x: auto; }
+.ca-scroll-x { overflow-x: auto; overflow-y: auto; max-height: 440px; }
 
 /* Range input */
 input[type=range] { padding: 0; cursor: pointer; accent-color: var(--accent); }
@@ -559,6 +566,8 @@ input[type=range] { padding: 0; cursor: pointer; accent-color: var(--accent); }
   .ca-metric { border: 1px solid #ddd; background: #fafafa; }
   .ca-page { padding: 16px; max-width: 100%; }
   .ca-table th, .ca-table td { border-bottom: 1px solid #ddd; }
+  .ca-table th { background: #fff; }
+  .ca-scroll-x { max-height: none; overflow-y: visible; }
   :root {
     --accent: #0a7c42;
     --accent2: #c0392b;

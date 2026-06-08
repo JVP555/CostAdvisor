@@ -27,29 +27,31 @@ export default function App() {
   return (
     <>
       {user && <Navbar />}
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/cost-models/new" element={<CostModelBuilder />} />
-          <Route path="/cost-models/:costModelId" element={<CostModelBuilder />} />
-          <Route path="/cost-models/:costModelId/evolution" element={<Evolution />} />
+      <div style={{ flex: 1 }}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/cost-models/new" element={<CostModelBuilder />} />
+            <Route path="/cost-models/:costModelId" element={<CostModelBuilder />} />
+            <Route path="/cost-models/:costModelId/evolution" element={<Evolution />} />
 
-          <Route path="/cost-models/:costModelId/brief" element={<Brief />} />
-          <Route path="/cost-models/:costModelId/pricing" element={<Pricing />} />
-          <Route path="/indexes" element={<Indexes />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/suppliers" element={<Suppliers />} />
-          <Route path="/suppliers/:supplierId/purchases" element={<SupplierPurchases />} />
-          <Route path="/team" element={<Team />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/admin" element={<Admin />} />
-        </Route>
-      </Routes>
-      {user && <ImpersonationBar />}
+            <Route path="/cost-models/:costModelId/brief" element={<Brief />} />
+            <Route path="/cost-models/:costModelId/pricing" element={<Pricing />} />
+            <Route path="/indexes" element={<Indexes />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/suppliers" element={<Suppliers />} />
+            <Route path="/suppliers/:supplierId/purchases" element={<SupplierPurchases />} />
+            <Route path="/team" element={<Team />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/admin" element={<Admin />} />
+          </Route>
+        </Routes>
+        {user && <ImpersonationBar />}
+      </div>
       <Footer />
     </>
   );
