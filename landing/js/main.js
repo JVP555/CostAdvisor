@@ -1,26 +1,16 @@
-const apiBase =
-  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000'
-    : 'https://api.costadvisor.org';
-
-const appBase =
-  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:5173'
-    : 'https://costadvisor.org';
-
 // Check auth status — swap sign-in buttons to Dashboard if already signed in.
 // ca_token is HttpOnly so we probe /auth/me instead of reading the cookie.
-fetch(`${apiBase}/auth/me`, { credentials: 'include' })
+fetch('http://localhost:8000/auth/me', { credentials: 'include' })
   .then((r) => {
     if (!r.ok) return; // 401 = not signed in, leave everything as-is
 
-    const dashboardBtn = `<a href="${appBase}" class="lp-btn lp-btn-primary lp-btn-lg">Go to Dashboard →</a>`;
+    const dashboardBtn = '<a href="http://localhost:5173" class="lp-btn lp-btn-primary lp-btn-lg">Go to Dashboard →</a>';
 
     // Nav button
     const navBtn = document.getElementById('nav-auth-btn');
     if (navBtn) {
       navBtn.textContent = 'Dashboard →';
-      navBtn.href = appBase;
+      navBtn.href = 'http://localhost:5173';
       navBtn.classList.replace('lp-btn-outline', 'lp-btn-primary');
     }
 
@@ -34,7 +24,7 @@ fetch(`${apiBase}/auth/me`, { credentials: 'include' })
     const ctaNote = document.getElementById('cta-note');
     if (ctaNote) ctaNote.style.display = 'none';
   })
-  .catch(() => {/* network error — leave page as-is */});
+  .catch(() => {/* backend not running — leave page as-is */});
 
 // Progressive scroll-reveal: add .lp-reveal to elements via JS so the page
 // renders fully without JS (Googlebot sees all content), and animations are
@@ -53,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   elements.forEach((el) => el.classList.add('lp-reveal'));
 
-  // Stagger siblings inside the same parent (features grid, steps)
+  // Stagger siblings inside the same parent
   document.querySelectorAll('.lp-features-grid, .lp-how-steps, .lp-security-list').forEach((container) => {
     Array.from(container.children).forEach((child, i) => {
       child.style.transitionDelay = `${i * 60}ms`;

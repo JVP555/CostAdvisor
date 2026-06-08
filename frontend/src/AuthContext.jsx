@@ -68,10 +68,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setTeams([]);
     setActiveTeamId(null);
-    const landingUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? 'http://localhost:3333'
-      : 'https://www.costadvisor.org';
-    window.location.href = landingUrl;
+    window.location.href = 'http://localhost:3333';
   };
 
   return (
