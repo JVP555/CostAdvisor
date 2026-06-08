@@ -30,7 +30,7 @@ export default function Team() {
 }
 
 function MembersTab() {
-  const { activeTeamId, teams, refreshUser } = useAuth();
+  const { activeTeamId, teams, refreshUser, user } = useAuth();
   const confirm = useConfirm();
   const [members, setMembers] = useState([]);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -175,6 +175,11 @@ function MembersTab() {
             const pendingChange = isPendingChange(m.user_id);
             const effRole = effectiveRole(m);
             const isOwnerRow = m.role === 'owner';
+            const isSelf = m.user_id === user?.id;
+            // Edit dropdown: must be manager, not self, and not the owner row unless you are owner
+            const canEditRow = canManage && !isSelf && !(isOwnerRow && !isOwner);
+            // Remove button: must be manager, not self, and never the owner row
+            const canRemoveRow = canManage && !isSelf && !isOwnerRow;
 
             return (
               <div key={m.user_id} style={{
@@ -186,11 +191,14 @@ function MembersTab() {
                 transition: 'opacity 0.2s',
               }}>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 500 }}>{m.display_name || m.email}</div>
+                  <div style={{ fontSize: 12, fontWeight: 500 }}>
+                    {m.display_name || m.email}
+                    {isSelf && <span style={{ marginLeft: 6, fontSize: 9, color: 'var(--muted)' }}>you</span>}
+                  </div>
                   <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.email}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {canManage && !pendingRemoval ? (
+                  {canEditRow && !pendingRemoval ? (
                     <select
                       value={effRole}
                       className="ca-input"
@@ -198,11 +206,7 @@ function MembersTab() {
                         fontSize: 11, padding: '3px 6px', width: 'auto',
                         borderColor: pendingChange ? 'var(--accent3)' : undefined,
                       }}
-                      onChange={e => {
-                        if (isOwnerRow && !isOwner) return; // admins can't touch owner
-                        if (e.target.value === 'owner' && !isOwner) return;
-                        stageRole(m.user_id, e.target.value);
-                      }}
+                      onChange={e => stageRole(m.user_id, e.target.value)}
                     >
                       {isOwner && <option value="owner">owner</option>}
                       <option value="admin">admin</option>
@@ -212,7 +216,7 @@ function MembersTab() {
                     <span style={{ fontSize: 10, color: 'var(--muted)' }}>{effRole}</span>
                   )}
 
-                  {canManage && !isOwnerRow && !pendingRemoval && (
+                  {canRemoveRow && !pendingRemoval && (
                     <button
                       className="ca-btn ca-btn-ghost ca-btn-sm"
                       style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)', fontSize: 11 }}
