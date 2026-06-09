@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api';
+import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
 
@@ -74,7 +74,7 @@ export default function Products() {
       resetForm();
       fetchData();
     } catch (err) {
-      showAlert({ title: 'Error', message: err.response?.data?.detail || err.message });
+      showAlert({ title: 'Error', message: formatApiError(err) });
     } finally {
       setSaving(false);
     }
@@ -92,7 +92,7 @@ export default function Products() {
       await api.delete(`/api/products/${id}`);
       fetchData();
     } catch (err) {
-      showAlert({ title: 'Error', message: err.response?.data?.detail || err.message });
+      showAlert({ title: 'Error', message: formatApiError(err) });
     }
   };
 

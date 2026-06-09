@@ -51,10 +51,16 @@ def create_product(
         custom_attributes=data.custom_attributes,
     )
     db.add(product)
+    # Flush first so Python-side defaults (id, created_at, updated_at) are applied
+    # and product.id is populated before we pass it to log_event.
+    db.flush()
     log_event(db, team_id, current_user.id, "create", "product", str(product.id),
               new_value={"name": data.name, "formula": data.formula, "unit": data.unit})
+    # Expunge before commit so the post-commit session expiry doesn't wipe the
+    # in-memory values. A post-commit db.refresh() would open a new transaction
+    # whose RLS context (app.current_user_id) may not be set, causing a 500.
+    db.expunge(product)
     db.commit()
-    db.refresh(product)
     return product
 
 
@@ -91,8 +97,9 @@ def update_product(
 
     log_event(db, product.team_id, current_user.id, "update", "product", str(product.id),
               previous_value=prev, new_value={"name": product.name, "formula": product.formula, "unit": product.unit})
+    db.flush()
+    db.expunge(product)
     db.commit()
-    db.refresh(product)
     return product
 
 

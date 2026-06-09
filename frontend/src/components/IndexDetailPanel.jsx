@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../api';
+import api, { formatApiError } from '../api';
 import { useConfirm } from './ConfirmDialog';
 
 export default function IndexDetailPanel({ commodity_id, commodity_name, region, teamId, source, globalScraper, onSourceChanged, onRemoved }) {
@@ -51,7 +51,7 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
       setEditing(false);
       setMessage({ type: 'success', text: 'Source saved.' });
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to save source.' });
+      setMessage({ type: 'error', text: formatApiError(err) });
     } finally {
       setSaving(false);
     }

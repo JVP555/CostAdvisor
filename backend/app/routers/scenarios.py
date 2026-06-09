@@ -61,8 +61,8 @@ def create_scenario(
     db.flush()
     log_event(db, team_id, current_user.id, "create", "scenario", str(scenario.id),
               new_value={"name": data.name})
+    db.expunge(scenario)
     db.commit()
-    db.refresh(scenario)
     return scenario
 
 

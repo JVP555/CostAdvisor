@@ -24,6 +24,10 @@ export default function Pricing() {
   const [editPrice, setEditPrice] = useState('');
   const [editVolume, setEditVolume] = useState('');
 
+  // Upload feedback
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadErrors, setUploadErrors] = useState([]); // per-row errors
+
   // Price change analyzer
   const [fromYear, setFromYear] = useState(2024);
   const [fromQuarter, setFromQuarter] = useState(1);
@@ -118,10 +122,19 @@ export default function Pricing() {
   const handleUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    setUploadError(null);
+    setUploadErrors([]);
     const formData = new FormData();
     formData.append('file', file);
     api.post(`/api/prices/${costModelId}/upload`, formData)
-      .then(() => fetchData());
+      .then(({ data }) => {
+        fetchData();
+        if (data.errors?.length) setUploadErrors(data.errors);
+      })
+      .catch(err => {
+        const detail = err.response?.data?.detail;
+        setUploadError(typeof detail === 'string' ? detail : 'Upload failed. Check the file format and try again.');
+      });
     e.target.value = '';
   };
 
@@ -148,6 +161,13 @@ export default function Pricing() {
 
   return (
     <div className="ca-page ca-fade-in">
+      <nav style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10, display: 'flex', gap: 6, alignItems: 'center' }}>
+        <button className="ca-btn-link" style={{ fontSize: 11 }} onClick={() => navigate('/dashboard')}>Dashboard</button>
+        <span>›</span>
+        <button className="ca-btn-link" style={{ fontSize: 11 }} onClick={() => navigate(`/cost-models/${costModelId}`)}>{model?.product_name ?? '…'}</button>
+        <span>›</span>
+        <span>Pricing</span>
+      </nav>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <div className="ca-h1">Pricing</div>
@@ -170,11 +190,34 @@ export default function Pricing() {
           <div className="ca-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div className="ca-card-title" style={{ margin: 0 }}>Pricing & Volume History</div>
-              <label className="ca-btn ca-btn-ghost ca-btn-sm" style={{ cursor: 'pointer' }}>
-                Upload CSV/Excel
-                <input type="file" accept=".csv,.xlsx" onChange={handleUpload} style={{ display: 'none' }} />
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <a
+                  href="data:text/csv;charset=utf-8,period%2Cprice%2Cincoterm%0AQ1-2023%2C1050%2CCIF"
+                  download="prices_template.csv"
+                  className="ca-btn ca-btn-ghost ca-btn-sm"
+                  style={{ fontSize: 11 }}
+                >
+                  Download template
+                </a>
+                <label className="ca-btn ca-btn-ghost ca-btn-sm" style={{ cursor: 'pointer' }}>
+                  Upload CSV/Excel
+                  <input type="file" accept=".csv,.xlsx" onChange={handleUpload} style={{ display: 'none' }} />
+                </label>
+              </div>
             </div>
+            {uploadError && (
+              <div style={{ fontSize: 12, color: 'var(--accent2)', background: 'var(--danger-bg, #fff1f0)', border: '1px solid var(--accent2)', borderRadius: 6, padding: '8px 12px', marginBottom: 10 }}>
+                {uploadError}
+              </div>
+            )}
+            {uploadErrors.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--warning, #92400e)', background: 'var(--warning-bg, #fffbea)', border: '1px solid var(--warning, #d97706)', borderRadius: 6, padding: '8px 12px', marginBottom: 10 }}>
+                <strong>{uploadErrors.length} row{uploadErrors.length > 1 ? 's' : ''} skipped:</strong>
+                <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                  {uploadErrors.map((e, i) => <li key={i}>Row {e.row}: {e.message}</li>)}
+                </ul>
+              </div>
+            )}
 
             {loadingPrices ? (
               <div style={{ color: 'var(--muted)', fontSize: 12 }}>Loading...</div>

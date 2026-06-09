@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api';
+import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
 import exportCsv from '../utils/exportCsv';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
@@ -40,7 +40,7 @@ export default function Dashboard() {
       await api.delete(`/api/cost-models/${id}`);
       fetchPortfolio();
     } catch (err) {
-      showAlert({ title: 'Error', message: err.response?.data?.detail || err.message });
+      showAlert({ title: 'Error', message: formatApiError(err) });
     }
   };
 

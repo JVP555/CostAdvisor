@@ -19,6 +19,7 @@ from app.schemas.costing import (
     SqueezeRequest, SqueezeResult, SqueezePeriod,
     BriefRequest, BriefResult, BriefDriver,
     PriceChangeRequest, PriceChangeResult, PriceChangeComponent,
+    DataGap,
 )
 
 # ── Period helpers ─────────────────────────────────────────────
@@ -365,6 +366,7 @@ def calculate_evolution(
                     ))
 
     periods_out = []
+    data_gaps: list[DataGap] = []
     for year, quarter, month, label in periods:
         # Period-aware: get the formula for this specific period
         period_fv = fv if use_active else _get_period_formula(cost_model, year, quarter)
@@ -389,6 +391,12 @@ def calculate_evolution(
                 cur_val = get_single_index_value(
                     db, cost_model.team_id, comp.commodity_id, region, year, quarter
                 )
+                if not ref_val or not cur_val:
+                    data_gaps.append(DataGap(
+                        component_label=comp.label,
+                        period=label,
+                        reason="no index value found",
+                    ))
                 ratio = (cur_val / ref_val) if (ref_val and cur_val) else 1.0
             else:
                 ratio = 1.0
@@ -451,6 +459,7 @@ def calculate_evolution(
         available_from_quarter=avail_min_q,
         available_to_year=avail_max_y,
         available_to_quarter=avail_max_q,
+        data_gaps=data_gaps,
     )
 
 
@@ -660,6 +669,7 @@ def calculate_brief(
     current_gap = last_period.gap if last_period else None
     current_gap_pct = last_period.gap_pct if last_period else None
 
+    volumes_missing = not bool(raw_volumes)
     total_impact = None
     if raw_volumes:
         total_impact = 0.0
@@ -670,8 +680,10 @@ def calculate_brief(
 
     # Compute drivers using latest formula
     last_y, last_q = periods[-1][0], periods[-1][1]
+    last_label = periods[-1][3]
     comp_base = _component_base(base_price, fv.margin_type, fv.margin_value)
     drivers = []
+    data_gaps: list[DataGap] = []
     for comp in fv.components:
         weight = float(comp.weight)
         idx_name = None
@@ -685,6 +697,12 @@ def calculate_brief(
             cur_val = get_single_index_value(
                 db, cost_model.team_id, comp.commodity_id, region, last_y, last_q
             )
+            if not ref_val or not cur_val:
+                data_gaps.append(DataGap(
+                    component_label=comp.label,
+                    period=last_label,
+                    reason="no index value found",
+                ))
             if ref_val is not None and cur_val is not None and ref_val != 0:
                 ratio = cur_val / ref_val
                 idx_change_pct = (ratio - 1) * 100
@@ -737,10 +755,12 @@ def calculate_brief(
         gap=current_gap,
         gap_pct=current_gap_pct,
         total_impact=round(total_impact, 2) if total_impact is not None else None,
+        volumes_missing=volumes_missing,
         period_label=period_label,
         evolution=evo_periods,
         narrative=narrative,
         drivers=drivers,
+        data_gaps=data_gaps,
     )
 
 

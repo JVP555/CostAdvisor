@@ -482,8 +482,6 @@ async def create_or_update_team_source(
         existing.scrape_config = body.scrape_config
         existing.fixed_value = body.fixed_value if body.source_type == "fixed" else None
         existing.updated_at = datetime.now(timezone.utc)
-        db.commit()
-        db.refresh(existing)
         source = existing
     else:
         source = TeamIndexSource(
@@ -497,17 +495,13 @@ async def create_or_update_team_source(
             created_by=current_user.id,
         )
         db.add(source)
-        db.commit()
-        db.refresh(source)
 
-    # Auto-scrape on save for scrape_url sources
-    if body.source_type == "scrape_url" and body.scrape_url:
-        try:
-            await _scrape_and_replace_overrides(db, source, current_user)
-        except Exception:
-            pass  # scrape failure shouldn't block saving the source config
+    # Flush to assign serial id (for new sources) before building the response.
+    db.flush()
 
-    return TeamIndexSourceOut(
+    # Build response while still in transaction so post-commit expiry doesn't
+    # open a second transaction where the RLS context may not be set.
+    response = TeamIndexSourceOut(
         id=source.id,
         team_id=source.team_id,
         commodity_id=source.commodity_id,
@@ -521,6 +515,16 @@ async def create_or_update_team_source(
         updated_at=source.updated_at,
         commodity_name=commodity.name,
     )
+    db.commit()
+
+    # Auto-scrape on save for scrape_url sources
+    if body.source_type == "scrape_url" and body.scrape_url:
+        try:
+            await _scrape_and_replace_overrides(db, source, current_user)
+        except Exception:
+            pass  # scrape failure shouldn't block saving the source config
+
+    return response
 
 
 @router.delete("/sources/{source_id}")

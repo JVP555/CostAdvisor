@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import api from '../api';
+import api, { formatApiError } from '../api';
 
 export default function FileUpload({ endpoint, onSuccess, accept = '.csv,.xlsx,.xls' }) {
   const [uploading, setUploading] = useState(false);
@@ -25,7 +25,7 @@ export default function FileUpload({ endpoint, onSuccess, accept = '.csv,.xlsx,.
       setResult(data);
       if (onSuccess) onSuccess(data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Upload failed');
+      setError(formatApiError(err));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';

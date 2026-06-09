@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { OVC_ITEMS, RM_ITEMS, PIE_COLORS, INCOTERMS } from '../utils/constants';
 import DonutChart from '../components/DonutChart';
 import IncotermAdjustments from '../components/IncotermAdjustments';
-import api from '../api';
+import api, { formatApiError } from '../api';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
 
 const REGIONS = ['Europe', 'NA', 'Asia', 'Latam'];
@@ -18,6 +18,8 @@ export default function CostModelBuilder() {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(!costModelId);
   const [editing, setEditing] = useState(!costModelId);
+  const [loadError, setLoadError] = useState(null);
+  const [justCreated, setJustCreated] = useState(false);
 
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -71,7 +73,7 @@ export default function CostModelBuilder() {
       setProducts(pRes.data);
       setSuppliers(sRes.data);
       setCommodities(iRes.data);
-    }).catch(console.error);
+    }).catch(() => setLoadError('Could not load reference data. Try reloading the page.'));
   }, [activeTeamId]);
 
   // Load existing cost model
@@ -254,10 +256,11 @@ export default function CostModelBuilder() {
         const { data } = await api.post(`/api/cost-models?team_id=${activeTeamId}`, payload);
         setEditing(false);
         setSnapshot(null);
+        setJustCreated(true);
         navigate(`/cost-models/${data.id}`, { replace: true });
       }
     } catch (err) {
-      showAlert({ title: 'Error saving', message: err.response?.data?.detail || err.message });
+      showAlert({ title: 'Error saving', message: formatApiError(err) });
     } finally {
       setSaving(false);
     }
@@ -277,6 +280,18 @@ export default function CostModelBuilder() {
 
   return (
     <div className="ca-page ca-fade-in">
+      {loadError && (
+        <div style={{ background: 'var(--accent2-bg, #fff1f0)', border: '1px solid var(--accent2)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--accent2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{loadError}</span>
+          <button className="ca-btn-icon" onClick={() => setLoadError(null)} style={{ marginLeft: 12, fontWeight: 700 }}>✕</button>
+        </div>
+      )}
+      {justCreated && (
+        <div style={{ background: 'var(--accent-bg, #f0faf4)', border: '1px solid var(--accent)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--accent)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Model created. Next: go to <button className="ca-btn-link" onClick={() => navigate(`/cost-models/${costModelId}/pricing`)}>Pricing</button> to upload actual prices and see the gap.</span>
+          <button className="ca-btn-icon" onClick={() => setJustCreated(false)} style={{ marginLeft: 12, fontWeight: 700 }}>✕</button>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <div className="ca-h1">
           {!costModelId ? 'New Cost Model' : editing ? 'Edit Cost Model' : 'Cost Model'}
@@ -477,6 +492,11 @@ export default function CostModelBuilder() {
                 <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ marginTop: 6, marginBottom: 12 }} onClick={addComp}>
                   + Add Component
                 </button>
+                {components.length === 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+                    Add at least one commodity component to enable should-cost calculation.
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -735,7 +755,7 @@ function VersionHistory({ costModelId, editing, onLoadVersion }) {
     if (!ok) return;
     api.delete(`/api/cost-models/${costModelId}/versions/${v.id}`)
       .then(fetchVersions)
-      .catch(err => showAlert({ title: 'Error', message: err.response?.data?.detail || err.message }));
+      .catch(err => showAlert({ title: 'Error', message: formatApiError(err) }));
   };
 
   if (versions.length === 0) return null;

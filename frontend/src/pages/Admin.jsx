@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import api from '../api';
+import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
 
@@ -79,7 +79,7 @@ export default function Admin() {
       await refreshUser();
       window.location.href = '/';
     } catch (err) {
-      showAlert({ title: 'Impersonation failed', message: err.response?.data?.detail || err.message });
+      showAlert({ title: 'Impersonation failed', message: formatApiError(err) });
     }
   };
 

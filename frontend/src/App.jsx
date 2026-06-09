@@ -3,6 +3,7 @@ import ProtectedRoute from './ProtectedRoute';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ImpersonationBar from './components/ImpersonationBar';
+import { ToastProvider } from './components/Toast';
 import Login from './pages/Login';
 import CostModelBuilder from './pages/CostModelBuilder';
 import Evolution from './pages/Evolution';
@@ -19,13 +20,14 @@ import Team from './pages/Team';
 import Privacy from './pages/Privacy';
 import Profile from './pages/Profile';
 import Terms from './pages/Terms';
+import NotFound from './pages/NotFound';
 import { useAuth } from './AuthContext';
 
 export default function App() {
   const { user } = useAuth();
 
   return (
-    <>
+    <ToastProvider>
       {user && <Navbar />}
       <div style={{ flex: 1 }}>
         <Routes>
@@ -49,10 +51,11 @@ export default function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<Admin />} />
           </Route>
+          <Route path="*" element={<NotFound />} />
         </Routes>
         {user && <ImpersonationBar />}
       </div>
       <Footer />
-    </>
+    </ToastProvider>
   );
 }

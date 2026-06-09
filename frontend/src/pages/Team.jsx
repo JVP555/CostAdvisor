@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import FileUpload from '../components/FileUpload';
-import api from '../api';
+import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
 import exportCsv from '../utils/exportCsv';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -136,7 +136,7 @@ function MembersTab() {
       setMessage({ type: 'success', text: `Team "${newTeamName}" created` });
       refreshUser();
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to create team' });
+      setMessage({ type: 'error', text: formatApiError(err) });
     }
   };
 

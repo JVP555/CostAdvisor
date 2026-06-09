@@ -112,12 +112,13 @@ def create_cost_model(
         )
         db.add(fc)
 
-    db.commit()
-    db.refresh(cm)
     log_event(db, team_id, current_user.id, "create", "cost_model", str(cm.id),
               new_value={"product_id": str(data.product_id), "region": data.region, "currency": data.currency})
+    # Build response while still in transaction so lazy-loaded relationships (product, supplier)
+    # are accessible without opening a second transaction after commit.
+    result = _build_cost_model_out(cm)
     db.commit()
-    return _build_cost_model_out(cm)
+    return result
 
 
 @router.get("/{cost_model_id}", response_model=CostModelOut)
@@ -152,12 +153,11 @@ def update_cost_model(
             changes[field] = {"old": str(getattr(cm, field)), "new": str(val)}
             setattr(cm, field, val)
 
-    db.commit()
-    db.refresh(cm)
     if changes:
         log_event(db, cm.team_id, current_user.id, "update", "cost_model", str(cm.id), new_value=changes)
-        db.commit()
-    return _build_cost_model_out(cm)
+    result = _build_cost_model_out(cm)
+    db.commit()
+    return result
 
 
 @router.delete("/{cost_model_id}")
@@ -223,12 +223,12 @@ def renegotiate(
             )
             db.add(fc)
 
-        db.commit()
-        db.refresh(existing)
+        db.flush()
         log_event(db, cm.team_id, current_user.id, "update", "formula_version", str(existing.id),
                   new_value={"cost_model_id": str(cost_model_id),
                              "quarter": f"Q{data.base_quarter}-{data.base_year}",
                              "base_price": str(existing.base_price), "margin_type": existing.margin_type})
+        db.expunge(existing)
         db.commit()
         return existing
     else:
@@ -257,12 +257,11 @@ def renegotiate(
             )
             db.add(fc)
 
-        db.commit()
-        db.refresh(fv)
         log_event(db, cm.team_id, current_user.id, "create", "formula_version", str(fv.id),
                   new_value={"cost_model_id": str(cost_model_id),
                              "quarter": f"Q{data.base_quarter}-{data.base_year}",
                              "base_price": str(fv.base_price), "margin_type": fv.margin_type})
+        db.expunge(fv)
         db.commit()
         return fv
 
@@ -371,6 +370,6 @@ def clone_cost_model(
 
     log_event(db, clone.team_id, current_user.id, "clone", "cost_model", str(clone.id),
               new_value={"source_cost_model_id": str(original.id)})
+    result = _build_cost_model_out(clone)
     db.commit()
-    db.refresh(clone)
-    return _build_cost_model_out(clone)
+    return result

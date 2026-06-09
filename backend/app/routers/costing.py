@@ -44,6 +44,12 @@ def should_cost(
         raise HTTPException(status_code=404, detail="Cost model not found")
     require_model_access(db, current_user, cm)
 
+    if not cm.current_formula:
+        raise HTTPException(
+            status_code=422,
+            detail="No formula defined for this cost model. Add components in the Cost Model Builder first.",
+        )
+
     return calculate_should_cost(
         db=db,
         cost_model=cm,

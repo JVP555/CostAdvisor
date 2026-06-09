@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import api from '../api';
+import api, { formatApiError } from '../api';
 import { useAlert } from './ConfirmDialog';
 
 // Mirror of backend/app/constants/incoterms.py COST_BUCKETS + labels
@@ -73,7 +73,7 @@ export default function IncotermAdjustments({
       });
       onChange(Object.keys(next).length ? next : null);
     } catch (err) {
-      showAlert({ title: 'Lane lookup failed', message: err.response?.data?.detail || err.message });
+      showAlert({ title: 'Lane lookup failed', message: formatApiError(err) });
     } finally {
       setLoadingDefaults(false);
     }

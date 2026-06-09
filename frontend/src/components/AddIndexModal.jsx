@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import Modal from './Modal';
-import api from '../api';
+import api, { formatApiError } from '../api';
 
 export default function AddIndexModal({ isOpen, onClose, commodities, teamId, onAdded }) {
   const [commodityId, setCommodityId] = useState('');
@@ -66,7 +66,7 @@ export default function AddIndexModal({ isOpen, onClose, commodities, teamId, on
       onAdded();
       setTimeout(() => onClose(), 600);
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to add index.' });
+      setMessage({ type: 'error', text: formatApiError(err) });
     } finally {
       setSaving(false);
     }

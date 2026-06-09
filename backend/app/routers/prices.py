@@ -57,7 +57,14 @@ async def upload_prices(
 
     content = await file.read()
     filename = file.filename or "upload"
-    rows = parse_price_upload(content, filename)
+
+    try:
+        result = parse_price_upload(content, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    rows = result["rows"]
+    parse_errors = result["errors"]
 
     count = 0
     for row in rows:
@@ -96,7 +103,12 @@ async def upload_prices(
     log_event(db, cm.team_id, current_user.id, "create", "price_data", str(cost_model_id),
               new_value={"rows_processed": count, "filename": filename})
     db.commit()
-    return {"status": "uploaded", "rows_processed": count, "filename": filename}
+    return {
+        "status": "uploaded",
+        "rows_processed": count,
+        "filename": filename,
+        "errors": parse_errors,
+    }
 
 
 @router.put("/{cost_model_id}/{year}/{quarter}", response_model=ActualPriceOut)
@@ -146,9 +158,10 @@ def update_price(
     log_event(db, cm.team_id, current_user.id, "update", "price_data", str(cost_model_id),
               previous_value={"year": year, "quarter": quarter, "price": previous} if previous is not None else None,
               new_value={"year": year, "quarter": quarter, "price": float(data.price)})
+    db.flush()
+    result = ActualPriceOut.model_validate(existing)
     db.commit()
-    db.refresh(existing)
-    return ActualPriceOut.model_validate(existing)
+    return result
 
 
 @router.delete("/{cost_model_id}/{year}/{quarter}")

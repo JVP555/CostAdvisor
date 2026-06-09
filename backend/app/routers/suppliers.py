@@ -52,10 +52,11 @@ def create_supplier(
         country=data.country,
     )
     db.add(supplier)
+    db.flush()  # apply Python-side defaults so supplier.id is populated before log_event
     log_event(db, team_id, current_user.id, "create", "supplier", str(supplier.id),
               new_value={"name": data.name, "country": data.country})
+    db.expunge(supplier)
     db.commit()
-    db.refresh(supplier)
     return supplier
 
 
@@ -75,8 +76,9 @@ def update_supplier(
     supplier.country = data.country
     log_event(db, supplier.team_id, current_user.id, "update", "supplier", str(supplier.id),
               previous_value=prev, new_value={"name": data.name, "country": data.country})
+    db.flush()
+    db.expunge(supplier)
     db.commit()
-    db.refresh(supplier)
     return supplier
 
 

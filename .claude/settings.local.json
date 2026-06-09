@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\costadvisor\\\\frontend\\\\src\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\CostAdvisor\\\\backend\" -Recurse -Filter \"*.py\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Head -30)",
+      "PowerShell(head *)",
+      "Bash(npx tsc *)",
+      "PowerShell(Get-Process *)"
+    ]
+  }
+}

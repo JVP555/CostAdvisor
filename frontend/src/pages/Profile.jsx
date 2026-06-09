@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import api from '../api';
+import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
 import { THEMES } from '../utils/theme';
 
@@ -27,7 +27,7 @@ export default function Profile() {
       await refreshUser();
       setMessage({ type: 'success', text: 'Profile updated.' });
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to save.' });
+      setMessage({ type: 'error', text: formatApiError(err) });
     } finally {
       setSavingName(false);
     }
@@ -42,7 +42,7 @@ export default function Profile() {
       await api.delete('/api/account');
       window.location.href = '/login';
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to delete account.' });
+      setMessage({ type: 'error', text: formatApiError(err) });
     }
   };
 
