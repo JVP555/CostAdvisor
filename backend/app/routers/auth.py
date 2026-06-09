@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response, Request
@@ -6,6 +7,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from jose import jwt
 from authlib.integrations.httpx_client import AsyncOAuth2Client
+from authlib.integrations.base_client.errors import OAuthError
 
 from app.config import get_settings
 from app.database import get_db, current_user_id_var, bypass_rls_var
@@ -16,6 +18,7 @@ from app.schemas.user import UserOut, UserWithTeams
 
 router = APIRouter()
 settings = get_settings()
+logger = logging.getLogger("app.auth")
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -95,14 +98,30 @@ async def callback(request: Request, db: Session = Depends(get_db)):
     if not code:
         raise HTTPException(status_code=400, detail="Missing authorization code")
 
+    redirect_uri = f"{settings.api_url}/auth/callback"
     client = AsyncOAuth2Client(
         client_id=settings.google_client_id,
         client_secret=settings.google_client_secret,
-        redirect_uri=f"{settings.api_url}/auth/callback",
+        redirect_uri=redirect_uri,
     )
 
     # Exchange code for tokens
-    token = await client.fetch_token(GOOGLE_TOKEN_URL, code=code)
+    try:
+        token = await client.fetch_token(GOOGLE_TOKEN_URL, code=code)
+    except OAuthError as e:
+        # Temporary diagnostic: surface exactly what we sent and what Google said.
+        cid = settings.google_client_id
+        logger.error(
+            "Google token exchange failed: error=%r description=%r | "
+            "redirect_uri=%r client_id=%s…(len=%d) secret_len=%d",
+            getattr(e, "error", None),
+            getattr(e, "description", None),
+            redirect_uri,
+            cid[:14],
+            len(cid),
+            len(settings.google_client_secret),
+        )
+        raise
 
     # Get user info from Google
     client.token = token
