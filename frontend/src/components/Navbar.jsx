@@ -29,8 +29,7 @@ export default function Navbar() {
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/indexes', label: 'Indexes' },
     { path: '/suppliers', label: 'Suppliers' },
-    { path: '/team', label: 'Team' },
-    { path: '/requests', label: 'Requests', badge: pendingInviteCount || 0 },
+    { path: '/team', label: 'Team', badge: pendingInviteCount || 0 },
     ...(user?.is_super_admin ? [{ path: '/admin', label: 'Admin' }] : []),
   ];
 
