@@ -83,7 +83,7 @@ def send_invite_email(
         logger.warning("SMTP not configured — invite email not sent to %s", to_email)
         return False
 
-    requests_url = f"{settings.app_url}/team"
+    requests_url = f"{settings.app_url}/team?tab=requests"
     html = build_invite_html(team_name, role, invited_by_name, invited_by_email, requests_url)
 
     msg = MIMEMultipart("alternative")

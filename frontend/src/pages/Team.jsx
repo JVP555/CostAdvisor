@@ -1,4 +1,5 @@
 import { useState, useEffect, Fragment, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import FileUpload from '../components/FileUpload';
 import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
@@ -7,7 +8,10 @@ import { useConfirm } from '../components/ConfirmDialog';
 
 export default function Team() {
   const { pendingInviteCount } = useAuth();
-  const [tab, setTab] = useState('teams');
+  const [searchParams] = useSearchParams();
+  const VALID_TABS = ['teams', 'requests', 'activity', 'settings'];
+  const initialTab = VALID_TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'teams';
+  const [tab, setTab] = useState(initialTab);
 
   const TAB_LABELS = {
     teams: 'Teams',
