@@ -130,6 +130,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
         )
         db.add(user)
         db.flush()
+        user.last_login_at = datetime.now(timezone.utc)
         # No auto-team: super admin assigns users to teams via the admin console
     else:
         user.last_login_at = datetime.now(timezone.utc)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import FileUpload from '../components/FileUpload';
 import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
@@ -6,7 +6,7 @@ import exportCsv from '../utils/exportCsv';
 import { useConfirm } from '../components/ConfirmDialog';
 
 export default function Team() {
-  const [tab, setTab] = useState('members');
+  const [tab, setTab] = useState('teams');
 
   return (
     <div className="ca-page ca-fade-in">
@@ -14,66 +14,191 @@ export default function Team() {
         <div className="ca-h1">Team</div>
       </div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {['members', 'activity', 'settings'].map(t => (
+        {['teams', 'activity', 'settings'].map(t => (
           <button key={t} className={`ca-btn ${tab === t ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
             onClick={() => setTab(t)}>
-            {t === 'members' ? 'Members' : t === 'activity' ? 'Activity Log' : 'Settings'}
+            {t === 'teams' ? 'Teams' : t === 'activity' ? 'Activity Log' : 'Settings'}
           </button>
         ))}
       </div>
 
-      {tab === 'members' && <MembersTab />}
+      {tab === 'teams' && <TeamsTab />}
       {tab === 'activity' && <ActivityTab />}
       {tab === 'settings' && <SettingsTab />}
     </div>
   );
 }
 
-function MembersTab() {
-  const { activeTeamId, teams, refreshUser, user } = useAuth();
-  const confirm = useConfirm();
-  const [members, setMembers] = useState([]);
-  const [inviteEmail, setInviteEmail] = useState('');
+const ROLE_COLORS = {
+  owner:  { bg: 'var(--accent-dim)',  color: 'var(--accent)' },
+  admin:  { bg: 'var(--info-bg)',     color: 'var(--accent3)' },
+  member: { bg: 'var(--neutral-bg)',  color: 'var(--muted)' },
+};
+
+function RoleBadge({ role }) {
+  const s = ROLE_COLORS[role] || ROLE_COLORS.member;
+  return (
+    <span style={{
+      display: 'inline-block', padding: '1px 8px', borderRadius: 4,
+      fontSize: 10, fontWeight: 600, background: s.bg, color: s.color,
+    }}>{role}</span>
+  );
+}
+
+function TeamsTab() {
+  const { teams, refreshUser, user } = useAuth();
   const [newTeamName, setNewTeamName] = useState('');
+  const [expandedTeamId, setExpandedTeamId] = useState(null);
   const [message, setMessage] = useState(null);
 
-  // Staged changes — nothing fires until Save is confirmed
-  const [pendingRoles, setPendingRoles] = useState({});
-  const [pendingRemovals, setPendingRemovals] = useState(new Set());
-  const [pendingInvites, setPendingInvites] = useState([]);
-
-  const hasPending = Object.keys(pendingRoles).length > 0 || pendingRemovals.size > 0 || pendingInvites.length > 0;
-
-  const fetchMembers = async () => {
-    if (!activeTeamId) return;
+  const handleCreateTeam = async () => {
+    const name = newTeamName.trim();
+    if (!name) return;
     try {
-      const { data } = await api.get(`/api/teams/${activeTeamId}/members`);
-      setMembers(data);
+      await api.post('/api/teams', { name });
+      setNewTeamName('');
+      await refreshUser();
+      setMessage({ type: 'success', text: `Team "${name}" created.` });
     } catch (err) {
-      console.error(err);
+      setMessage({ type: 'error', text: formatApiError(err) });
     }
   };
 
-  useEffect(() => {
-    fetchMembers();
-    // Clear pending changes when team switches
-    setPendingRoles({});
-    setPendingRemovals(new Set());
-    setPendingInvites([]);
-  }, [activeTeamId]);
+  const toggleExpand = (teamId) => setExpandedTeamId(prev => prev === teamId ? null : teamId);
+
+  const formatDate = (iso) => {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString();
+  };
+
+  return (
+    <>
+      {message && (
+        <div style={{
+          padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 12,
+          background: message.type === 'success' ? 'var(--accent-dim)' : 'var(--accent2-dim)',
+          color: message.type === 'success' ? 'var(--accent)' : 'var(--accent2)',
+          border: `1px solid ${message.type === 'success' ? 'var(--success-bg-strong)' : 'var(--danger-bg-strong)'}`,
+          display: 'flex', justifyContent: 'space-between',
+        }}>
+          {message.text}
+          <button onClick={() => setMessage(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}>×</button>
+        </div>
+      )}
+
+      <div className="ca-card">
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+          <input
+            className="ca-input"
+            placeholder="New team name…"
+            value={newTeamName}
+            onChange={e => setNewTeamName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleCreateTeam()}
+            style={{ maxWidth: 280 }}
+          />
+          <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleCreateTeam}>
+            + Create Team
+          </button>
+        </div>
+
+        <div className="ca-scroll-x">
+          <table className="ca-table">
+            <thead>
+              <tr>
+                <th>Team</th>
+                <th>Your Role</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teams.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: 36, color: 'var(--muted)', fontSize: 12 }}>
+                    No teams yet. Create one above.
+                  </td>
+                </tr>
+              ) : teams.map(t => (
+                <Fragment key={t.id}>
+                  <tr style={{ background: expandedTeamId === t.id ? 'var(--surface2)' : undefined }}>
+                    <td style={{ fontWeight: 500, fontSize: 13 }}>{t.name}</td>
+                    <td><RoleBadge role={t.role} /></td>
+                    <td style={{ fontSize: 11, color: 'var(--muted)' }}>{formatDate(t.created_at)}</td>
+                    <td>
+                      <button
+                        className={`ca-btn ca-btn-sm ${expandedTeamId === t.id ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+                        onClick={() => toggleExpand(t.id)}
+                      >
+                        {expandedTeamId === t.id ? 'Close' : 'Manage'}
+                      </button>
+                    </td>
+                  </tr>
+                  {expandedTeamId === t.id && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: 0, background: 'var(--surface2)', borderBottom: '2px solid var(--border)' }}>
+                        <TeamManagePanel
+                          teamId={t.id}
+                          teamName={t.name}
+                          userRole={t.role}
+                          currentUserId={user?.id}
+                          onRefresh={refreshUser}
+                          onClose={() => setExpandedTeamId(null)}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh, onClose }) {
+  const { activeTeamId } = useAuth();
+  const confirm = useConfirm();
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [pendingRoles, setPendingRoles] = useState({});
+  const [pendingRemovals, setPendingRemovals] = useState(new Set());
+  const [pendingInvites, setPendingInvites] = useState([]);
+  const [message, setMessage] = useState(null);
+
+  const isOwner = userRole === 'owner';
+  const isAdmin = userRole === 'admin';
+  const canManage = isOwner || isAdmin;
+
+  const fetchMembers = async () => {
+    try {
+      const { data } = await api.get(`/api/teams/${teamId}/members`);
+      setMembers(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchMembers(); }, [teamId]);
+
+  const hasPending = Object.keys(pendingRoles).length > 0 || pendingRemovals.size > 0 || pendingInvites.length > 0;
+  const pendingCount = Object.keys(pendingRoles).length + pendingRemovals.size + pendingInvites.length;
 
   const stageRole = (userId, role) => {
     const committed = members.find(m => m.user_id === userId);
     if (committed?.role === role) {
-      // Revert to committed value — remove from pending
       setPendingRoles(p => { const n = { ...p }; delete n[userId]; return n; });
     } else {
       setPendingRoles(p => ({ ...p, [userId]: role }));
     }
   };
 
-  const stageRemove = (userId) => setPendingRemovals(p => new Set([...p, userId]));
-  const unstageRemove = (userId) => setPendingRemovals(p => { const n = new Set(p); n.delete(userId); return n; });
+  const stageRemove = (uid) => setPendingRemovals(p => new Set([...p, uid]));
+  const unstageRemove = (uid) => setPendingRemovals(p => { const n = new Set(p); n.delete(uid); return n; });
 
   const stageInvite = () => {
     if (!inviteEmail.trim()) return;
@@ -104,15 +229,15 @@ function MembersTab() {
 
     const errors = [];
     for (const [uid, role] of Object.entries(pendingRoles)) {
-      try { await api.patch(`/api/teams/${activeTeamId}/members/${uid}`, { role }); }
+      try { await api.patch(`/api/teams/${teamId}/members/${uid}`, { role }); }
       catch (e) { errors.push(e.response?.data?.detail || 'Role update failed'); }
     }
     for (const uid of pendingRemovals) {
-      try { await api.delete(`/api/teams/${activeTeamId}/members/${uid}`); }
+      try { await api.delete(`/api/teams/${teamId}/members/${uid}`); }
       catch (e) { errors.push(e.response?.data?.detail || 'Remove failed'); }
     }
     for (const email of pendingInvites) {
-      try { await api.post(`/api/teams/${activeTeamId}/invite`, { email }); }
+      try { await api.post(`/api/teams/${teamId}/invite`, { email }); }
       catch (e) { errors.push(e.response?.data?.detail || `Invite ${email} failed`); }
     }
 
@@ -120,7 +245,7 @@ function MembersTab() {
     setPendingRemovals(new Set());
     setPendingInvites([]);
     await fetchMembers();
-    await refreshUser();
+    await onRefresh();
 
     setMessage(errors.length
       ? { type: 'error', text: errors.join('; ') }
@@ -128,35 +253,36 @@ function MembersTab() {
     );
   };
 
-  const handleCreateTeam = async () => {
-    if (!newTeamName.trim()) return;
+  const handleLeave = async () => {
+    const ok = await confirm({
+      title: `Leave ${teamName}?`,
+      message: 'You will be removed from this team. This cannot be undone.',
+      confirmLabel: 'Leave Team',
+      danger: true,
+    });
+    if (!ok) return;
     try {
-      await api.post('/api/teams', { name: newTeamName });
-      setNewTeamName('');
-      setMessage({ type: 'success', text: `Team "${newTeamName}" created` });
-      refreshUser();
+      await api.delete(`/api/teams/${teamId}/members/${currentUserId}`);
+      await onRefresh();
+      onClose();
     } catch (err) {
       setMessage({ type: 'error', text: formatApiError(err) });
     }
   };
 
-  const currentTeam = teams.find(t => t.id === activeTeamId);
-  const isOwner = currentTeam?.role === 'owner';
-  const isAdmin = currentTeam?.role === 'admin';
-  const canManage = isOwner || isAdmin;
-
   const effectiveRole = (m) => pendingRoles[m.user_id] ?? m.role;
-  const isPendingRemoval = (uid) => pendingRemovals.has(uid);
-  const isPendingChange = (uid) => uid in pendingRoles;
+
+  if (loading) {
+    return <div style={{ padding: '16px 24px', color: 'var(--muted)', fontSize: 12 }}>Loading members…</div>;
+  }
 
   return (
-    <>
+    <div style={{ padding: '16px 24px' }}>
       {message && (
         <div style={{
-          padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 12,
+          padding: '8px 12px', borderRadius: 6, marginBottom: 12, fontSize: 11,
           background: message.type === 'success' ? 'var(--accent-dim)' : 'var(--accent2-dim)',
           color: message.type === 'success' ? 'var(--accent)' : 'var(--accent2)',
-          border: `1px solid ${message.type === 'success' ? 'var(--success-bg-strong)' : 'var(--danger-bg-strong)'}`,
           display: 'flex', justifyContent: 'space-between',
         }}>
           {message.text}
@@ -164,39 +290,34 @@ function MembersTab() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
-        <div className="ca-card">
-          <div className="ca-card-title">
-            Team Members — {currentTeam?.name || 'Select a team'}
-          </div>
-
+      <table className="ca-table" style={{ marginBottom: 12 }}>
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Role</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
           {members.map(m => {
-            const pendingRemoval = isPendingRemoval(m.user_id);
-            const pendingChange = isPendingChange(m.user_id);
+            const pendingRemoval = pendingRemovals.has(m.user_id);
+            const pendingChange = m.user_id in pendingRoles;
             const effRole = effectiveRole(m);
             const isOwnerRow = m.role === 'owner';
-            const isSelf = m.user_id === user?.id;
-            // Edit dropdown: must be manager, not self, and not the owner row unless you are owner
+            const isSelf = m.user_id === currentUserId;
             const canEditRow = canManage && !isSelf && !(isOwnerRow && !isOwner);
-            // Remove button: must be manager, not self, and never the owner row
             const canRemoveRow = canManage && !isSelf && !isOwnerRow;
 
             return (
-              <div key={m.user_id} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 0', borderBottom: '1px solid var(--border)',
+              <tr key={m.user_id} style={{
                 opacity: pendingRemoval ? 0.4 : 1,
                 borderLeft: pendingChange ? '2px solid var(--accent3)' : pendingRemoval ? '2px solid var(--accent2)' : '2px solid transparent',
-                paddingLeft: 8,
-                transition: 'opacity 0.2s',
               }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 500 }}>
-                    {m.display_name ? `${m.display_name} (${m.email})` : m.email}
-                    {isSelf && <span style={{ marginLeft: 6, fontSize: 9, color: 'var(--muted)' }}>you</span>}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <td style={{ fontSize: 12 }}>
+                  {m.display_name ? `${m.display_name} (${m.email})` : m.email}
+                  {isSelf && <span style={{ marginLeft: 6, fontSize: 9, color: 'var(--muted)' }}>you</span>}
+                </td>
+                <td>
                   {canEditRow && !pendingRemoval ? (
                     <select
                       value={effRole}
@@ -212,9 +333,10 @@ function MembersTab() {
                       <option value="member">member</option>
                     </select>
                   ) : (
-                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>{effRole}</span>
+                    <RoleBadge role={effRole} />
                   )}
-
+                </td>
+                <td style={{ textAlign: 'right' }}>
                   {canRemoveRow && !pendingRemoval && (
                     <button
                       className="ca-btn ca-btn-ghost ca-btn-sm"
@@ -225,91 +347,78 @@ function MembersTab() {
                     </button>
                   )}
                   {pendingRemoval && (
-                    <button
-                      className="ca-btn ca-btn-ghost ca-btn-sm"
-                      style={{ fontSize: 11 }}
-                      onClick={() => unstageRemove(m.user_id)}
-                    >
+                    <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }} onClick={() => unstageRemove(m.user_id)}>
                       Undo
                     </button>
                   )}
-                </div>
-              </div>
+                </td>
+              </tr>
             );
           })}
 
-          {/* Pending invites (staged, not yet sent) */}
           {pendingInvites.map((email, i) => (
-            <div key={email} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '8px 0 8px 8px', borderBottom: '1px solid var(--border)',
-              borderLeft: '2px solid var(--accent)',
-              opacity: 0.7,
-            }}>
-              <div>
-                <div style={{ fontSize: 12 }}>{email}</div>
-                <div style={{ fontSize: 10, color: 'var(--accent)' }}>pending invite</div>
-              </div>
-              <button
-                className="ca-btn ca-btn-ghost ca-btn-sm"
-                style={{ fontSize: 11 }}
-                onClick={() => setPendingInvites(p => p.filter((_, j) => j !== i))}
-              >
-                Undo
-              </button>
-            </div>
+            <tr key={`invite-${i}`} style={{ borderLeft: '2px solid var(--accent)', opacity: 0.7 }}>
+              <td style={{ fontSize: 12 }}>
+                {email}
+                <span style={{ marginLeft: 8, fontSize: 9, color: 'var(--accent)' }}>pending invite</span>
+              </td>
+              <td />
+              <td style={{ textAlign: 'right' }}>
+                <button
+                  className="ca-btn ca-btn-ghost ca-btn-sm"
+                  style={{ fontSize: 11 }}
+                  onClick={() => setPendingInvites(p => p.filter((_, j) => j !== i))}
+                >
+                  Undo
+                </button>
+              </td>
+            </tr>
           ))}
+        </tbody>
+      </table>
 
-          {canManage && (
-            <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-              <input
-                className="ca-input"
-                placeholder="Add member by email…"
-                value={inviteEmail}
-                onChange={e => setInviteEmail(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && stageInvite()}
-              />
-              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={stageInvite}>
-                + Add
-              </button>
-            </div>
-          )}
+      {canManage && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <input
+            className="ca-input"
+            placeholder="Add member by email…"
+            value={inviteEmail}
+            onChange={e => setInviteEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && stageInvite()}
+            style={{ maxWidth: 280 }}
+          />
+          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={stageInvite}>+ Add</button>
+        </div>
+      )}
 
-          {hasPending && (
-            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-              <button
-                className="ca-btn ca-btn-ghost ca-btn-sm"
-                onClick={() => { setPendingRoles({}); setPendingRemovals(new Set()); setPendingInvites([]); }}
-              >
-                Discard
-              </button>
-              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleSave}>
-                Save {Object.keys(pendingRoles).length + pendingRemovals.size + pendingInvites.length} change{Object.keys(pendingRoles).length + pendingRemovals.size + pendingInvites.length !== 1 ? 's' : ''}
-              </button>
-            </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          {/* Leave only available if not owner and not the active team (avoids breaking the session) */}
+          {!isOwner && teamId !== activeTeamId && (
+            <button
+              className="ca-btn ca-btn-ghost ca-btn-sm"
+              style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)', fontSize: 11 }}
+              onClick={handleLeave}
+            >
+              Leave Team
+            </button>
           )}
         </div>
-
-        <div className="ca-card">
-          <div className="ca-card-title">Create New Team</div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 16 }}>
-            Teams share products, index overrides, and uploaded price data.
-          </p>
+        {hasPending && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              className="ca-input"
-              placeholder="Team name..."
-              value={newTeamName}
-              onChange={e => setNewTeamName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCreateTeam()}
-            />
-            <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleCreateTeam}>
-              Create
+            <button
+              className="ca-btn ca-btn-ghost ca-btn-sm"
+              onClick={() => { setPendingRoles({}); setPendingRemovals(new Set()); setPendingInvites([]); }}
+            >
+              Discard
+            </button>
+            <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleSave}>
+              Save {pendingCount} change{pendingCount !== 1 ? 's' : ''}
             </button>
           </div>
-        </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -359,7 +468,7 @@ function ActivityTab() {
   }, [page]);
 
   const formatDate = (iso) => {
-    if (!iso) return '\u2014';
+    if (!iso) return '—';
     return new Date(iso).toLocaleString();
   };
 
@@ -406,11 +515,11 @@ function ActivityTab() {
                 {logs.map(log => (
                   <tr key={log.id}>
                     <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                      {formatDate(log.created_at)}
+                      {formatDate(log.timestamp)}
                     </td>
                     <td style={{ fontSize: 11 }}>{(() => {
                       const m = membersMap[log.user_id];
-                      return m?.display_name ? `${m.display_name} (${log.user_email})` : (log.user_email || '\u2014');
+                      return m?.display_name ? `${m.display_name} (${log.user_email})` : (log.user_email || '—');
                     })()}</td>
                     <td>
                       <span style={{
@@ -433,7 +542,7 @@ function ActivityTab() {
                             {JSON.stringify(log.new_value, null, 2)}
                           </pre>
                         </details>
-                      ) : '\u2014'}
+                      ) : '—'}
                     </td>
                   </tr>
                 ))}
@@ -551,7 +660,7 @@ function SettingsTab() {
                           const val = pairRates.find(r => r.year === y && r.quarter === q);
                           return (
                             <td key={q} className="center" style={{ fontFamily: "'JetBrains Mono', monospace", color: val ? 'var(--text)' : 'var(--muted)' }}>
-                              {val ? val.rate.toFixed(4) : '\u2014'}
+                              {val ? val.rate.toFixed(4) : '—'}
                             </td>
                           );
                         })}

@@ -126,7 +126,7 @@ export default function AuditTrail() {
                 {logs.map(log => (
                   <tr key={log.id}>
                     <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                      {formatDate(log.created_at)}
+                      {formatDate(log.timestamp)}
                     </td>
                     <td style={{ fontSize: 11 }}>{(() => {
                       const m = membersMap[log.user_id];
