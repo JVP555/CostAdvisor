@@ -43,8 +43,12 @@ class Settings(BaseSettings):
     eurostat_api_base: str = "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1"
     worldbank_api_base: str = "https://api.worldbank.org/v2"
 
-    # Email (Resend)
-    resend_api_key: str = ""
+    # Email (SMTP — stdlib smtplib, no third-party SDK)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_tls: bool = True   # STARTTLS on 587; set False + port 465 for implicit SSL
     email_from: str = "noreply@costadvisor.org"
 
     # Ollama (local LLM)
