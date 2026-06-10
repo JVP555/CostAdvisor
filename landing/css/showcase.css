@@ -336,6 +336,41 @@
   padding-left: 8px;
 }
 
+/* ─── Coming soon badge ─── */
+.lp-coming-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--accent3);
+  background: var(--info-bg);
+  border-radius: 3px;
+  padding: 2px 7px;
+  vertical-align: middle;
+  margin-left: 8px;
+  position: relative;
+  top: -1px;
+}
+
+/* ─── Portfolio gap table mockup ─── */
+.lp-sv-gap-table { width: 100%; border-collapse: collapse; }
+.lp-sv-gap-table th {
+  font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--muted); font-weight: 500; padding: 0 0 8px; text-align: left;
+}
+.lp-sv-gap-table td {
+  font-size: 10px; color: var(--text); padding: 7px 0;
+  border-top: 1px solid var(--border);
+}
+.lp-sv-gap-bar {
+  display: inline-block; height: 6px; border-radius: 2px;
+  background: var(--accent2); opacity: 0.75; vertical-align: middle;
+}
+.lp-sv-gap-ok  { color: var(--accent);  font-weight: 600; }
+.lp-sv-gap-bad { color: var(--accent2); font-weight: 600; }
+.lp-sv-gap-warn{ color: var(--warning,#f59e0b); font-weight: 600; }
+
 @media (max-width: 900px) {
   .lp-showcase-row,
   .lp-showcase-row-flip {

@@ -6,19 +6,19 @@
 
   <!-- SEO -->
   <title>CostAdvisor — Procurement Cost Intelligence</title>
-  <meta name="description" content="Build should-cost models from live commodity indices. Track market evolution. Walk into supplier negotiations knowing exactly where you stand." />
+  <meta name="description" content="Know what your products should cost before your supplier tells you. Should-cost models from live commodity indices — for procurement teams in chemicals, paper, food & beverage, and more." />
   <link rel="canonical" href="https://www.costadvisor.org/" />
 
   <!-- Open Graph -->
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://www.costadvisor.org/" />
-  <meta property="og:title" content="CostAdvisor — Procurement Cost Intelligence" />
+  <meta property="og:type"        content="website" />
+  <meta property="og:url"         content="https://www.costadvisor.org/" />
+  <meta property="og:title"       content="CostAdvisor — Procurement Cost Intelligence" />
   <meta property="og:description" content="Know if your supplier's price increase is justified — before you negotiate." />
-  <meta property="og:site_name" content="CostAdvisor" />
+  <meta property="og:site_name"   content="CostAdvisor" />
 
   <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="CostAdvisor — Procurement Cost Intelligence" />
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:title"       content="CostAdvisor — Procurement Cost Intelligence" />
   <meta name="twitter:description" content="Should-cost models. Live market indices. AI negotiation briefs." />
 
   <!-- Favicon -->
@@ -35,7 +35,9 @@
   <link rel="stylesheet" href="css/nav.css" />
   <link rel="stylesheet" href="css/hero.css" />
   <link rel="stylesheet" href="css/strip.css" />
+  <link rel="stylesheet" href="css/sectors.css" />
   <link rel="stylesheet" href="css/problem.css" />
+  <link rel="stylesheet" href="css/stats.css" />
   <link rel="stylesheet" href="css/how.css" />
   <link rel="stylesheet" href="css/showcase.css" />
   <link rel="stylesheet" href="css/principles.css" />
@@ -60,7 +62,7 @@
           <button class="lp-swatch" data-theme-id="amber"       title="Amber"       aria-label="Amber theme"></button>
           <button class="lp-swatch" data-theme-id="staminachem" title="StaminaChem" aria-label="StaminaChem theme"></button>
         </div>
-        <a id="nav-auth-btn" href="http://localhost:8000/auth/login" class="lp-btn lp-btn-outline" style="margin-left: 2px; padding: 7px 16px; font-size: 11px;">Sign in →</a>
+        <a id="nav-auth-btn" href="https://api.costadvisor.org/auth/login" class="lp-btn lp-btn-outline" style="margin-left:2px;padding:7px 16px;font-size:11px;">Sign in →</a>
       </div>
     </div>
   </nav>
@@ -75,24 +77,24 @@
           <div class="lp-hero-text">
             <div class="lp-hero-eyebrow">
               <span class="lp-eyebrow-dot" aria-hidden="true"></span>
-              Invite-only · Procurement Intelligence
+              Invite-only · Buyer-side cost intelligence
             </div>
             <h1 class="lp-hero-title" id="hero-title">
-              Know if the price<br />increase is <span class="lp-accent">justified.</span>
+              Know what it should<br />cost <span class="lp-accent">before they tell you.</span>
             </h1>
             <p class="lp-hero-sub">
               Build should-cost models from live commodity indices.
               Track market evolution quarter by quarter.
-              Walk into every negotiation with a number — not a hunch.
+              Walk into every supplier negotiation with a defensible number — not a hunch.
             </p>
             <div class="lp-hero-cta" id="hero-cta">
-              <a href="mailto:access@costadvisor.org?subject=Early%20Access%20Request&body=Company%3A%0ARole%3A%0AUse%20case%3A"
+              <a href="mailto:access@costadvisor.org?subject=Early%20Access%20Request&body=Company%3A%0ARole%3A%0ACategory%3A%0AUse%20case%3A"
                  class="lp-btn lp-btn-primary lp-btn-lg">Request early access</a>
-              <a href="http://localhost:8000/auth/login" class="lp-btn lp-btn-ghost lp-btn-lg">Sign in →</a>
+              <a href="https://api.costadvisor.org/auth/login" class="lp-btn lp-btn-ghost lp-btn-lg">Sign in →</a>
             </div>
           </div>
 
-          <!-- Product mockup: brief summary card -->
+          <!-- Product mockup: negotiation brief card -->
           <div class="lp-hero-mockup" aria-hidden="true">
             <div class="lp-mock-card">
               <div class="lp-mock-header">
@@ -158,7 +160,7 @@
         <div class="lp-strip-inner">
           <span class="lp-strip-item">
             <span class="lp-strip-dot" aria-hidden="true"></span>
-            Live commodity indices — ECB, EIA, Eurostat, FRED, World Bank
+            Live indices — ECB, EIA, Eurostat, FRED, World Bank
           </span>
           <span class="lp-strip-sep" aria-hidden="true"></span>
           <span class="lp-strip-item">
@@ -170,6 +172,28 @@
             <span class="lp-strip-dot" aria-hidden="true"></span>
             AI-generated negotiation briefs
           </span>
+          <span class="lp-strip-sep" aria-hidden="true"></span>
+          <span class="lp-strip-item">
+            <span class="lp-strip-dot" aria-hidden="true"></span>
+            Full Incoterms 2020 support
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════ SECTORS ═══ -->
+    <div class="lp-sectors" aria-label="Target industries">
+      <div class="lp-container">
+        <div class="lp-sectors-inner">
+          <span class="lp-sectors-label">Built for</span>
+          <span class="lp-sector-chip">Specialty Chemicals</span>
+          <span class="lp-sector-chip">Paper &amp; Pulp</span>
+          <span class="lp-sector-chip">Water Treatment</span>
+          <span class="lp-sector-chip">Oil &amp; Gas</span>
+          <span class="lp-sector-chip">Food &amp; Beverage</span>
+          <span class="lp-sector-chip">Agriculture</span>
+          <span class="lp-sector-chip">Mining</span>
+          <span class="lp-sector-chip">Automotive</span>
         </div>
       </div>
     </div>
@@ -184,11 +208,38 @@
         <p class="lp-problem-answer">
           Most procurement teams walk into that meeting without a number.
           They push back on instinct, accept partial rollbacks, and leave margin on the table —
-          because they don't know their should-cost.
+          because they have no defensible view of what the product should cost.
+          Procurement is ~50% of industrial company revenue.
+          That gap is expensive.
         </p>
         <p class="lp-problem-statement">
-          CostAdvisor gives you the number.
+          CostAdvisor closes it.
         </p>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ STATS ═══ -->
+    <section class="lp-stats" aria-labelledby="stats-title">
+      <div class="lp-container">
+        <div class="lp-label" id="stats-title">By the numbers</div>
+        <div class="lp-stats-grid">
+          <div class="lp-stat-card">
+            <span class="lp-stat-number">13%</span>
+            <span class="lp-stat-claim">average raw-material savings from should-cost models</span>
+            <span class="lp-stat-source">McKinsey &amp; Company</span>
+          </div>
+          <div class="lp-stat-card">
+            <span class="lp-stat-number">~50%</span>
+            <span class="lp-stat-claim">of supplier cost-increase requests deflected with cost transparency</span>
+            <span class="lp-stat-source">AlixPartners</span>
+          </div>
+          <div class="lp-stat-card">
+            <span class="lp-stat-number">8–12%</span>
+            <span class="lp-stat-claim">purchasing-expense reduction by world-class procurement teams</span>
+            <span class="lp-stat-source">Bain &amp; Company</span>
+          </div>
+        </div>
+        <p class="lp-stats-disclaimer">Industry research figures — individual results will vary by category, supplier, and market conditions.</p>
       </div>
     </section>
 
@@ -201,9 +252,9 @@
           <li class="lp-how-item">
             <span class="lp-how-num">01</span>
             <div>
-              <strong>Build your cost model.</strong>
-              Compose each product from its commodity components — PE, naphtha, energy, logistics.
-              Assign weights. CostAdvisor links each component to a live index automatically.
+              <strong>Decompose your product.</strong>
+              Break each product into its commodity components — feedstock, energy, labor, logistics.
+              Assign cost weights. CostAdvisor links each component to a live public index automatically.
             </div>
           </li>
           <li class="lp-how-item">
@@ -211,15 +262,23 @@
             <div>
               <strong>Indices update every night.</strong>
               Nightly pulls from ECB, EIA, Eurostat, FRED, and World Bank keep your should-cost current.
-              No spreadsheets, no manual refresh. Override any index with your own data.
+              No spreadsheets, no manual refresh. Override any index with your own data or team sources.
             </div>
           </li>
           <li class="lp-how-item">
             <span class="lp-how-num">03</span>
             <div>
+              <strong>Compare against actuals.</strong>
+              Upload your supplier's prices. CostAdvisor calculates the gap — the difference between
+              what the market justifies and what you're paying — quarter by quarter.
+            </div>
+          </li>
+          <li class="lp-how-item">
+            <span class="lp-how-num">04</span>
+            <div>
               <strong>Walk in with a brief.</strong>
-              One click generates your negotiation brief: should-cost vs. actual, ranked drivers,
-              squeeze zones, and an AI narrative. Export as PDF.
+              One click generates your negotiation brief: verdict, ranked cost drivers, total financial
+              impact, and an AI narrative. Export as PDF — named for the product, supplier, and quarter.
             </div>
           </li>
         </ol>
@@ -228,7 +287,7 @@
 
     <!-- ══════════════════════ FEATURE SHOWCASE ═══ -->
     <section class="lp-showcase" id="features" aria-labelledby="showcase-title">
-      <div class="lp-label lp-container" style="padding-bottom:0; padding-top: 96px;">Capabilities</div>
+      <div class="lp-label lp-container" style="padding-bottom:0;padding-top:96px;">Capabilities</div>
       <h2 class="lp-showcase-headline lp-container" id="showcase-title">
         Everything you need<br />to own the number.
       </h2>
@@ -281,7 +340,7 @@
           <h3 class="lp-showcase-h3">Build a model in minutes.<br />Not a spreadsheet in weeks.</h3>
           <p>Compose each product's cost from weighted commodity components.
             CostAdvisor links every component to a live market index.
-            Supports INCOTERM-normalised landed costs, FX conversion,
+            Full Incoterms 2020 support for landed-cost normalisation, FX conversion,
             and custom team data sources.</p>
         </div>
       </div>
@@ -293,13 +352,12 @@
           <h3 class="lp-showcase-h3">See exactly when<br />over-pricing began.</h3>
           <p>Quarter-by-quarter should-cost vs. actual comparison.
             Identifies the inflection point where your supplier started
-            capturing excess margin — with the index data to back it up.</p>
+            capturing excess margin — with the index data to prove it.</p>
         </div>
         <div class="lp-showcase-visual lp-showcase-visual-b" aria-hidden="true">
           <div class="lp-sv-card">
             <div class="lp-sv-header">Evolution · Sodium Hydroxide · 4 quarters</div>
             <div class="lp-sv-chart">
-              <!-- Stacked bar chart — each bar = stacked components; dot = actual price -->
               <div class="lp-sv-chart-area">
                 <div class="lp-sv-col">
                   <div class="lp-sv-stack">
@@ -369,7 +427,6 @@
               </div>
             </div>
 
-            <!-- Cost drivers table — mirrors the app's Brief page -->
             <div class="lp-sv-drivers">
               <div class="lp-sv-drivers-head">
                 <span>Component</span><span>Index</span><span>Δ%</span><span>Contribution</span>
@@ -403,9 +460,61 @@
         <div class="lp-showcase-text">
           <div class="lp-label">AI Negotiation Brief</div>
           <h3 class="lp-showcase-h3">One click.<br />A brief ready to share.</h3>
-          <p>Gap analysis, ranked drivers, total financial impact, and an
+          <p>Gap analysis, ranked cost drivers, total financial impact at volume, and an
             AI-generated narrative written for a supplier conversation.
             Export as PDF — named for the product, supplier, and quarter.</p>
+        </div>
+      </div>
+
+      <!-- Row D: Portfolio Intelligence (Wave 2) -->
+      <div class="lp-showcase-row lp-showcase-row-flip">
+        <div class="lp-showcase-text">
+          <div class="lp-label">Portfolio Intelligence <span class="lp-coming-badge">Coming</span></div>
+          <h3 class="lp-showcase-h3">See where the money<br />is at stake — at a glance.</h3>
+          <p>The dashboard will surface which products are above should-cost, ranked by total gap value.
+            Automatic flagging, a procurement priority matrix, and directional index forecasts —
+            so you know where to focus this quarter without running the analysis yourself.</p>
+        </div>
+        <div class="lp-showcase-visual" aria-hidden="true">
+          <div class="lp-sv-card">
+            <div class="lp-sv-header">Portfolio · Gap Triage · Q2 2025</div>
+            <table class="lp-sv-gap-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Gap %</th>
+                  <th>Gap value</th>
+                  <th style="width:80px">Exposure</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Sodium Hydroxide</td>
+                  <td class="lp-sv-gap-bad">+11.4%</td>
+                  <td class="lp-sv-gap-bad">+€39.10/t</td>
+                  <td><span class="lp-sv-gap-bar" style="width:72px"></span></td>
+                </tr>
+                <tr>
+                  <td>Polyethylene (LDPE)</td>
+                  <td class="lp-sv-gap-warn">+6.8%</td>
+                  <td class="lp-sv-gap-warn">+€82.40/t</td>
+                  <td><span class="lp-sv-gap-bar" style="width:52px;opacity:0.55"></span></td>
+                </tr>
+                <tr>
+                  <td>Sulphuric Acid</td>
+                  <td class="lp-sv-gap-warn">+4.2%</td>
+                  <td class="lp-sv-gap-warn">+€18.60/t</td>
+                  <td><span class="lp-sv-gap-bar" style="width:34px;opacity:0.4"></span></td>
+                </tr>
+                <tr>
+                  <td>Aluminium Sulphate</td>
+                  <td class="lp-sv-gap-ok">−1.1%</td>
+                  <td class="lp-sv-gap-ok">−€4.20/t</td>
+                  <td><span class="lp-sv-gap-bar" style="width:12px;opacity:0.2;background:var(--accent)"></span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -420,22 +529,22 @@
           <div class="lp-principle-card">
             <div class="lp-principle-icon" aria-hidden="true">⬡</div>
             <h3>Index-linked pricing</h3>
-            <p>Every cost component traces back to a live public index. No estimates, no gut feel.</p>
+            <p>Every cost component traces back to a live public index. No estimates, no gut feel — just market data.</p>
           </div>
           <div class="lp-principle-card">
             <div class="lp-principle-icon" aria-hidden="true">◈</div>
             <h3>One source of truth</h3>
-            <p>The same model, the same indices, the same number — across every team member and every quarter.</p>
+            <p>The same model, the same indices, the same number — across every team member, every quarter.</p>
           </div>
           <div class="lp-principle-card">
             <div class="lp-principle-icon" aria-hidden="true">◇</div>
-            <h3>Multi-tenant isolation</h3>
-            <p>Row-level security at the database layer. Your data is invisible to every other organisation.</p>
+            <h3>Buyer-side, always</h3>
+            <p>Built for the buyer. The output is a position you can defend — not an estimate a consultant prepared.</p>
           </div>
           <div class="lp-principle-card">
             <div class="lp-principle-icon" aria-hidden="true">✦</div>
             <h3>AI at the brief layer</h3>
-            <p>The model calculates. The AI narrates. Numbers first — narrative second, never the other way around.</p>
+            <p>The model calculates. The AI narrates. Numbers first — narrative second. Never the other way around.</p>
           </div>
         </div>
       </div>
@@ -448,20 +557,20 @@
         <h2 class="lp-social-headline" id="social-title">From the negotiation table.</h2>
         <div class="lp-social-grid">
           <blockquote class="lp-social-card">
-            <p>"We challenged a 15% steel surcharge using actual ECB and LME index data.
-               The supplier revised to 7%. That gap paid for a year of tooling."</p>
+            <p>"We challenged a 15% caustic soda surcharge using actual ECB and FRED index data.
+               The supplier revised to 7% before the second meeting. That gap paid for a quarter of capex."</p>
             <footer>
               <span class="lp-social-name">Head of Procurement</span>
-              <span class="lp-social-co">Industrial Manufacturer · Germany</span>
+              <span class="lp-social-co">Specialty Chemicals · Germany</span>
             </footer>
           </blockquote>
           <blockquote class="lp-social-card">
-            <p>"For the first time we walked into a polymer renegotiation knowing
-               exactly which cost drivers were real and which were margin padding.
+            <p>"For the first time we walked into a polymer renegotiation knowing exactly
+               which cost drivers were real and which were margin padding.
                The supplier dropped 4 points before we even asked."</p>
             <footer>
               <span class="lp-social-name">Category Manager, Packaging</span>
-              <span class="lp-social-co">FMCG Group · Netherlands</span>
+              <span class="lp-social-co">Food &amp; Beverage Group · Netherlands</span>
             </footer>
           </blockquote>
         </div>
@@ -477,10 +586,11 @@
             <h2 class="lp-security-headline" id="security-title">
               Built for teams with<br />compliance requirements.
             </h2>
-            <p class="lp-lead" style="max-width:420px; margin-top:14px;">
+            <p class="lp-lead" style="max-width:420px;margin-top:14px;">
               Procurement teams handle commercially sensitive cost data.
               Every architectural decision prioritises isolation, auditability,
               and access control — from the database layer up.
+              EU data residency. SOC 2 groundwork in progress.
             </p>
           </div>
           <a href="mailto:access@costadvisor.org?subject=Security%20Overview%20Request"
@@ -530,14 +640,14 @@
             Ready to negotiate from<br />a position of knowledge?
           </h2>
           <p class="lp-cta-body">
-            CostAdvisor is available to selected procurement teams.
+            CostAdvisor is available to selected procurement teams in chemicals,
+            paper &amp; pulp, food &amp; beverage, water treatment, and related industries.
             Request access and we'll be in touch within 48 hours.
-            No waiting room. No self-serve signup.
           </p>
           <div class="lp-cta-actions" id="cta-actions">
-            <a href="mailto:access@costadvisor.org?subject=Early%20Access%20Request&body=Company%3A%0ARole%3A%0AUse%20case%3A"
+            <a href="mailto:access@costadvisor.org?subject=Early%20Access%20Request&body=Company%3A%0ARole%3A%0ACategory%3A%0AUse%20case%3A"
                class="lp-btn lp-btn-primary lp-btn-lg">Request early access</a>
-            <a href="http://localhost:8000/auth/login" class="lp-btn lp-btn-ghost lp-btn-lg">Already have an account →</a>
+            <a href="https://api.costadvisor.org/auth/login" class="lp-btn lp-btn-ghost lp-btn-lg">Already have an account →</a>
           </div>
           <p class="lp-cta-note" id="cta-note">We respond to every request. No automated replies.</p>
         </div>
@@ -552,7 +662,7 @@
       <div class="lp-footer-inner">
         <div class="lp-footer-brand">
           <div class="lp-logo lp-logo-sm" aria-label="CostAdvisor">Cost<span>Advisor</span></div>
-          <p class="lp-footer-tagline">Procurement cost intelligence.<br />Know your number.</p>
+          <p class="lp-footer-tagline">Buyer-side cost intelligence.<br />Know your number before they do.</p>
         </div>
         <div class="lp-footer-links">
           <div class="lp-footer-col">
@@ -562,8 +672,14 @@
             <a href="#security"     class="lp-footer-link">Security</a>
           </div>
           <div class="lp-footer-col">
+            <div class="lp-footer-col-title">Industries</div>
+            <a href="mailto:access@costadvisor.org" class="lp-footer-link">Specialty Chemicals</a>
+            <a href="mailto:access@costadvisor.org" class="lp-footer-link">Paper &amp; Pulp</a>
+            <a href="mailto:access@costadvisor.org" class="lp-footer-link">Food &amp; Beverage</a>
+          </div>
+          <div class="lp-footer-col">
             <div class="lp-footer-col-title">Access</div>
-            <a href="http://localhost:8000/auth/login" class="lp-footer-link">Sign in</a>
+            <a href="https://api.costadvisor.org/auth/login"                                      class="lp-footer-link">Sign in</a>
             <a href="mailto:access@costadvisor.org?subject=Early%20Access%20Request" class="lp-footer-link">Request access</a>
           </div>
           <div class="lp-footer-col">

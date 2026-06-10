@@ -16,6 +16,7 @@
   --on-accent: #0d1117;
   --nav-glass-bg: rgba(10, 12, 16, 0.85);
   --accent-glow: rgba(79, 255, 176, 0.07);
+  --info-bg: rgba(255, 209, 102, 0.10);
   --cat-energy:   #F0A35B;
   --cat-chemical: #A35BF0;
   --cat-labor:    #5BF0A3;
@@ -54,6 +55,7 @@
   --on-accent: #ffffff;
   --nav-glass-bg: rgba(246, 247, 249, 0.92);
   --accent-glow: rgba(10, 124, 66, 0.07);
+  --info-bg: rgba(184, 127, 0, 0.10);
 }
 
 [data-theme="amber"] {
@@ -81,6 +83,7 @@
   --on-accent: #1a1006;
   --nav-glass-bg: rgba(26, 19, 13, 0.85);
   --accent-glow: rgba(255, 179, 71, 0.07);
+  --info-bg: rgba(255, 209, 102, 0.12);
 }
 
 [data-theme="staminachem"] {
@@ -108,4 +111,5 @@
   --on-accent: #ffffff;
   --nav-glass-bg: rgba(245, 247, 250, 0.92);
   --accent-glow: rgba(0, 169, 157, 0.07);
+  --info-bg: rgba(200, 145, 26, 0.10);
 }
