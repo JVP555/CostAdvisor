@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
@@ -180,7 +180,7 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
       </div>
 
       <div className="ca-card">
-        <div className="ca-scroll-x">
+        <div className="ca-scroll-x" style={{ minHeight: 300 }}>
           <table className="ca-table">
             <thead>
               <tr>
@@ -194,7 +194,7 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
             </thead>
             <tbody>
               {users.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>No users found.</td></tr>
+                <tr><td colSpan={6} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No users found.</td></tr>
               )}
               {users.map(u => (
                 <tr key={u.id} style={{ opacity: u.deleted_at ? 0.5 : 1 }}>
@@ -269,10 +269,9 @@ function TeamsTab({ teams, allUsers, onRefresh }) {
   const [expanded, setExpanded] = useState(null);
   const [error, setError] = useState(null);
 
-  // Staged changes scoped to the currently expanded team
   const [pendingRoles, setPendingRoles] = useState({});
   const [pendingRemovals, setPendingRemovals] = useState(new Set());
-  const [pendingAdditions, setPendingAdditions] = useState([]); // [{ userId, email }]
+  const [pendingAdditions, setPendingAdditions] = useState([]);
 
   const hasPending = Object.keys(pendingRoles).length > 0 || pendingRemovals.size > 0 || pendingAdditions.length > 0;
 
@@ -370,151 +369,172 @@ function TeamsTab({ teams, allUsers, onRefresh }) {
         </div>
       )}
 
-      {teams.length === 0 && (
-        <div className="ca-card" style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No teams yet.</div>
-      )}
+      <div className="ca-card">
+        <div className="ca-scroll-x" style={{ minHeight: 300 }}>
+          <table className="ca-table">
+            <thead>
+              <tr>
+                <th>Team</th>
+                <th className="center">Members</th>
+                <th className="center">Created</th>
+                <th className="center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teams.length === 0 && (
+                <tr><td colSpan={4} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No teams found.</td></tr>
+              )}
+              {teams.map(t => {
+                const isOpen = expanded === t.id;
+                const memberIds = new Set(t.members.map(m => m.user_id));
+                const addable = allUsers.filter(u => !memberIds.has(u.id) && !u.deleted_at && !pendingAdditions.find(a => a.userId === u.id));
 
-      {teams.map(t => {
-        const isOpen = expanded === t.id;
-        const memberIds = new Set(t.members.map(m => m.user_id));
-        const addable = allUsers.filter(u => !memberIds.has(u.id) && !u.deleted_at && !pendingAdditions.find(a => a.userId === u.id));
-
-        return (
-          <div key={t.id} className="ca-card" style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{t.name}</span>
-                <span style={{ marginLeft: 10, fontSize: 11, color: 'var(--muted)' }}>
-                  {t.member_count} member{t.member_count !== 1 ? 's' : ''} · created {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
-                </span>
-              </div>
-              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => handleExpand(t.id)}>
-                {isOpen ? 'Close' : 'Manage'}
-              </button>
-              <button
-                className="ca-btn ca-btn-ghost ca-btn-sm"
-                style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
-                onClick={() => deleteTeam(t)}
-              >
-                Delete Team
-              </button>
-            </div>
-
-            {isOpen && (
-              <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                <table className="ca-table" style={{ marginBottom: 14 }}>
-                  <thead>
+                return (
+                  <Fragment key={t.id}>
                     <tr>
-                      <th>Member</th>
-                      <th className="center">Role</th>
-                      <th className="center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {t.members.map(m => {
-                      const pendingRole = pendingRoles[m.user_id];
-                      const pendingRemoval = pendingRemovals.has(m.user_id);
-                      const effRole = pendingRole ?? m.role;
-
-                      return (
-                        <tr key={m.user_id} style={{
-                          opacity: pendingRemoval ? 0.4 : 1,
-                          borderLeft: pendingRole ? '2px solid var(--accent3)' : pendingRemoval ? '2px solid var(--accent2)' : undefined,
-                        }}>
-                          <td style={{ fontSize: 12 }}>{m.email || m.user_id.slice(0, 8)}</td>
-                          <td className="center">
-                            {!pendingRemoval ? (
-                              <select
-                                value={effRole}
-                                className="ca-input"
-                                style={{
-                                  fontSize: 11, padding: '3px 6px', width: 'auto',
-                                  borderColor: pendingRole ? 'var(--accent3)' : undefined,
-                                }}
-                                onChange={e => stageRole(m.user_id, e.target.value, m.role)}
-                              >
-                                <option value="owner">owner</option>
-                                <option value="admin">admin</option>
-                                <option value="member">member</option>
-                              </select>
-                            ) : (
-                              <span style={{ fontSize: 10, color: 'var(--accent2)' }}>removing</span>
-                            )}
-                          </td>
-                          <td className="center">
-                            {m.role !== 'owner' && !pendingRemoval && (
-                              <button
-                                className="ca-btn ca-btn-ghost ca-btn-sm"
-                                style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
-                                onClick={() => stageRemove(m.user_id)}
-                              >
-                                Remove
-                              </button>
-                            )}
-                            {pendingRemoval && (
-                              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => unstageRemove(m.user_id)}>
-                                Undo
-                              </button>
-                            )}
-                            {m.role === 'owner' && !pendingRemoval && (
-                              <span style={{ fontSize: 10, color: 'var(--muted)' }}>transfer to remove</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {/* Staged additions */}
-                    {pendingAdditions.map(({ userId, email }) => (
-                      <tr key={userId} style={{ borderLeft: '2px solid var(--accent)', opacity: 0.75 }}>
-                        <td style={{ fontSize: 12 }}>{email}</td>
-                        <td className="center"><span style={{ fontSize: 10, color: 'var(--accent)' }}>member (pending)</span></td>
-                        <td className="center">
+                      <td style={{ fontWeight: 600, fontSize: 13 }}>{t.name}</td>
+                      <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>
+                        {t.member_count} member{t.member_count !== 1 ? 's' : ''}
+                      </td>
+                      <td className="center" style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                        {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="center">
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => handleExpand(t.id)}>
+                            {isOpen ? 'Close' : 'Manage'}
+                          </button>
                           <button
                             className="ca-btn ca-btn-ghost ca-btn-sm"
-                            onClick={() => setPendingAdditions(p => p.filter(a => a.userId !== userId))}
+                            style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                            onClick={() => deleteTeam(t)}
                           >
-                            Undo
+                            Delete
                           </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {isOpen && (
+                      <tr>
+                        <td colSpan={4} style={{ padding: '16px 20px', background: 'var(--surface2)', borderLeft: '3px solid var(--accent)' }}>
+                          <table className="ca-table" style={{ marginBottom: 14 }}>
+                            <thead>
+                              <tr>
+                                <th>Member</th>
+                                <th className="center">Role</th>
+                                <th className="center">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {t.members.map(m => {
+                                const pendingRole = pendingRoles[m.user_id];
+                                const pendingRemoval = pendingRemovals.has(m.user_id);
+                                const effRole = pendingRole ?? m.role;
+
+                                return (
+                                  <tr key={m.user_id} style={{
+                                    opacity: pendingRemoval ? 0.4 : 1,
+                                    borderLeft: pendingRole ? '2px solid var(--accent3)' : pendingRemoval ? '2px solid var(--accent2)' : undefined,
+                                  }}>
+                                    <td style={{ fontSize: 12 }}>{m.email || m.user_id.slice(0, 8)}</td>
+                                    <td className="center">
+                                      {!pendingRemoval ? (
+                                        <select
+                                          value={effRole}
+                                          className="ca-input"
+                                          style={{
+                                            fontSize: 11, padding: '3px 6px', width: 'auto',
+                                            borderColor: pendingRole ? 'var(--accent3)' : undefined,
+                                          }}
+                                          onChange={e => stageRole(m.user_id, e.target.value, m.role)}
+                                        >
+                                          <option value="owner">owner</option>
+                                          <option value="admin">admin</option>
+                                          <option value="member">member</option>
+                                        </select>
+                                      ) : (
+                                        <span style={{ fontSize: 10, color: 'var(--accent2)' }}>removing</span>
+                                      )}
+                                    </td>
+                                    <td className="center">
+                                      {m.role !== 'owner' && !pendingRemoval && (
+                                        <button
+                                          className="ca-btn ca-btn-ghost ca-btn-sm"
+                                          style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                                          onClick={() => stageRemove(m.user_id)}
+                                        >
+                                          Remove
+                                        </button>
+                                      )}
+                                      {pendingRemoval && (
+                                        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => unstageRemove(m.user_id)}>
+                                          Undo
+                                        </button>
+                                      )}
+                                      {m.role === 'owner' && !pendingRemoval && (
+                                        <span style={{ fontSize: 10, color: 'var(--muted)' }}>transfer to remove</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+
+                              {pendingAdditions.map(({ userId, email }) => (
+                                <tr key={userId} style={{ borderLeft: '2px solid var(--accent)', opacity: 0.75 }}>
+                                  <td style={{ fontSize: 12 }}>{email}</td>
+                                  <td className="center"><span style={{ fontSize: 10, color: 'var(--accent)' }}>member (pending)</span></td>
+                                  <td className="center">
+                                    <button
+                                      className="ca-btn ca-btn-ghost ca-btn-sm"
+                                      onClick={() => setPendingAdditions(p => p.filter(a => a.userId !== userId))}
+                                    >
+                                      Undo
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+
+                          {addable.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                              <span style={{ fontSize: 11, color: 'var(--muted)' }}>Add:</span>
+                              <select
+                                className="ca-input"
+                                style={{ fontSize: 11, padding: '4px 8px' }}
+                                value=""
+                                onChange={e => {
+                                  const u = allUsers.find(u => u.id === e.target.value);
+                                  if (u) stageAdd(u);
+                                }}
+                              >
+                                <option value="" disabled>Select user…</option>
+                                {addable.map(u => (
+                                  <option key={u.id} value={u.id}>{u.email}{u.display_name ? ` (${u.display_name})` : ''}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {hasPending && (
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={clearPending}>Discard</button>
+                              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => handleSave(t)}>
+                                Save {Object.keys(pendingRoles).length + pendingRemovals.size + pendingAdditions.length} change{Object.keys(pendingRoles).length + pendingRemovals.size + pendingAdditions.length !== 1 ? 's' : ''}
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                {addable.length > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>Add:</span>
-                    <select
-                      className="ca-input"
-                      style={{ fontSize: 11, padding: '4px 8px' }}
-                      value=""
-                      onChange={e => {
-                        const u = allUsers.find(u => u.id === e.target.value);
-                        if (u) stageAdd(u);
-                      }}
-                    >
-                      <option value="" disabled>Select user…</option>
-                      {addable.map(u => (
-                        <option key={u.id} value={u.id}>{u.email}{u.display_name ? ` (${u.display_name})` : ''}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {hasPending && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                    <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={clearPending}>Discard</button>
-                    <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => handleSave(t)}>
-                      Save {Object.keys(pendingRoles).length + pendingRemovals.size + pendingAdditions.length} change{Object.keys(pendingRoles).length + pendingRemovals.size + pendingAdditions.length !== 1 ? 's' : ''}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </>
   );
 }
@@ -546,7 +566,7 @@ function AuditTab({ logs, eventType, setEventType, onRefresh }) {
       </div>
 
       <div className="ca-card">
-        <div className="ca-scroll-x">
+        <div className="ca-scroll-x" style={{ minHeight: 300 }}>
           <table className="ca-table">
             <thead>
               <tr>
