@@ -42,6 +42,7 @@
   <link rel="stylesheet" href="css/problem.css" />
   <link rel="stylesheet" href="css/gapchart.css" />
   <link rel="stylesheet" href="css/stats.css" />
+  <link rel="stylesheet" href="css/tabs.css" />
   <link rel="stylesheet" href="css/how.css" />
   <link rel="stylesheet" href="css/showcase.css" />
   <link rel="stylesheet" href="css/roi.css" />
@@ -94,6 +95,22 @@
               Track market evolution quarter by quarter.
               Walk into every supplier negotiation with a defensible number — not a hunch.
             </p>
+            <div class="lp-hero-trust" aria-label="Industry benchmarks">
+              <div class="lp-hero-trust-item">
+                <span class="lp-hero-trust-num">13%</span>
+                <span class="lp-hero-trust-label">raw-material savings · McKinsey</span>
+              </div>
+              <div class="lp-hero-trust-sep" aria-hidden="true"></div>
+              <div class="lp-hero-trust-item">
+                <span class="lp-hero-trust-num">~50%</span>
+                <span class="lp-hero-trust-label">increases deflected · AlixPartners</span>
+              </div>
+              <div class="lp-hero-trust-sep" aria-hidden="true"></div>
+              <div class="lp-hero-trust-item">
+                <span class="lp-hero-trust-num">8–12%</span>
+                <span class="lp-hero-trust-label">cost reduction · Bain</span>
+              </div>
+            </div>
             <div class="lp-hero-cta" id="hero-cta">
               <a href="mailto:access@costadvisor.org?subject=Early%20Access%20Request&body=Company%3A%0ARole%3A%0ACategory%3A%0AUse%20case%3A"
                  class="lp-btn lp-btn-primary lp-btn-lg">Request early access</a>
@@ -162,29 +179,55 @@
     </section>
 
     <!-- ══════════════════════════════════ STRIP ═══ -->
-    <div class="lp-strip" aria-label="Key capabilities">
-      <div class="lp-container">
-        <div class="lp-strip-inner">
-          <span class="lp-strip-item">
-            <span class="lp-strip-dot" aria-hidden="true"></span>
-            Live indices — ECB, EIA, Eurostat, FRED, World Bank
-          </span>
-          <span class="lp-strip-sep" aria-hidden="true"></span>
-          <span class="lp-strip-item">
-            <span class="lp-strip-dot" aria-hidden="true"></span>
-            Should-cost models updated nightly
-          </span>
-          <span class="lp-strip-sep" aria-hidden="true"></span>
-          <span class="lp-strip-item">
-            <span class="lp-strip-dot" aria-hidden="true"></span>
-            AI-generated negotiation briefs
-          </span>
-          <span class="lp-strip-sep" aria-hidden="true"></span>
-          <span class="lp-strip-item">
-            <span class="lp-strip-dot" aria-hidden="true"></span>
-            Full Incoterms 2020 support
-          </span>
-        </div>
+    <!-- Marquee: duplicated set scrolls to -50% for a seamless infinite loop -->
+    <div class="lp-strip" aria-hidden="true">
+      <div class="lp-strip-track">
+        <!-- set 1 -->
+        <span class="lp-strip-item"><span class="lp-strip-src lp-strip-src-ecb"></span>ECB · FX Rates</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-src lp-strip-src-eia"></span>EIA · Energy Indices</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-src lp-strip-src-eurostat"></span>Eurostat · Industrial Prices</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-src lp-strip-src-fred"></span>FRED · US PPI</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-src lp-strip-src-wb"></span>World Bank · Commodities</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>Incoterms 2020</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>Quarterly Evolution</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>AI Negotiation Briefs</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>Nightly Index Refresh</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>PDF &amp; CSV Export</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>Row-Level Security</span>
+        <span class="lp-strip-sep"></span>
+        <!-- set 2 — exact duplicate for seamless loop -->
+        <span class="lp-strip-item"><span class="lp-strip-src lp-strip-src-ecb"></span>ECB · FX Rates</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-src lp-strip-src-eia"></span>EIA · Energy Indices</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-src lp-strip-src-eurostat"></span>Eurostat · Industrial Prices</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-src lp-strip-src-fred"></span>FRED · US PPI</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-src lp-strip-src-wb"></span>World Bank · Commodities</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>Incoterms 2020</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>Quarterly Evolution</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>AI Negotiation Briefs</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>Nightly Index Refresh</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>PDF &amp; CSV Export</span>
+        <span class="lp-strip-sep"></span>
+        <span class="lp-strip-item"><span class="lp-strip-dot"></span>Row-Level Security</span>
+        <span class="lp-strip-sep"></span>
       </div>
     </div>
 
@@ -324,6 +367,219 @@
             </div>
           </li>
         </ol>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════ TABS ═══ -->
+    <section class="lp-tabs" id="use-cases" aria-labelledby="tabs-title">
+      <div class="lp-container">
+        <div class="lp-label">Built for your negotiation</div>
+        <h2 class="lp-tabs-headline" id="tabs-title">Every scenario.<br />One platform.</h2>
+
+        <div class="lp-tab-bar" role="tablist" aria-label="Use case tabs">
+          <button class="lp-tab-btn active" role="tab" aria-selected="true"
+                  aria-controls="tab-increase" data-tab="increase">Supplier price increase</button>
+          <button class="lp-tab-btn" role="tab" aria-selected="false"
+                  aria-controls="tab-renewal" data-tab="renewal">Contract renewal</button>
+          <button class="lp-tab-btn" role="tab" aria-selected="false"
+                  aria-controls="tab-new" data-tab="new">New category</button>
+          <button class="lp-tab-btn" role="tab" aria-selected="false"
+                  aria-controls="tab-portfolio" data-tab="portfolio">Portfolio triage</button>
+        </div>
+
+        <!-- Tab: Supplier price increase -->
+        <div class="lp-tab-panel active" id="tab-increase" role="tabpanel">
+          <div class="lp-tab-text">
+            <ul class="lp-tab-bullets">
+              <li>Receive a price increase notice — respond with data, not instinct</li>
+              <li>Calculate exactly which portion of the increase is index-justified</li>
+              <li>Walk in with a brief showing the defensible gap before the meeting</li>
+            </ul>
+            <div class="lp-tab-caps-label">Capabilities</div>
+            <div class="lp-tab-caps">
+              <span class="lp-tab-cap">Should-cost model</span>
+              <span class="lp-tab-cap">Gap analysis</span>
+              <span class="lp-tab-cap">AI narrative</span>
+              <span class="lp-tab-cap">PDF brief</span>
+            </div>
+          </div>
+          <div class="lp-tab-visual" aria-hidden="true">
+            <div class="lp-sv-card">
+              <div class="lp-sv-header">Brief · Sodium Hydroxide · Q2 2025</div>
+              <div class="lp-sv-brief-verdict">
+                <span class="lp-sv-brief-label">Verdict</span>
+                <span class="lp-sv-brief-challenge">Above should-cost · Challenge</span>
+              </div>
+              <div class="lp-sv-brief-metrics">
+                <div class="lp-sv-brief-row"><span>Should-cost</span><span>€ 342.80 / t</span></div>
+                <div class="lp-sv-brief-row"><span>Supplier ask</span><span>€ 381.90 / t</span></div>
+                <div class="lp-sv-brief-row lp-sv-brief-gap">
+                  <span>Unjustified gap</span>
+                  <span class="lp-sv-accent2">+€ 39.10 · +11.4%</span>
+                </div>
+              </div>
+              <div class="lp-sv-brief-narrative">
+                "Natural gas rose 18.2% — justifying +8.2%. The remaining +3.2% has no index basis. Challenge directly."
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Contract renewal -->
+        <div class="lp-tab-panel" id="tab-renewal" role="tabpanel">
+          <div class="lp-tab-text">
+            <ul class="lp-tab-bullets">
+              <li>Track how input costs have moved over every quarter of the contract term</li>
+              <li>Pinpoint the exact quarter when the supplier started capturing excess margin</li>
+              <li>Enter renewal negotiations with 8 quarters of market evidence</li>
+            </ul>
+            <div class="lp-tab-caps-label">Capabilities</div>
+            <div class="lp-tab-caps">
+              <span class="lp-tab-cap">Quarterly evolution</span>
+              <span class="lp-tab-cap">Squeeze / desqueeze</span>
+              <span class="lp-tab-cap">Index timeline</span>
+              <span class="lp-tab-cap">CSV export</span>
+            </div>
+          </div>
+          <div class="lp-tab-visual" aria-hidden="true">
+            <div class="lp-sv-card">
+              <div class="lp-sv-header">Evolution · 8 quarters · Q3 2023 – Q2 2025</div>
+              <div class="lp-sv-chart">
+                <div class="lp-sv-chart-area">
+                  <div class="lp-sv-col">
+                    <div class="lp-sv-stack">
+                      <div class="lp-sv-seg" style="height:30%;background:var(--cat-energy)"></div>
+                      <div class="lp-sv-seg" style="height:17%;background:var(--cat-ppi)"></div>
+                      <div class="lp-sv-seg" style="height:13%;background:var(--cat-labor)"></div>
+                    </div>
+                    <div class="lp-sv-act-dot lp-sv-act-match"></div>
+                    <span class="lp-sv-qlabel">Q3 23</span>
+                  </div>
+                  <div class="lp-sv-col">
+                    <div class="lp-sv-stack">
+                      <div class="lp-sv-seg" style="height:32%;background:var(--cat-energy)"></div>
+                      <div class="lp-sv-seg" style="height:18%;background:var(--cat-ppi)"></div>
+                      <div class="lp-sv-seg" style="height:14%;background:var(--cat-labor)"></div>
+                    </div>
+                    <div class="lp-sv-act-dot lp-sv-act-match"></div>
+                    <span class="lp-sv-qlabel">Q4 23</span>
+                  </div>
+                  <div class="lp-sv-col">
+                    <div class="lp-sv-stack">
+                      <div class="lp-sv-seg" style="height:35%;background:var(--cat-energy)"></div>
+                      <div class="lp-sv-seg" style="height:19%;background:var(--cat-ppi)"></div>
+                      <div class="lp-sv-seg" style="height:14%;background:var(--cat-labor)"></div>
+                    </div>
+                    <div class="lp-sv-act-dot lp-sv-act-above"></div>
+                    <span class="lp-sv-qlabel">Q1 24</span>
+                  </div>
+                  <div class="lp-sv-col">
+                    <div class="lp-sv-stack">
+                      <div class="lp-sv-seg" style="height:40%;background:var(--cat-energy)"></div>
+                      <div class="lp-sv-seg" style="height:20%;background:var(--cat-ppi)"></div>
+                      <div class="lp-sv-seg" style="height:15%;background:var(--cat-labor)"></div>
+                    </div>
+                    <div class="lp-sv-act-dot lp-sv-act-gap"></div>
+                    <span class="lp-sv-qlabel">Q2 25</span>
+                  </div>
+                </div>
+                <div class="lp-sv-legend">
+                  <span><span class="lp-sv-leg-swatch" style="background:var(--cat-energy)"></span>Energy</span>
+                  <span><span class="lp-sv-leg-swatch" style="background:var(--cat-ppi)"></span>Feedstock</span>
+                  <span><span class="lp-sv-leg-dot lp-sv-leg-act"></span>Actual</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: New category -->
+        <div class="lp-tab-panel" id="tab-new" role="tabpanel">
+          <div class="lp-tab-text">
+            <ul class="lp-tab-bullets">
+              <li>Decompose a new product into weighted commodity components in under 30 minutes</li>
+              <li>Link each component to the right index — ECB, EIA, Eurostat, FRED — automatically</li>
+              <li>Have a live should-cost running before your first supplier meeting</li>
+            </ul>
+            <div class="lp-tab-caps-label">Capabilities</div>
+            <div class="lp-tab-caps">
+              <span class="lp-tab-cap">Cost model builder</span>
+              <span class="lp-tab-cap">Index linking</span>
+              <span class="lp-tab-cap">FX conversion</span>
+              <span class="lp-tab-cap">Incoterm normalisation</span>
+            </div>
+          </div>
+          <div class="lp-tab-visual" aria-hidden="true">
+            <div class="lp-sv-card">
+              <div class="lp-sv-header">Cost Model · Polyethylene (LDPE)</div>
+              <div class="lp-sv-formula">
+                <div class="lp-sv-comp">
+                  <span class="lp-sv-dot" style="background:var(--cat-energy)"></span>
+                  <span class="lp-sv-comp-label">Naphtha</span>
+                  <span class="lp-sv-index-src">Crude Oil · EIA</span>
+                  <span class="lp-sv-w">48%</span>
+                </div>
+                <div class="lp-sv-comp">
+                  <span class="lp-sv-dot" style="background:var(--cat-ppi)"></span>
+                  <span class="lp-sv-comp-label">Ethylene</span>
+                  <span class="lp-sv-index-src">PPI Plastics · FRED</span>
+                  <span class="lp-sv-w">24%</span>
+                </div>
+                <div class="lp-sv-comp">
+                  <span class="lp-sv-dot" style="background:var(--cat-labor)"></span>
+                  <span class="lp-sv-comp-label">Labor</span>
+                  <span class="lp-sv-index-src">Labor Europe · Eurostat</span>
+                  <span class="lp-sv-w">18%</span>
+                </div>
+                <div class="lp-sv-comp">
+                  <span class="lp-sv-dot" style="background:var(--cat-fx)"></span>
+                  <span class="lp-sv-comp-label">FX</span>
+                  <span class="lp-sv-index-src">EUR/USD · ECB</span>
+                  <span class="lp-sv-w">10%</span>
+                </div>
+              </div>
+              <div class="lp-sv-result">
+                <span>Should-cost · Q2 2025 · FCA</span>
+                <span class="lp-sv-num">€ 1,214 / t</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Portfolio triage -->
+        <div class="lp-tab-panel" id="tab-portfolio" role="tabpanel">
+          <div class="lp-tab-text">
+            <ul class="lp-tab-bullets">
+              <li>See every product gap ranked by money at stake — not alphabetically</li>
+              <li>Flag categories where market conditions changed but prices didn't follow</li>
+              <li>Prioritise this quarter's negotiations by ROI, not urgency</li>
+            </ul>
+            <div class="lp-tab-caps-label">Capabilities <span class="lp-coming-badge">Coming · Wave 2</span></div>
+            <div class="lp-tab-caps">
+              <span class="lp-tab-cap">Portfolio dashboard</span>
+              <span class="lp-tab-cap">Gap flagging</span>
+              <span class="lp-tab-cap">Priority matrix</span>
+              <span class="lp-tab-cap">Spend exposure</span>
+            </div>
+          </div>
+          <div class="lp-tab-visual" aria-hidden="true">
+            <div class="lp-sv-card">
+              <div class="lp-sv-header">Portfolio · Gap Triage · Q2 2025</div>
+              <table class="lp-sv-gap-table">
+                <thead>
+                  <tr><th>Product</th><th>Gap %</th><th>Value</th><th style="width:70px">Exposure</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Sodium Hydroxide</td><td class="lp-sv-gap-bad">+11.4%</td><td class="lp-sv-gap-bad">+€39/t</td><td><span class="lp-sv-gap-bar" style="width:64px"></span></td></tr>
+                  <tr><td>LDPE</td><td class="lp-sv-gap-warn">+6.8%</td><td class="lp-sv-gap-warn">+€82/t</td><td><span class="lp-sv-gap-bar" style="width:46px;opacity:0.55"></span></td></tr>
+                  <tr><td>Sulphuric Acid</td><td class="lp-sv-gap-warn">+4.2%</td><td class="lp-sv-gap-warn">+€19/t</td><td><span class="lp-sv-gap-bar" style="width:30px;opacity:0.4"></span></td></tr>
+                  <tr><td>Al. Sulphate</td><td class="lp-sv-gap-ok">−1.1%</td><td class="lp-sv-gap-ok">−€4/t</td><td><span class="lp-sv-gap-bar" style="width:10px;opacity:0.2;background:var(--accent)"></span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 

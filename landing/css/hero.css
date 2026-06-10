@@ -65,6 +65,51 @@
   margin-bottom: 36px;
 }
 
+/* ─── Inline trust stats (Auth0-style "3 billion+" row) ─── */
+.lp-hero-trust {
+  display: flex;
+  align-items: center;
+  margin-bottom: 32px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  max-width: 440px;
+}
+
+.lp-hero-trust-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  padding: 0 16px;
+}
+
+.lp-hero-trust-item:first-child { padding-left: 0; }
+
+.lp-hero-trust-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.lp-hero-trust-label {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.2px;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.lp-hero-trust-sep {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
 .lp-hero-cta {
   display: flex;
   gap: 12px;

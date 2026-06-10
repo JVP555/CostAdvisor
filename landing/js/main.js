@@ -170,6 +170,26 @@ function calcLpROI() {
   document.getElementById('roiResult').textContent = result;
 }
 
+// ─── Use-case tabs ───
+document.querySelectorAll('.lp-tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+
+    document.querySelectorAll('.lp-tab-btn').forEach((b) => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    document.querySelectorAll('.lp-tab-panel').forEach((p) => {
+      p.classList.remove('active');
+    });
+
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    const panel = document.getElementById('tab-' + tab);
+    if (panel) panel.classList.add('active');
+  });
+});
+
 // ─── FAQ accordion ───
 function toggleLpFaq(btn) {
   const answer = btn.nextElementSibling;
@@ -253,6 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
     '.lp-gapchart-wrap',
     '.lp-roi-card',
     '.lp-faq-item',
+    '.lp-tab-bar',
   ];
 
   const elements = document.querySelectorAll(selectors.join(', '));
