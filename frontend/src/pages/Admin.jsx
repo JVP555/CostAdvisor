@@ -390,22 +390,27 @@ function TeamsTab({ teams, allUsers, onRefresh, targetTeamId, onTeamExpanded }) 
 
   const stageAdd = (user) => {
     if (!pendingAdditions.find(a => a.userId === user.id)) {
-      setPendingAdditions(p => [...p, { userId: user.id, email: user.email }]);
+      setPendingAdditions(p => [...p, { userId: user.id, email: user.email, displayName: user.display_name }]);
     }
+  };
+
+  const memberLabel = (userId) => {
+    const u = allUsers.find(u => u.id === userId);
+    if (!u) return userId?.slice(0, 12) + '…';
+    return u.display_name ? `${u.display_name} (${u.email})` : u.email;
   };
 
   const handleSave = async (team) => {
     const lines = [];
     for (const [uid, role] of Object.entries(pendingRoles)) {
       const m = team.members.find(m => m.user_id === uid);
-      lines.push(`· ${m?.email}: ${m?.role} → ${role}`);
+      lines.push(`· ${memberLabel(uid)}: ${m?.role} → ${role}`);
     }
     for (const uid of pendingRemovals) {
-      const m = team.members.find(m => m.user_id === uid);
-      lines.push(`· Remove ${m?.email}`);
+      lines.push(`· Remove ${memberLabel(uid)}`);
     }
-    for (const { email } of pendingAdditions) {
-      lines.push(`· Add ${email}`);
+    for (const { userId, email, displayName } of pendingAdditions) {
+      lines.push(`· Add ${displayName ? `${displayName} (${email})` : email}`);
     }
 
     const ok = await confirm({
@@ -545,7 +550,7 @@ function TeamsTab({ teams, allUsers, onRefresh, targetTeamId, onTeamExpanded }) 
                                     opacity: pendingRemoval ? 0.4 : 1,
                                     borderLeft: pendingRole ? '2px solid var(--accent3)' : pendingRemoval ? '2px solid var(--accent2)' : undefined,
                                   }}>
-                                    <td style={{ fontSize: 12 }}>{m.email || m.user_id.slice(0, 8)}</td>
+                                    <td style={{ fontSize: 12 }}>{memberLabel(m.user_id)}</td>
                                     <td className="center">
                                       {!pendingRemoval ? (
                                         <select
@@ -588,9 +593,9 @@ function TeamsTab({ teams, allUsers, onRefresh, targetTeamId, onTeamExpanded }) 
                                 );
                               })}
 
-                              {pendingAdditions.map(({ userId, email }) => (
+                              {pendingAdditions.map(({ userId, email, displayName }) => (
                                 <tr key={userId} style={{ borderLeft: '2px solid var(--accent)', opacity: 0.75 }}>
-                                  <td style={{ fontSize: 12 }}>{email}</td>
+                                  <td style={{ fontSize: 12 }}>{displayName ? `${displayName} (${email})` : email}</td>
                                   <td className="center"><span style={{ fontSize: 10, color: 'var(--accent)' }}>member (pending)</span></td>
                                   <td className="center">
                                     <button
@@ -619,7 +624,7 @@ function TeamsTab({ teams, allUsers, onRefresh, targetTeamId, onTeamExpanded }) 
                               >
                                 <option value="" disabled>Select user…</option>
                                 {addable.map(u => (
-                                  <option key={u.id} value={u.id}>{u.email}{u.display_name ? ` (${u.display_name})` : ''}</option>
+                                  <option key={u.id} value={u.id}>{u.display_name ? `${u.display_name} (${u.email})` : u.email}</option>
                                 ))}
                               </select>
                             </div>

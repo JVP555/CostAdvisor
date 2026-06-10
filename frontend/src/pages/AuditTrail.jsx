@@ -36,7 +36,15 @@ export default function AuditTrail() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [entityType, setEntityType] = useState('');
+  const [membersMap, setMembersMap] = useState({});
   const PAGE_SIZE = 50;
+
+  useEffect(() => {
+    if (!activeTeamId) return;
+    api.get(`/api/teams/${activeTeamId}/members`)
+      .then(r => setMembersMap(Object.fromEntries(r.data.map(m => [m.user_id, m]))))
+      .catch(() => {});
+  }, [activeTeamId]);
 
   const fetchLogs = (reset = false) => {
     if (!activeTeamId) return;
@@ -120,7 +128,10 @@ export default function AuditTrail() {
                     <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                       {formatDate(log.created_at)}
                     </td>
-                    <td style={{ fontSize: 11 }}>{log.user_email || '\u2014'}</td>
+                    <td style={{ fontSize: 11 }}>{(() => {
+                      const m = membersMap[log.user_id];
+                      return m?.display_name ? `${m.display_name} (${log.user_email})` : (log.user_email || '\u2014');
+                    })()}</td>
                     <td>
                       <span style={{
                         display: 'inline-block', padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
