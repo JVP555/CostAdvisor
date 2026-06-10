@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment, useMemo } from 'react';
 import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
+import Tooltip from '../components/Tooltip';
 
 export default function Admin() {
   const { user, refreshUser } = useAuth();
@@ -16,6 +17,9 @@ export default function Admin() {
   const [search, setSearch] = useState('');
   const [showDeleted, setShowDeleted] = useState(false);
   const [auditEventType, setAuditEventType] = useState('');
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [targetTeamId, setTargetTeamId] = useState(null);
+  const [roleFilter, setRoleFilter] = useState('all');
 
   const fetchData = () => {
     setLoading(true);
@@ -84,13 +88,22 @@ export default function Admin() {
   };
 
   const filtered = users.filter(u => {
+    if (roleFilter === 'super_admin' && !u.is_super_admin) return false;
+    if (roleFilter === 'regular' && u.is_super_admin) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
       u.email?.toLowerCase().includes(q) ||
-      u.display_name?.toLowerCase().includes(q)
+      u.display_name?.toLowerCase().includes(q) ||
+      u.teams?.some(t => t.team_name?.toLowerCase().includes(q))
     );
   });
+
+  const handleNavigateToTeam = (teamId) => {
+    setSelectedUser(null);
+    setTab('teams');
+    setTargetTeamId(teamId);
+  };
 
   if (!user?.is_super_admin && !impersonating) {
     return (
@@ -141,16 +154,46 @@ export default function Admin() {
           onRestore={restoreUser}
           onChanged={fetchData}
           isImpersonating={impersonating}
+          roleFilter={roleFilter}
+          setRoleFilter={setRoleFilter}
+          onSelectUser={setSelectedUser}
         />
       ) : tab === 'teams' ? (
-        <TeamsTab teams={teams} allUsers={users} onRefresh={fetchData} />
+        <TeamsTab
+          teams={teams}
+          allUsers={users}
+          onRefresh={fetchData}
+          targetTeamId={targetTeamId}
+          onTeamExpanded={() => setTargetTeamId(null)}
+        />
       ) : (
         <AuditTab
           logs={auditLogs}
           eventType={auditEventType}
           setEventType={setAuditEventType}
           onRefresh={fetchAuditLogs}
+          users={users}
         />
+      )}
+
+      {selectedUser && (
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 140 }}
+            onClick={() => setSelectedUser(null)}
+          />
+          <UserDetailPanel
+            user={selectedUser}
+            onClose={() => setSelectedUser(null)}
+            onNavigateToTeam={handleNavigateToTeam}
+            onToggleSuperAdmin={(id, cur) => { toggleSuperAdmin(id, cur); setSelectedUser(null); }}
+            onImpersonate={(id) => { impersonate(id); setSelectedUser(null); }}
+            onDelete={(u) => { deleteUser(u); setSelectedUser(null); }}
+            onRestore={(u) => { restoreUser(u); setSelectedUser(null); }}
+            currentUser={user}
+            isImpersonating={impersonating}
+          />
+        </>
       )}
     </div>
   );
@@ -158,17 +201,28 @@ export default function Admin() {
 
 
 function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDeleted,
-  currentUser, onToggleSuperAdmin, onImpersonate, onDelete, onRestore, onChanged, isImpersonating }) {
+  currentUser, onToggleSuperAdmin, onImpersonate, onDelete, onRestore, onChanged,
+  isImpersonating, roleFilter, setRoleFilter, onSelectUser }) {
   return (
     <>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
           className="ca-input"
-          placeholder="Search by name or email…"
+          placeholder="Search by name, email or team…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ maxWidth: 280 }}
+          style={{ maxWidth: 260 }}
         />
+        <select
+          className="ca-input"
+          value={roleFilter}
+          onChange={e => setRoleFilter(e.target.value)}
+          style={{ width: 'auto' }}
+        >
+          <option value="all">All users</option>
+          <option value="super_admin">Super Admin</option>
+          <option value="regular">Regular User</option>
+        </select>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)', cursor: 'pointer' }}>
           <input
             type="checkbox"
@@ -187,17 +241,20 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
                 <th>User</th>
                 <th>Email</th>
                 <th className="center">Role</th>
-                <th>Teams</th>
                 <th className="center">Last Login</th>
                 <th className="center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No users found.</td></tr>
+                <tr><td colSpan={5} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No users found.</td></tr>
               )}
               {users.map(u => (
-                <tr key={u.id} style={{ opacity: u.deleted_at ? 0.5 : 1 }}>
+                <tr
+                  key={u.id}
+                  style={{ opacity: u.deleted_at ? 0.5 : 1, cursor: 'pointer' }}
+                  onClick={() => onSelectUser(u)}
+                >
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {u.avatar_url && <img src={u.avatar_url} alt="" style={{ width: 24, height: 24, borderRadius: '50%' }} />}
@@ -216,40 +273,45 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
                       {u.is_super_admin ? 'SUPER ADMIN' : 'USER'}
                     </span>
                   </td>
-                  <td>
-                    <TeamCell userId={u.id} userTeams={u.teams} allTeams={allTeams} onChanged={onChanged} />
-                  </td>
                   <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>
                     {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : '—'}
                   </td>
                   <td className="center">
-                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
                       {!u.deleted_at && u.id !== currentUser?.id && (
                         <>
-                          <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                            onClick={() => onToggleSuperAdmin(u.id, u.is_super_admin)}>
-                            {u.is_super_admin ? 'Revoke Admin' : 'Make Admin'}
-                          </button>
-                          <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                            style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)', opacity: isImpersonating ? 0.4 : 1 }}
-                            onClick={() => onImpersonate(u.id)}
-                            disabled={isImpersonating}
-                            title={isImpersonating ? 'Stop current impersonation first' : undefined}>
-                            Impersonate
-                          </button>
-                          <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                            style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
-                            onClick={() => onDelete(u)}>
-                            Delete
-                          </button>
+                          <Tooltip text={u.is_super_admin ? 'Revoke Admin' : 'Make Admin'}>
+                            <button
+                              className="ca-btn ca-btn-ghost ca-btn-sm"
+                              style={{ padding: '4px 8px', fontSize: 13, lineHeight: 1 }}
+                              onClick={e => { e.stopPropagation(); onToggleSuperAdmin(u.id, u.is_super_admin); }}
+                            >⚙</button>
+                          </Tooltip>
+                          <Tooltip text={isImpersonating ? 'Stop current impersonation first' : 'Impersonate'}>
+                            <button
+                              className="ca-btn ca-btn-ghost ca-btn-sm"
+                              style={{ padding: '4px 8px', fontSize: 13, lineHeight: 1, color: 'var(--accent3)', borderColor: 'var(--accent3)', opacity: isImpersonating ? 0.4 : 1 }}
+                              onClick={e => { e.stopPropagation(); onImpersonate(u.id); }}
+                              disabled={isImpersonating}
+                            >⇒</button>
+                          </Tooltip>
+                          <Tooltip text="Delete">
+                            <button
+                              className="ca-btn ca-btn-ghost ca-btn-sm"
+                              style={{ padding: '4px 8px', fontSize: 13, lineHeight: 1, color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                              onClick={e => { e.stopPropagation(); onDelete(u); }}
+                            >✕</button>
+                          </Tooltip>
                         </>
                       )}
                       {u.deleted_at && (
-                        <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                          style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
-                          onClick={() => onRestore(u)}>
-                          Restore
-                        </button>
+                        <Tooltip text="Restore">
+                          <button
+                            className="ca-btn ca-btn-ghost ca-btn-sm"
+                            style={{ padding: '4px 8px', fontSize: 13, lineHeight: 1, color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                            onClick={e => { e.stopPropagation(); onRestore(u); }}
+                          >↺</button>
+                        </Tooltip>
                       )}
                     </div>
                   </td>
@@ -264,10 +326,19 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
 }
 
 
-function TeamsTab({ teams, allUsers, onRefresh }) {
+function TeamsTab({ teams, allUsers, onRefresh, targetTeamId, onTeamExpanded }) {
   const confirm = useConfirm();
   const [expanded, setExpanded] = useState(null);
   const [error, setError] = useState(null);
+  const [teamSearch, setTeamSearch] = useState('');
+
+  useEffect(() => {
+    if (targetTeamId) {
+      setExpanded(targetTeamId);
+      setError(null);
+      onTeamExpanded?.();
+    }
+  }, [targetTeamId]);
 
   const [pendingRoles, setPendingRoles] = useState({});
   const [pendingRemovals, setPendingRemovals] = useState(new Set());
@@ -356,6 +427,14 @@ function TeamsTab({ teams, allUsers, onRefresh }) {
     catch (e) { setError(e.response?.data?.detail || e.message || 'Error'); }
   };
 
+  const filteredTeams = teamSearch
+    ? teams.filter(t => {
+        const q = teamSearch.toLowerCase();
+        return t.name.toLowerCase().includes(q) ||
+               t.members.some(m => m.email?.toLowerCase().includes(q));
+      })
+    : teams;
+
   return (
     <>
       {error && (
@@ -369,6 +448,16 @@ function TeamsTab({ teams, allUsers, onRefresh }) {
         </div>
       )}
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <input
+          className="ca-input"
+          placeholder="Search by team name or member email…"
+          value={teamSearch}
+          onChange={e => setTeamSearch(e.target.value)}
+          style={{ maxWidth: 340 }}
+        />
+      </div>
+
       <div className="ca-card">
         <div className="ca-scroll-x" style={{ minHeight: 300 }}>
           <table className="ca-table">
@@ -381,10 +470,10 @@ function TeamsTab({ teams, allUsers, onRefresh }) {
               </tr>
             </thead>
             <tbody>
-              {teams.length === 0 && (
+              {filteredTeams.length === 0 && (
                 <tr><td colSpan={4} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No teams found.</td></tr>
               )}
-              {teams.map(t => {
+              {filteredTeams.map(t => {
                 const isOpen = expanded === t.id;
                 const memberIds = new Set(t.members.map(m => m.user_id));
                 const addable = allUsers.filter(u => !memberIds.has(u.id) && !u.deleted_at && !pendingAdditions.find(a => a.userId === u.id));
@@ -544,13 +633,63 @@ const AUDIT_EVENT_TYPES = [
   '', 'admin_impersonate_start', 'admin_impersonate_stop',
   'admin_update_user', 'admin_delete_user', 'admin_restore_user',
   'admin_set_team', 'admin_add_team', 'admin_remove_team',
+  'admin_update_role', 'admin_remove_member',
   'create', 'update', 'delete',
 ];
 
-function AuditTab({ logs, eventType, setEventType, onRefresh }) {
+function resolveUserName(entityId, usersMap) {
+  const u = usersMap[entityId];
+  return u ? (u.display_name || u.email) : (entityId?.slice(0, 12) + '…');
+}
+
+function formatAuditDetail(log, usersMap) {
+  const nv = log.new_value || {};
+  const pv = log.previous_value || {};
+  const target = resolveUserName(log.entity_id, usersMap);
+  switch (log.event_type) {
+    case 'admin_add_team':
+    case 'admin_set_team':
+      return `${target} · role: ${nv.role} · team: ${nv.team}`;
+    case 'admin_update_user': {
+      const parts = Object.entries(nv.changes || {}).map(([k, v]) => `${k}: ${v.from}→${v.to}`);
+      return `${target} · ${parts.join(', ')}`;
+    }
+    case 'admin_delete_user':  return `deleted: ${nv.email}`;
+    case 'admin_restore_user': return `restored: ${nv.email}`;
+    case 'admin_impersonate_start': return `target: ${nv.target_email}`;
+    case 'admin_impersonate_stop':  return '(impersonation ended)';
+    case 'admin_update_role':  return `${target} · role: ${pv.role}→${nv.role}`;
+    case 'admin_remove_team':
+    case 'admin_remove_member': return `${target} · removed`;
+    default: {
+      const parts = Object.entries(nv)
+        .filter(([k]) => k !== 'by')
+        .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`);
+      return parts.join(' · ') || '—';
+    }
+  }
+}
+
+function AuditTab({ logs, eventType, setEventType, onRefresh, users }) {
+  const [actorSearch, setActorSearch] = useState('');
+
+  const usersMap = useMemo(
+    () => Object.fromEntries((users || []).map(u => [u.id, u])),
+    [users],
+  );
+
+  const filtered = actorSearch
+    ? logs.filter(l => {
+        const q = actorSearch.toLowerCase();
+        const actor = usersMap[l.user_id];
+        return l.user_email?.toLowerCase().includes(q) ||
+               actor?.display_name?.toLowerCase().includes(q);
+      })
+    : logs;
+
   return (
     <>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <select
           className="ca-input"
           value={eventType}
@@ -561,8 +700,15 @@ function AuditTab({ logs, eventType, setEventType, onRefresh }) {
             <option key={t} value={t}>{t || 'All event types'}</option>
           ))}
         </select>
+        <input
+          className="ca-input"
+          placeholder="Search actor…"
+          value={actorSearch}
+          onChange={e => setActorSearch(e.target.value)}
+          style={{ maxWidth: 200 }}
+        />
         <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={onRefresh}>Refresh</button>
-        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{logs.length} entries</span>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{filtered.length} entries</span>
       </div>
 
       <div className="ca-card">
@@ -578,46 +724,169 @@ function AuditTab({ logs, eventType, setEventType, onRefresh }) {
               </tr>
             </thead>
             <tbody>
-              {logs.length === 0 && (
-                <tr><td colSpan={5} style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>No log entries.</td></tr>
+              {filtered.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No log entries.</td></tr>
               )}
-              {logs.map(log => (
-                <tr key={log.id}>
-                  <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                    {new Date(log.timestamp).toLocaleString()}
-                  </td>
-                  <td style={{ fontSize: 11 }}>{log.user_email || log.user_id?.slice(0, 8)}</td>
-                  <td>
-                    <span style={{
-                      display: 'inline-block', padding: '2px 8px', borderRadius: 4,
-                      fontSize: 10, fontWeight: 600,
-                      background: log.event_type.startsWith('admin') ? 'var(--neutral-bg)' : 'var(--surface2)',
-                      color: log.event_type.includes('delete') ? 'var(--accent2)'
-                        : log.event_type.includes('impersonate') ? 'var(--accent3)'
-                          : 'var(--muted)',
-                    }}>
-                      {log.event_type}
-                    </span>
-                  </td>
-                  <td style={{ fontSize: 11 }}>
-                    <span style={{ color: 'var(--muted)' }}>{log.entity_type}/</span>{log.entity_id?.slice(0, 12)}…
-                  </td>
-                  <td style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 300 }}>
-                    {log.new_value ? (
-                      <span title={JSON.stringify(log.new_value, null, 2)}>
-                        {Object.entries(log.new_value).map(([k, v]) =>
-                          `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`
-                        ).join(' · ')}
+              {filtered.map(log => {
+                const actor = usersMap[log.user_id];
+                const actorLabel = actor?.display_name
+                  ? `${actor.display_name} (${log.user_email})`
+                  : (log.user_email || log.user_id?.slice(0, 8));
+                return (
+                  <tr key={log.id}>
+                    <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                      {new Date(log.timestamp).toLocaleString()}
+                    </td>
+                    <td style={{ fontSize: 11 }}>{actorLabel}</td>
+                    <td>
+                      <span style={{
+                        display: 'inline-block', padding: '2px 8px', borderRadius: 4,
+                        fontSize: 10, fontWeight: 600,
+                        background: log.event_type.startsWith('admin') ? 'var(--neutral-bg)' : 'var(--surface2)',
+                        color: log.event_type.includes('delete') ? 'var(--accent2)'
+                          : log.event_type.includes('impersonate') ? 'var(--accent3)'
+                            : 'var(--muted)',
+                      }}>
+                        {log.event_type}
                       </span>
-                    ) : '—'}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td style={{ fontSize: 11 }}>
+                      <span style={{ color: 'var(--muted)' }}>{log.entity_type}/</span>{log.entity_id?.slice(0, 12)}…
+                    </td>
+                    <td style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 300 }}>
+                      {formatAuditDetail(log, usersMap)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
     </>
+  );
+}
+
+
+function UserDetailPanel({ user, onClose, onNavigateToTeam, onToggleSuperAdmin,
+  onImpersonate, onDelete, onRestore, currentUser, isImpersonating }) {
+  if (!user) return null;
+  return (
+    <div style={{
+      position: 'fixed', top: 0, right: 0,
+      width: 360, height: '100vh',
+      background: 'var(--surface)',
+      borderLeft: '1px solid var(--border)',
+      zIndex: 150, overflowY: 'auto',
+      padding: 24,
+      boxShadow: '-4px 0 24px rgba(0,0,0,0.15)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+        <div style={{ fontWeight: 700, fontSize: 15 }}>User Details</div>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        {user.avatar_url
+          ? <img src={user.avatar_url} alt="" style={{ width: 48, height: 48, borderRadius: '50%' }} />
+          : <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: 'var(--surface2)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, color: 'var(--muted)', fontWeight: 700,
+            }}>
+              {(user.display_name || user.email)?.[0]?.toUpperCase()}
+            </div>
+        }
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{user.display_name || 'No name'}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>{user.email}</div>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6 }}>Role</div>
+        <span style={{
+          display: 'inline-block', padding: '3px 10px', borderRadius: 4,
+          fontSize: 10, fontWeight: 600,
+          background: user.is_super_admin ? 'var(--success-bg)' : 'var(--neutral-bg)',
+          color: user.is_super_admin ? 'var(--accent)' : 'var(--muted)',
+        }}>
+          {user.is_super_admin ? 'SUPER ADMIN' : 'USER'}
+        </span>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6 }}>Last Login</div>
+        <div style={{ fontSize: 12 }}>
+          {user.last_login_at ? new Date(user.last_login_at).toLocaleString() : '—'}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 8 }}>Teams</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {(!user.teams || user.teams.length === 0) && (
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>No teams</span>
+          )}
+          {user.teams?.map((t, i) => (
+            <button
+              key={i}
+              onClick={() => onNavigateToTeam(t.team_id)}
+              style={{
+                background: 'var(--surface2)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '7px 12px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                color: 'var(--text)', fontSize: 12, textAlign: 'left',
+                transition: 'border-color .15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+            >
+              <span>{t.team_name}</span>
+              <span style={{ fontSize: 9, color: 'var(--accent3)', fontWeight: 600 }}>{t.role}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!user.deleted_at && user.id !== currentUser?.id && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+          <button
+            className="ca-btn ca-btn-ghost ca-btn-sm"
+            onClick={() => onToggleSuperAdmin(user.id, user.is_super_admin)}
+          >
+            ⚙ {user.is_super_admin ? 'Revoke Admin' : 'Make Admin'}
+          </button>
+          <button
+            className="ca-btn ca-btn-ghost ca-btn-sm"
+            style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)', opacity: isImpersonating ? 0.4 : 1 }}
+            onClick={() => onImpersonate(user.id)}
+            disabled={isImpersonating}
+          >
+            ⇒ Impersonate
+          </button>
+          <button
+            className="ca-btn ca-btn-ghost ca-btn-sm"
+            style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+            onClick={() => onDelete(user)}
+          >
+            ✕ Delete
+          </button>
+        </div>
+      )}
+      {user.deleted_at && user.id !== currentUser?.id && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+          <button
+            className="ca-btn ca-btn-ghost ca-btn-sm"
+            style={{ color: 'var(--accent)', borderColor: 'var(--accent)', width: '100%' }}
+            onClick={() => onRestore(user)}
+          >
+            ↺ Restore
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
