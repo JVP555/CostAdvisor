@@ -306,12 +306,12 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
                               onClick={e => { e.stopPropagation(); onToggleSuperAdmin(u.id, u.is_super_admin); }}
                             >⚙</button>
                           </Tooltip>
-                          <Tooltip text={isImpersonating ? 'Stop current impersonation first' : 'Impersonate'}>
+                          <Tooltip text={u.is_super_admin ? 'Cannot impersonate a super admin' : isImpersonating ? 'Stop current impersonation first' : 'Impersonate'}>
                             <button
                               className="ca-btn ca-btn-ghost ca-btn-sm"
-                              style={{ padding: '4px 8px', fontSize: 13, lineHeight: 1, color: 'var(--accent3)', borderColor: 'var(--accent3)', opacity: isImpersonating ? 0.4 : 1 }}
+                              style={{ padding: '4px 8px', fontSize: 13, lineHeight: 1, color: 'var(--accent3)', borderColor: 'var(--accent3)', opacity: (isImpersonating || u.is_super_admin) ? 0.4 : 1 }}
                               onClick={e => { e.stopPropagation(); onImpersonate(u.id); }}
-                              disabled={isImpersonating}
+                              disabled={isImpersonating || u.is_super_admin}
                             >⇒</button>
                           </Tooltip>
                           <Tooltip text="Delete">
@@ -676,7 +676,7 @@ function formatAuditDetail(log, usersMap) {
     case 'admin_delete_user':  return `deleted: ${nv.email}`;
     case 'admin_restore_user': return `restored: ${nv.email}`;
     case 'admin_impersonate_start': return `target: ${nv.target_email}`;
-    case 'admin_impersonate_stop':  return '(impersonation ended)';
+    case 'admin_impersonate_stop':  return nv.target_email ? `stopped — was on ${nv.target_email}` : '(impersonation ended)';
     case 'admin_update_role':  return `${target} · role: ${pv.role}→${nv.role}`;
     case 'admin_remove_team':
     case 'admin_remove_member': return `${target} · removed`;
@@ -879,11 +879,12 @@ function UserDetailPanel({ user, onClose, onNavigateToTeam, onToggleSuperAdmin,
           </button>
           <button
             className="ca-btn ca-btn-ghost ca-btn-sm"
-            style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)', opacity: isImpersonating ? 0.4 : 1 }}
+            style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)', opacity: (isImpersonating || user.is_super_admin) ? 0.4 : 1 }}
             onClick={() => onImpersonate(user.id)}
-            disabled={isImpersonating}
+            disabled={isImpersonating || user.is_super_admin}
+            title={user.is_super_admin ? 'Cannot impersonate a super admin' : undefined}
           >
-            ⇒ Impersonate
+            ⇒ {user.is_super_admin ? 'Cannot impersonate (super admin)' : 'Impersonate'}
           </button>
           <button
             className="ca-btn ca-btn-ghost ca-btn-sm"

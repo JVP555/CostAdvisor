@@ -2,6 +2,33 @@ import { useState, useEffect } from 'react';
 import api from '../api';
 import { useAuth } from '../AuthContext';
 
+function formatEventDetail(log) {
+  const nv = log.new_value || {};
+  switch (log.event_type) {
+    case 'admin_impersonate_start':
+      return (
+        <span style={{ color: 'var(--accent3)' }}>
+          impersonated by <strong>{nv.by}</strong> (on {nv.target_email})
+        </span>
+      );
+    case 'admin_impersonate_stop':
+      return (
+        <span style={{ color: 'var(--muted)' }}>
+          impersonation stopped by <strong>{nv.by}</strong> (was on {nv.target_email})
+        </span>
+      );
+    default:
+      return nv && Object.keys(nv).length > 0 ? (
+        <details style={{ fontSize: 10 }}>
+          <summary style={{ cursor: 'pointer', color: 'var(--accent3)' }}>View changes</summary>
+          <pre style={{ marginTop: 4, padding: 8, background: 'var(--surface2)', borderRadius: 4, overflow: 'auto', maxHeight: 150, fontSize: 9 }}>
+            {JSON.stringify(nv, null, 2)}
+          </pre>
+        </details>
+      ) : '—';
+  }
+}
+
 export default function AuditTrail() {
   const { activeTeamId } = useAuth();
   const [logs, setLogs] = useState([]);
@@ -107,15 +134,8 @@ export default function AuditTrail() {
                       <span style={{ color: 'var(--text)' }}>{log.entity_type}</span>
                       <span style={{ color: 'var(--muted)', marginLeft: 6, fontSize: 9 }}>{log.entity_id?.slice(0, 8)}</span>
                     </td>
-                    <td style={{ maxWidth: 300 }}>
-                      {log.new_value ? (
-                        <details style={{ fontSize: 10 }}>
-                          <summary style={{ cursor: 'pointer', color: 'var(--accent3)' }}>View changes</summary>
-                          <pre style={{ marginTop: 4, padding: 8, background: 'var(--surface2)', borderRadius: 4, overflow: 'auto', maxHeight: 150, fontSize: 9 }}>
-                            {JSON.stringify(log.new_value, null, 2)}
-                          </pre>
-                        </details>
-                      ) : '\u2014'}
+                    <td style={{ maxWidth: 300, fontSize: 11 }}>
+                      {formatEventDetail(log)}
                     </td>
                   </tr>
                 ))}
