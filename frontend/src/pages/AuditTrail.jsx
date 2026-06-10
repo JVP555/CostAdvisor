@@ -14,6 +14,8 @@ const EVENT_TYPES = [
   { value: 'upload', label: 'Upload' },
   { value: 'override', label: 'Index Override' },
   { value: 'scrape', label: 'Scrape' },
+  { value: 'invite_accepted', label: 'Invite Accepted' },
+  { value: 'invite_revoked', label: 'Invite Revoked' },
 ];
 
 const ENTITY_TYPES = [
@@ -56,6 +58,10 @@ function formatEventDetail(log) {
       return nv.cloned_from ? `Cloned from "${nv.cloned_from}"` : 'Cloned';
     case 'invite':
       return `Invited ${nv.email || '?'} as ${nv.role || 'member'}`;
+    case 'invite_accepted':
+      return `Accepted invite as ${nv.role || 'member'}`;
+    case 'invite_revoked':
+      return `Revoked invite for ${nv.email || '?'}${nv.role ? ` (${nv.role})` : ''}`;
     case 'update_role': {
       const from = pv.role || '?';
       const to = nv.role || '?';

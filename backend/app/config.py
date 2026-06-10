@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     eurostat_api_base: str = "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1"
     worldbank_api_base: str = "https://api.worldbank.org/v2"
 
+    # Email (Resend)
+    resend_api_key: str = ""
+    email_from: str = "noreply@costadvisor.org"
+
     # Ollama (local LLM)
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b"

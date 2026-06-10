@@ -348,6 +348,7 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
   const { activeTeamId } = useAuth();
   const confirm = useConfirm();
   const [members, setMembers] = useState([]);
+  const [pendingInvites, setPendingInvites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [message, setMessage] = useState(null);
@@ -359,8 +360,12 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
   const fetchMembers = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/api/teams/${teamId}/members`);
-      setMembers(data);
+      const [membersRes, invitesRes] = await Promise.all([
+        api.get(`/api/teams/${teamId}/members`),
+        canManage ? api.get(`/api/teams/${teamId}/invites`) : Promise.resolve({ data: [] }),
+      ]);
+      setMembers(membersRes.data);
+      setPendingInvites(invitesRes.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -423,8 +428,24 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
     await fetchMembers();
     setMessage(error
       ? { type: 'error', text: `Some invites failed: ${error}` }
-      : { type: 'success', text: 'Members added.' }
+      : { type: 'success', text: 'Invite sent.' }
     );
+  };
+
+  const handleRevoke = async (inviteId, email) => {
+    const ok = await confirm({
+      title: 'Revoke invite?',
+      message: `Revoke the pending invite for ${email}?`,
+      confirmLabel: 'Revoke',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/api/teams/${teamId}/invites/${inviteId}`);
+      setPendingInvites(prev => prev.filter(i => i.id !== inviteId));
+    } catch (err) {
+      setMessage({ type: 'error', text: formatApiError(err) });
+    }
   };
 
   const formatDate = (iso) => iso ? new Date(iso).toLocaleDateString() : '—';
@@ -527,6 +548,58 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
           })}
         </tbody>
       </table>
+
+      {canManage && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', marginBottom: 8, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+            Pending Invites
+            {pendingInvites.length > 0 && (
+              <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 400, color: 'var(--muted)' }}>
+                {pendingInvites.length} waiting
+              </span>
+            )}
+          </div>
+          {pendingInvites.length === 0 ? (
+            <div style={{ fontSize: 11, color: 'var(--muted)', padding: '8px 0' }}>No pending invites.</div>
+          ) : (
+            <table className="ca-table">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Invited</th>
+                  <th>Expires</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingInvites.map(inv => {
+                  const daysLeft = Math.ceil((new Date(inv.expires_at) - Date.now()) / 86400000);
+                  return (
+                    <tr key={inv.id}>
+                      <td style={{ fontSize: 12 }}>{inv.invited_email}</td>
+                      <td><RoleBadge role={inv.role} /></td>
+                      <td style={{ fontSize: 11, color: 'var(--muted)' }}>{formatDate(inv.created_at)}</td>
+                      <td style={{ fontSize: 11, color: daysLeft <= 2 ? 'var(--accent2)' : 'var(--muted)' }}>
+                        {daysLeft}d left
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          className="ca-btn ca-btn-ghost ca-btn-sm"
+                          style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)', fontSize: 11 }}
+                          onClick={() => handleRevoke(inv.id, inv.invited_email)}
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -556,6 +629,10 @@ function formatActivityDetail(log) {
       return nv.cloned_from ? `Cloned from "${nv.cloned_from}"` : 'Cloned';
     case 'invite':
       return `Invited ${nv.email || '?'} as ${nv.role || 'member'}`;
+    case 'invite_accepted':
+      return `Accepted invite as ${nv.role || 'member'}`;
+    case 'invite_revoked':
+      return `Revoked invite for ${nv.email || '?'}${nv.role ? ` (${nv.role})` : ''}`;
     case 'update_role': {
       const from = pv.role || '?';
       const to = nv.role || '?';
@@ -612,6 +689,8 @@ const EVENT_TYPES = [
   { value: 'upload', label: 'Upload' },
   { value: 'override', label: 'Index Override' },
   { value: 'scrape', label: 'Scrape' },
+  { value: 'invite_accepted', label: 'Invite Accepted' },
+  { value: 'invite_revoked', label: 'Invite Revoked' },
 ];
 
 const ENTITY_TYPES = [

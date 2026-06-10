@@ -10,6 +10,7 @@ from app.models.actual_volume import ActualVolume
 from app.models.fx_rate import FxRate
 from app.models.scenario import CostScenario
 from app.models.audit_log import AuditLog
+from app.models.invite import TeamInvite
 
 __all__ = [
     "User",
@@ -30,4 +31,5 @@ __all__ = [
     "FxRate",
     "CostScenario",
     "AuditLog",
+    "TeamInvite",
 ]

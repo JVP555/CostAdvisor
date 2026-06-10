@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const [teams, setTeams] = useState([]);
   const [activeTeamId, setActiveTeamId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pendingInviteCount, setPendingInviteCount] = useState(0);
 
   const fetchUser = useCallback(async () => {
     try {
@@ -36,9 +37,18 @@ export function AuthProvider({ children }) {
       } else if (userTeams.length > 0) {
         setActiveTeamId(userTeams[0].id);
       }
+
+      // Fetch pending invites for badge count
+      try {
+        const { data: invites } = await api.get('/api/invites/pending');
+        setPendingInviteCount(invites.length);
+      } catch {
+        setPendingInviteCount(0);
+      }
     } catch {
       setUser(null);
       setTeams([]);
+      setPendingInviteCount(0);
     } finally {
       setLoading(false);
     }
@@ -82,6 +92,7 @@ export function AuthProvider({ children }) {
       logout,
       refreshUser: fetchUser,
       setTheme,
+      pendingInviteCount,
     }}>
       {children}
     </AuthContext.Provider>

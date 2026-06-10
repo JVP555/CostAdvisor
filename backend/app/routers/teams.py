@@ -1,13 +1,17 @@
 import uuid
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
 from app.models.team import Team, TeamMembership
+from app.models.invite import TeamInvite
 from app.routers.auth import get_current_user
 from app.schemas.team import TeamCreate, TeamOut, TeamMemberOut, InviteRequest, RoleUpdate
+from app.schemas.invite import TeamInviteOut
 from app.services.audit import log_event
+from app.services.email import send_invite_email
 
 router = APIRouter()
 
@@ -90,24 +94,106 @@ def invite_member(
     current_user: User = Depends(get_current_user),
 ):
     require_team_role(db, current_user, team_id, ["owner", "admin"])
-    user = db.query(User).filter(User.email == data.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found. They must log in at least once first.")
 
-    existing = db.query(TeamMembership).filter(
-        TeamMembership.user_id == user.id,
-        TeamMembership.team_id == team_id,
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="User already on team")
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
 
     role = data.role if data.role in ("admin", "member") else "member"
-    membership = TeamMembership(user_id=user.id, team_id=team_id, role=role)
-    db.add(membership)
-    log_event(db, team_id, current_user.id, "invite", "team_member", str(user.id),
-              new_value={"email": data.email, "role": role})
+    email = data.email.strip().lower()
+
+    # Block inviting someone already on the team
+    existing_user = db.query(User).filter(User.email == email).first()
+    if existing_user:
+        existing_membership = db.query(TeamMembership).filter(
+            TeamMembership.user_id == existing_user.id,
+            TeamMembership.team_id == team_id,
+        ).first()
+        if existing_membership:
+            raise HTTPException(status_code=400, detail="User is already a member of this team")
+
+    # Block duplicate pending invite
+    existing_invite = db.query(TeamInvite).filter(
+        TeamInvite.team_id == team_id,
+        TeamInvite.invited_email == email,
+        TeamInvite.status == "pending",
+        TeamInvite.expires_at > datetime.now(timezone.utc),
+    ).first()
+    if existing_invite:
+        raise HTTPException(status_code=400, detail="A pending invite has already been sent to this email")
+
+    invite = TeamInvite(
+        team_id=team_id,
+        invited_email=email,
+        invited_by_id=current_user.id,
+        role=role,
+    )
+    db.add(invite)
+    db.flush()  # populate invite.id before sending email
+
+    email_sent = send_invite_email(
+        to_email=email,
+        team_name=team.name,
+        role=role,
+        invited_by_name=current_user.display_name or "",
+        invited_by_email=current_user.email,
+    )
+
+    log_event(db, team_id, current_user.id, "invite", "team_member", str(invite.id),
+              new_value={"email": email, "role": role, "email_sent": email_sent})
     db.commit()
-    return {"status": "invited", "email": data.email}
+    return {"status": "invited", "email": email, "email_sent": email_sent}
+
+
+@router.get("/{team_id}/invites", response_model=list[TeamInviteOut])
+def list_team_invites(
+    team_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_team_role(db, current_user, team_id, ["owner", "admin"])
+    invites = db.query(TeamInvite).filter(
+        TeamInvite.team_id == team_id,
+        TeamInvite.status == "pending",
+    ).order_by(TeamInvite.created_at.desc()).all()
+    result = []
+    for inv in invites:
+        inviter = inv.invited_by
+        result.append(TeamInviteOut(
+            id=inv.id,
+            invited_email=inv.invited_email,
+            role=inv.role,
+            invited_by_name=inviter.display_name if inviter else None,
+            invited_by_email=inviter.email if inviter else "",
+            created_at=inv.created_at,
+            expires_at=inv.expires_at,
+            status=inv.status,
+        ))
+    return result
+
+
+@router.delete("/{team_id}/invites/{invite_id}")
+def revoke_invite(
+    team_id: uuid.UUID,
+    invite_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_team_role(db, current_user, team_id, ["owner", "admin"])
+    invite = db.query(TeamInvite).filter(
+        TeamInvite.id == invite_id,
+        TeamInvite.team_id == team_id,
+    ).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    if invite.status != "pending":
+        raise HTTPException(status_code=400, detail="Invite is not pending")
+
+    invite.status = "revoked"
+    log_event(db, team_id, current_user.id, "invite_revoked", "team_member", str(invite_id),
+              new_value={"email": invite.invited_email, "role": invite.role})
+    db.commit()
+    return {"status": "revoked"}
 
 
 @router.patch("/{team_id}/members/{user_id}")

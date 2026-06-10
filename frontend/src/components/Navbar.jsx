@@ -3,10 +3,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import TeamSelector from './TeamSelector';
 
+
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, pendingInviteCount } = useAuth();
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -29,6 +30,7 @@ export default function Navbar() {
     { path: '/indexes', label: 'Indexes' },
     { path: '/suppliers', label: 'Suppliers' },
     { path: '/team', label: 'Team' },
+    { path: '/requests', label: 'Requests', badge: pendingInviteCount || 0 },
     ...(user?.is_super_admin ? [{ path: '/admin', label: 'Admin' }] : []),
   ];
 
@@ -45,8 +47,21 @@ export default function Navbar() {
           key={t.path}
           className={`ca-tab ${location.pathname.startsWith(t.path) ? 'active' : ''}`}
           onClick={() => navigate(t.path)}
+          style={{ position: 'relative' }}
         >
           {t.label}
+          {t.badge > 0 && (
+            <span style={{
+              position: 'absolute', top: 2, right: -6,
+              background: 'var(--accent2)', color: '#fff',
+              borderRadius: 999, fontSize: 9, fontWeight: 700,
+              minWidth: 16, height: 16, display: 'inline-flex',
+              alignItems: 'center', justifyContent: 'center',
+              padding: '0 4px', lineHeight: 1,
+            }}>
+              {t.badge > 9 ? '9+' : t.badge}
+            </span>
+          )}
         </div>
       ))}
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
