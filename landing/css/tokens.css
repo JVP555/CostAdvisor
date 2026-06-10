@@ -17,6 +17,10 @@
   --nav-glass-bg: rgba(10, 12, 16, 0.85);
   --accent-glow: rgba(79, 255, 176, 0.07);
   --info-bg: rgba(255, 209, 102, 0.10);
+  --chart-should-cost: #4fffb0;
+  --chart-supplier: #ff6b6b;
+  --chart-grid: rgba(255,255,255,0.05);
+  --chart-tick: #4d5680;
   --cat-energy:   #F0A35B;
   --cat-chemical: #A35BF0;
   --cat-labor:    #5BF0A3;
@@ -56,6 +60,10 @@
   --nav-glass-bg: rgba(246, 247, 249, 0.92);
   --accent-glow: rgba(10, 124, 66, 0.07);
   --info-bg: rgba(184, 127, 0, 0.10);
+  --chart-should-cost: #0a7c42;
+  --chart-supplier: #c0392b;
+  --chart-grid: rgba(0,0,0,0.06);
+  --chart-tick: #6f7588;
 }
 
 [data-theme="amber"] {
@@ -84,6 +92,10 @@
   --nav-glass-bg: rgba(26, 19, 13, 0.85);
   --accent-glow: rgba(255, 179, 71, 0.07);
   --info-bg: rgba(255, 209, 102, 0.12);
+  --chart-should-cost: #ffb347;
+  --chart-supplier: #e8665e;
+  --chart-grid: rgba(255,255,255,0.04);
+  --chart-tick: #8c7559;
 }
 
 [data-theme="staminachem"] {
@@ -112,4 +124,8 @@
   --nav-glass-bg: rgba(245, 247, 250, 0.92);
   --accent-glow: rgba(0, 169, 157, 0.07);
   --info-bg: rgba(200, 145, 26, 0.10);
+  --chart-should-cost: #00A99D;
+  --chart-supplier: #d64545;
+  --chart-grid: rgba(0,0,0,0.06);
+  --chart-tick: #666666;
 }
