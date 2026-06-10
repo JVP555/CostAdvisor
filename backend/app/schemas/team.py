@@ -37,6 +37,7 @@ class TeamMemberOut(BaseModel):
 
 class InviteRequest(BaseModel):
     email: str
+    role: str = "member"
 
 
 class RoleUpdate(BaseModel):

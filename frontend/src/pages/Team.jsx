@@ -120,10 +120,7 @@ function CreateTeamModal({ onClose, onCreated }) {
         {members.length > 0 && (
           <div style={{ marginBottom: 10 }}>
             {members.map((m, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 0', borderBottom: '1px solid var(--border)',
-              }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ flex: 1, fontSize: 12 }}>{m.email}</span>
                 <RoleBadge role={m.role} />
                 <button onClick={() => removeMember(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, lineHeight: 1 }}>×</button>
@@ -133,20 +130,10 @@ function CreateTeamModal({ onClose, onCreated }) {
         )}
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            className="ca-input"
-            placeholder="email@example.com"
-            value={newEmail}
-            onChange={e => setNewEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addMember()}
-            style={{ flex: 1 }}
-          />
-          <select
-            className="ca-input"
-            value={newRole}
-            onChange={e => setNewRole(e.target.value)}
-            style={{ width: 'auto', minWidth: 80 }}
-          >
+          <input className="ca-input" placeholder="email@example.com" value={newEmail}
+            onChange={e => setNewEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && addMember()}
+            style={{ flex: 1 }} />
+          <select className="ca-input" value={newRole} onChange={e => setNewRole(e.target.value)} style={{ width: 'auto', minWidth: 80 }}>
             <option value="admin">admin</option>
             <option value="member">member</option>
           </select>
@@ -154,16 +141,96 @@ function CreateTeamModal({ onClose, onCreated }) {
         </div>
 
         {error && (
-          <div style={{
-            marginTop: 14, padding: '8px 12px', borderRadius: 6, fontSize: 11,
-            background: 'var(--accent2-dim)', color: 'var(--accent2)',
-          }}>{error}</div>
+          <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 6, fontSize: 11, background: 'var(--accent2-dim)', color: 'var(--accent2)' }}>
+            {error}
+          </div>
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>
           <button className="ca-btn ca-btn-ghost" onClick={onClose}>Cancel</button>
           <button className="ca-btn ca-btn-primary" onClick={handleCreate} disabled={loading}>
             {loading ? 'Creating…' : 'Create Team'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Add Members Modal ────────────────────────────────────────────────────────
+
+function AddMembersModal({ teamId, onClose, onDone }) {
+  const [entries, setEntries] = useState([{ email: '', role: 'member' }]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const firstRef = useRef(null);
+
+  useEffect(() => { firstRef.current?.focus(); }, []);
+
+  const addRow = () => setEntries(prev => [...prev, { email: '', role: 'member' }]);
+  const updateRow = (i, field, val) => setEntries(prev => prev.map((e, j) => j === i ? { ...e, [field]: val } : e));
+  const removeRow = (i) => setEntries(prev => prev.filter((_, j) => j !== i));
+
+  const handleSubmit = async () => {
+    const valid = entries.filter(e => e.email.trim());
+    if (valid.length === 0) { setError('Enter at least one email address.'); return; }
+    setLoading(true);
+    setError(null);
+    const errors = [];
+    for (const e of valid) {
+      try { await api.post(`/api/teams/${teamId}/invite`, { email: e.email.trim(), role: e.role }); }
+      catch (err) { errors.push(`${e.email}: ${err.response?.data?.detail || 'failed'}`); }
+    }
+    setLoading(false);
+    onDone(errors.length ? errors.join('; ') : null);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="ca-card" style={{ width: 480, maxWidth: '92vw', padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Add Members</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--muted)', lineHeight: 1 }}>×</button>
+        </div>
+
+        {entries.map((e, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input
+              ref={i === 0 ? firstRef : null}
+              className="ca-input"
+              placeholder="email@example.com"
+              value={e.email}
+              onChange={ev => updateRow(i, 'email', ev.target.value)}
+              onKeyDown={ev => ev.key === 'Enter' && addRow()}
+              style={{ flex: 1 }}
+            />
+            <select className="ca-input" value={e.role} onChange={ev => updateRow(i, 'role', ev.target.value)} style={{ width: 'auto', minWidth: 80 }}>
+              <option value="admin">admin</option>
+              <option value="member">member</option>
+            </select>
+            {entries.length > 1 && (
+              <button onClick={() => removeRow(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 16, lineHeight: 1, padding: '0 4px' }}>×</button>
+            )}
+          </div>
+        ))}
+
+        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={addRow} style={{ marginBottom: 16, fontSize: 11 }}>
+          + Add another
+        </button>
+
+        {error && (
+          <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 6, fontSize: 11, background: 'var(--accent2-dim)', color: 'var(--accent2)' }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+          <button className="ca-btn ca-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="ca-btn ca-btn-primary" onClick={handleSubmit} disabled={loading}>
+            {loading ? 'Adding…' : `Add ${entries.filter(e => e.email.trim()).length || ''} Member${entries.filter(e => e.email.trim()).length !== 1 ? 's' : ''}`}
           </button>
         </div>
       </div>
@@ -282,10 +349,7 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
   const confirm = useConfirm();
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [pendingRoles, setPendingRoles] = useState({});
-  const [pendingRemovals, setPendingRemovals] = useState(new Set());
-  const [pendingInvites, setPendingInvites] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [message, setMessage] = useState(null);
 
   const isOwner = userRole === 'owner';
@@ -293,80 +357,48 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
   const canManage = isOwner || isAdmin;
 
   const fetchMembers = async () => {
+    setLoading(true);
     try {
       const { data } = await api.get(`/api/teams/${teamId}/members`);
       setMembers(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchMembers(); }, [teamId]);
 
-  const hasPending = Object.keys(pendingRoles).length > 0 || pendingRemovals.size > 0 || pendingInvites.length > 0;
-  const pendingCount = Object.keys(pendingRoles).length + pendingRemovals.size + pendingInvites.length;
-
-  const stageRole = (userId, role) => {
-    const committed = members.find(m => m.user_id === userId);
-    if (committed?.role === role) {
-      setPendingRoles(p => { const n = { ...p }; delete n[userId]; return n; });
-    } else {
-      setPendingRoles(p => ({ ...p, [userId]: role }));
-    }
-  };
-
-  const stageRemove = (uid) => setPendingRemovals(p => new Set([...p, uid]));
-  const unstageRemove = (uid) => setPendingRemovals(p => { const n = new Set(p); n.delete(uid); return n; });
-
-  const stageInvite = () => {
-    if (!inviteEmail.trim()) return;
-    setPendingInvites(p => [...p, inviteEmail.trim()]);
-    setInviteEmail('');
-  };
-
-  const handleSave = async () => {
-    const lines = [];
-    for (const [uid, role] of Object.entries(pendingRoles)) {
-      const m = members.find(m => m.user_id === uid);
-      lines.push(`· ${m?.display_name || m?.email}: ${m?.role} → ${role}`);
-    }
-    for (const uid of pendingRemovals) {
-      const m = members.find(m => m.user_id === uid);
-      lines.push(`· Remove ${m?.display_name || m?.email}`);
-    }
-    for (const email of pendingInvites) {
-      lines.push(`· Invite ${email}`);
-    }
-
-    const ok = await confirm({ title: 'Save changes?', message: lines.join('\n'), confirmLabel: 'Save changes' });
+  const handleRoleChange = async (userId, newRole) => {
+    const m = members.find(m => m.user_id === userId);
+    const ok = await confirm({
+      title: 'Change role?',
+      message: `Change ${m?.display_name || m?.email}'s role to ${newRole}?`,
+      confirmLabel: 'Change Role',
+    });
     if (!ok) return;
-
-    const errors = [];
-    for (const [uid, role] of Object.entries(pendingRoles)) {
-      try { await api.patch(`/api/teams/${teamId}/members/${uid}`, { role }); }
-      catch (e) { errors.push(e.response?.data?.detail || 'Role update failed'); }
+    try {
+      await api.patch(`/api/teams/${teamId}/members/${userId}`, { role: newRole });
+      await fetchMembers();
+    } catch (err) {
+      setMessage({ type: 'error', text: formatApiError(err) });
     }
-    for (const uid of pendingRemovals) {
-      try { await api.delete(`/api/teams/${teamId}/members/${uid}`); }
-      catch (e) { errors.push(e.response?.data?.detail || 'Remove failed'); }
-    }
-    for (const email of pendingInvites) {
-      try { await api.post(`/api/teams/${teamId}/invite`, { email }); }
-      catch (e) { errors.push(e.response?.data?.detail || `Invite ${email} failed`); }
-    }
+  };
 
-    setPendingRoles({});
-    setPendingRemovals(new Set());
-    setPendingInvites([]);
-    await fetchMembers();
-    await onRefresh();
-
-    setMessage(errors.length
-      ? { type: 'error', text: errors.join('; ') }
-      : { type: 'success', text: 'Changes saved.' }
-    );
+  const handleRemove = async (userId) => {
+    const m = members.find(m => m.user_id === userId);
+    const ok = await confirm({
+      title: 'Remove member?',
+      message: `Remove ${m?.display_name || m?.email} from ${teamName}?`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/api/teams/${teamId}/members/${userId}`);
+      await fetchMembers();
+      await onRefresh();
+    } catch (err) {
+      setMessage({ type: 'error', text: formatApiError(err) });
+    }
   };
 
   const handleLeave = async () => {
@@ -386,7 +418,16 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
     }
   };
 
-  const effectiveRole = (m) => pendingRoles[m.user_id] ?? m.role;
+  const handleMembersAdded = async (error) => {
+    setShowAddModal(false);
+    await fetchMembers();
+    setMessage(error
+      ? { type: 'error', text: `Some invites failed: ${error}` }
+      : { type: 'success', text: 'Members added.' }
+    );
+  };
+
+  const formatDate = (iso) => iso ? new Date(iso).toLocaleDateString() : '—';
 
   if (loading) {
     return <div style={{ padding: '16px 24px', color: 'var(--muted)', fontSize: 12 }}>Loading members…</div>;
@@ -394,6 +435,10 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
 
   return (
     <div style={{ padding: '16px 24px' }}>
+      {showAddModal && (
+        <AddMembersModal teamId={teamId} onClose={() => setShowAddModal(false)} onDone={handleMembersAdded} />
+      )}
+
       {message && (
         <div style={{
           padding: '8px 12px', borderRadius: 6, marginBottom: 12, fontSize: 11,
@@ -406,92 +451,82 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
         </div>
       )}
 
-      <table className="ca-table" style={{ marginBottom: 12 }}>
-        <thead>
-          <tr><th>Member</th><th>Role</th><th></th></tr>
-        </thead>
-        <tbody>
-          {members.map(m => {
-            const pendingRemoval = pendingRemovals.has(m.user_id);
-            const pendingChange = m.user_id in pendingRoles;
-            const effRole = effectiveRole(m);
-            const isOwnerRow = m.role === 'owner';
-            const isSelf = m.user_id === currentUserId;
-            const canEditRow = canManage && !isSelf && !(isOwnerRow && !isOwner);
-            const canRemoveRow = canManage && !isSelf && !isOwnerRow;
-            return (
-              <tr key={m.user_id} style={{
-                opacity: pendingRemoval ? 0.4 : 1,
-                borderLeft: pendingChange ? '2px solid var(--accent3)' : pendingRemoval ? '2px solid var(--accent2)' : '2px solid transparent',
-              }}>
-                <td style={{ fontSize: 12 }}>
-                  {m.display_name ? `${m.display_name} (${m.email})` : m.email}
-                  {isSelf && <span style={{ marginLeft: 6, fontSize: 9, color: 'var(--muted)' }}>you</span>}
-                </td>
-                <td>
-                  {canEditRow && !pendingRemoval ? (
-                    <select value={effRole} className="ca-input"
-                      style={{ fontSize: 11, padding: '3px 6px', width: 'auto', borderColor: pendingChange ? 'var(--accent3)' : undefined }}
-                      onChange={e => stageRole(m.user_id, e.target.value)}>
-                      {isOwner && <option value="owner">owner</option>}
-                      <option value="admin">admin</option>
-                      <option value="member">member</option>
-                    </select>
-                  ) : <RoleBadge role={effRole} />}
-                </td>
-                <td style={{ textAlign: 'right' }}>
-                  {canRemoveRow && !pendingRemoval && (
-                    <button className="ca-btn ca-btn-ghost ca-btn-sm"
-                      style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)', fontSize: 11 }}
-                      onClick={() => stageRemove(m.user_id)}>Remove</button>
-                  )}
-                  {pendingRemoval && (
-                    <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }} onClick={() => unstageRemove(m.user_id)}>Undo</button>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-          {pendingInvites.map((email, i) => (
-            <tr key={`invite-${i}`} style={{ borderLeft: '2px solid var(--accent)', opacity: 0.7 }}>
-              <td style={{ fontSize: 12 }}>{email}<span style={{ marginLeft: 8, fontSize: 9, color: 'var(--accent)' }}>pending invite</span></td>
-              <td />
-              <td style={{ textAlign: 'right' }}>
-                <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }}
-                  onClick={() => setPendingInvites(p => p.filter((_, j) => j !== i))}>Undo</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {canManage && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <input className="ca-input" placeholder="Add member by email…" value={inviteEmail}
-            onChange={e => setInviteEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && stageInvite()}
-            style={{ maxWidth: 280 }} />
-          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={stageInvite}>+ Add</button>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{members.length} member{members.length !== 1 ? 's' : ''}</span>
+        <div style={{ display: 'flex', gap: 8 }}>
           {!isOwner && teamId !== activeTeamId && (
             <button className="ca-btn ca-btn-ghost ca-btn-sm"
               style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)', fontSize: 11 }}
               onClick={handleLeave}>Leave Team</button>
           )}
-        </div>
-        {hasPending && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="ca-btn ca-btn-ghost ca-btn-sm"
-              onClick={() => { setPendingRoles({}); setPendingRemovals(new Set()); setPendingInvites([]); }}>Discard</button>
-            <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleSave}>
-              Save {pendingCount} change{pendingCount !== 1 ? 's' : ''}
+          {canManage && (
+            <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowAddModal(true)}>
+              + Add Members
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      <table className="ca-table">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Role</th>
+            <th>Added On</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {members.length === 0 ? (
+            <tr>
+              <td colSpan={4} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)', fontSize: 12 }}>
+                No members yet.
+              </td>
+            </tr>
+          ) : members.map(m => {
+            const isOwnerRow = m.role === 'owner';
+            const isSelf = m.user_id === currentUserId;
+            const canEditRole = canManage && !isSelf && !(isOwnerRow && !isOwner);
+            const canRemove = canManage && !isSelf && !isOwnerRow;
+            return (
+              <tr key={m.user_id}>
+                <td style={{ fontSize: 12 }}>
+                  {m.display_name ? `${m.display_name} (${m.email})` : m.email}
+                  {isSelf && <span style={{ marginLeft: 6, fontSize: 9, color: 'var(--muted)' }}>you</span>}
+                </td>
+                <td>
+                  {canEditRole ? (
+                    <select
+                      value={m.role}
+                      className="ca-input"
+                      style={{ fontSize: 11, padding: '3px 6px', width: 'auto' }}
+                      onChange={e => handleRoleChange(m.user_id, e.target.value)}
+                    >
+                      {isOwner && <option value="owner">owner</option>}
+                      <option value="admin">admin</option>
+                      <option value="member">member</option>
+                    </select>
+                  ) : (
+                    <RoleBadge role={m.role} />
+                  )}
+                </td>
+                <td style={{ fontSize: 11, color: 'var(--muted)' }}>{formatDate(m.joined_at)}</td>
+                <td style={{ textAlign: 'right' }}>
+                  {canRemove && (
+                    <button
+                      className="ca-btn ca-btn-ghost ca-btn-sm"
+                      style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)', fontSize: 11 }}
+                      onClick={() => handleRemove(m.user_id)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -501,9 +536,7 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
 function formatActivityDetail(log) {
   const nv = log.new_value || {};
   const pv = log.previous_value || {};
-  // Strip internal metadata keys before display
   const { _impersonated_by, by, ...data } = nv;
-
   const label = (k) => k.replace(/_/g, ' ');
 
   switch (log.event_type) {
@@ -533,9 +566,7 @@ function formatActivityDetail(log) {
     case 'upload':
       return `Uploaded: ${nv.filename || nv.name || 'file'}`;
     case 'override':
-      return nv.index || nv.commodity
-        ? `Index override: ${nv.index || nv.commodity}`
-        : 'Index value overridden';
+      return nv.index || nv.commodity ? `Index override: ${nv.index || nv.commodity}` : 'Index value overridden';
     case 'scrape':
       return `Index source scraped${nv.url ? `: ${nv.url}` : ''}`;
     default: {
@@ -648,7 +679,6 @@ function ActivityTab() {
   useEffect(() => { if (page > 0) fetchLogs(); }, [page]);
 
   const commitSearch = () => setSearch(searchInput.trim());
-
   const formatDate = (iso) => iso ? new Date(iso).toLocaleString() : '—';
 
   const EVENT_BADGE_STYLE = {

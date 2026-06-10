@@ -25,6 +25,7 @@ export function AuthProvider({ children }) {
         id: m.team_id,
         name: m.team?.name || 'Team',
         role: m.role,
+        created_at: m.team?.created_at || null,
       })) || [];
       setTeams(userTeams);
 

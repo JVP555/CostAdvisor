@@ -101,10 +101,11 @@ def invite_member(
     if existing:
         raise HTTPException(status_code=400, detail="User already on team")
 
-    membership = TeamMembership(user_id=user.id, team_id=team_id, role="member")
+    role = data.role if data.role in ("admin", "member") else "member"
+    membership = TeamMembership(user_id=user.id, team_id=team_id, role=role)
     db.add(membership)
     log_event(db, team_id, current_user.id, "invite", "team_member", str(user.id),
-              new_value={"email": data.email, "role": "member"})
+              new_value={"email": data.email, "role": role})
     db.commit()
     return {"status": "invited", "email": data.email}
 
