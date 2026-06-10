@@ -8,7 +8,7 @@ from jose import jwt
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 from app.config import get_settings
-from app.database import get_db, current_user_id_var, bypass_rls_var
+from app.database import get_db, current_user_id_var, bypass_rls_var, impersonating_admin_email_var
 from app.models.user import User
 from app.rate_limit import limiter
 from app.schemas.user import UserOut, UserWithTeams
@@ -65,6 +65,22 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     # these routes; bypass here just lets the query itself return rows.
     if user.is_super_admin:
         bypass_rls_var.set(True)
+
+    # If ca_admin_token is present this request is running as an impersonated user.
+    # Decode it so audit log entries can be marked with who is impersonating.
+    admin_cookie = request.cookies.get("ca_admin_token")
+    if admin_cookie:
+        try:
+            admin_payload = jwt.decode(admin_cookie, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+            admin_uid = admin_payload.get("sub")
+            if admin_uid:
+                bypass_rls_var.set(True)
+                admin_user = db.query(User).filter(User.id == uuid.UUID(admin_uid)).first()
+                bypass_rls_var.set(False)
+                if admin_user:
+                    impersonating_admin_email_var.set(admin_user.email)
+        except Exception:
+            pass
 
     # Attach the user to any error reports Sentry captures on this request.
     from app.observability import set_user_context

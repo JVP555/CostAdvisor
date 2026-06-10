@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment, useRef } from 'react';
 import FileUpload from '../components/FileUpload';
 import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
@@ -45,23 +45,147 @@ function RoleBadge({ role }) {
   );
 }
 
+// ─── Create Team Modal ────────────────────────────────────────────────────────
+
+function CreateTeamModal({ onClose, onCreated }) {
+  const [name, setName] = useState('');
+  const [members, setMembers] = useState([]);
+  const [newEmail, setNewEmail] = useState('');
+  const [newRole, setNewRole] = useState('member');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const nameRef = useRef(null);
+
+  useEffect(() => { nameRef.current?.focus(); }, []);
+
+  const addMember = () => {
+    const email = newEmail.trim();
+    if (!email) return;
+    if (members.some(m => m.email === email)) return;
+    setMembers(prev => [...prev, { email, role: newRole }]);
+    setNewEmail('');
+    setNewRole('member');
+  };
+
+  const removeMember = (i) => setMembers(prev => prev.filter((_, j) => j !== i));
+
+  const handleCreate = async () => {
+    if (!name.trim()) { setError('Team name is required.'); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: team } = await api.post('/api/teams', { name: name.trim() });
+      const inviteErrors = [];
+      for (const m of members) {
+        try {
+          await api.post(`/api/teams/${team.id}/invite`, { email: m.email, role: m.role });
+        } catch (e) {
+          inviteErrors.push(`${m.email}: ${e.response?.data?.detail || 'invite failed'}`);
+        }
+      }
+      onCreated(inviteErrors.length ? inviteErrors.join('; ') : null);
+    } catch (err) {
+      setError(formatApiError(err));
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="ca-card" style={{ width: 480, maxWidth: '92vw', padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Create New Team</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--muted)', lineHeight: 1 }}>×</button>
+        </div>
+
+        <label className="ca-label">Team Name <span style={{ color: 'var(--accent2)' }}>*</span></label>
+        <input
+          ref={nameRef}
+          className="ca-input"
+          placeholder="e.g. Acme Packaging Team"
+          value={name}
+          onChange={e => { setName(e.target.value); setError(null); }}
+          onKeyDown={e => e.key === 'Enter' && handleCreate()}
+          style={{ marginBottom: 20 }}
+        />
+
+        <label className="ca-label" style={{ marginBottom: 6, display: 'block' }}>Add Members <span style={{ fontWeight: 400, color: 'var(--muted)' }}>(optional)</span></label>
+        <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10, marginTop: 0 }}>
+          You are the owner by default. Add others now or later from the Manage panel.
+        </p>
+
+        {members.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            {members.map((m, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 0', borderBottom: '1px solid var(--border)',
+              }}>
+                <span style={{ flex: 1, fontSize: 12 }}>{m.email}</span>
+                <RoleBadge role={m.role} />
+                <button onClick={() => removeMember(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, lineHeight: 1 }}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            className="ca-input"
+            placeholder="email@example.com"
+            value={newEmail}
+            onChange={e => setNewEmail(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addMember()}
+            style={{ flex: 1 }}
+          />
+          <select
+            className="ca-input"
+            value={newRole}
+            onChange={e => setNewRole(e.target.value)}
+            style={{ width: 'auto', minWidth: 80 }}
+          >
+            <option value="admin">admin</option>
+            <option value="member">member</option>
+          </select>
+          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={addMember}>+ Add</button>
+        </div>
+
+        {error && (
+          <div style={{
+            marginTop: 14, padding: '8px 12px', borderRadius: 6, fontSize: 11,
+            background: 'var(--accent2-dim)', color: 'var(--accent2)',
+          }}>{error}</div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>
+          <button className="ca-btn ca-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="ca-btn ca-btn-primary" onClick={handleCreate} disabled={loading}>
+            {loading ? 'Creating…' : 'Create Team'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Teams Tab ────────────────────────────────────────────────────────────────
+
 function TeamsTab() {
   const { teams, refreshUser, user } = useAuth();
-  const [newTeamName, setNewTeamName] = useState('');
+  const [showModal, setShowModal] = useState(false);
   const [expandedTeamId, setExpandedTeamId] = useState(null);
   const [message, setMessage] = useState(null);
 
-  const handleCreateTeam = async () => {
-    const name = newTeamName.trim();
-    if (!name) return;
-    try {
-      await api.post('/api/teams', { name });
-      setNewTeamName('');
-      await refreshUser();
-      setMessage({ type: 'success', text: `Team "${name}" created.` });
-    } catch (err) {
-      setMessage({ type: 'error', text: formatApiError(err) });
-    }
+  const handleCreated = async (inviteError) => {
+    setShowModal(false);
+    await refreshUser();
+    setMessage(inviteError
+      ? { type: 'error', text: `Team created, but some invites failed: ${inviteError}` }
+      : { type: 'success', text: 'Team created.' }
+    );
   };
 
   const toggleExpand = (teamId) => setExpandedTeamId(prev => prev === teamId ? null : teamId);
@@ -73,6 +197,8 @@ function TeamsTab() {
 
   return (
     <>
+      {showModal && <CreateTeamModal onClose={() => setShowModal(false)} onCreated={handleCreated} />}
+
       {message && (
         <div style={{
           padding: '10px 16px', borderRadius: 8, marginBottom: 16, fontSize: 12,
@@ -87,16 +213,8 @@ function TeamsTab() {
       )}
 
       <div className="ca-card">
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
-          <input
-            className="ca-input"
-            placeholder="New team name…"
-            value={newTeamName}
-            onChange={e => setNewTeamName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleCreateTeam()}
-            style={{ maxWidth: 280 }}
-          />
-          <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleCreateTeam}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+          <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowModal(true)}>
             + Create Team
           </button>
         </div>
@@ -156,6 +274,8 @@ function TeamsTab() {
     </>
   );
 }
+
+// ─── Team Manage Panel ────────────────────────────────────────────────────────
 
 function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh, onClose }) {
   const { activeTeamId } = useAuth();
@@ -220,11 +340,7 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
       lines.push(`· Invite ${email}`);
     }
 
-    const ok = await confirm({
-      title: 'Save changes?',
-      message: lines.join('\n'),
-      confirmLabel: 'Save changes',
-    });
+    const ok = await confirm({ title: 'Save changes?', message: lines.join('\n'), confirmLabel: 'Save changes' });
     if (!ok) return;
 
     const errors = [];
@@ -292,11 +408,7 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
 
       <table className="ca-table" style={{ marginBottom: 12 }}>
         <thead>
-          <tr>
-            <th>Member</th>
-            <th>Role</th>
-            <th></th>
-          </tr>
+          <tr><th>Member</th><th>Role</th><th></th></tr>
         </thead>
         <tbody>
           {members.map(m => {
@@ -307,7 +419,6 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
             const isSelf = m.user_id === currentUserId;
             const canEditRow = canManage && !isSelf && !(isOwnerRow && !isOwner);
             const canRemoveRow = canManage && !isSelf && !isOwnerRow;
-
             return (
               <tr key={m.user_id} style={{
                 opacity: pendingRemoval ? 0.4 : 1,
@@ -319,58 +430,35 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
                 </td>
                 <td>
                   {canEditRow && !pendingRemoval ? (
-                    <select
-                      value={effRole}
-                      className="ca-input"
-                      style={{
-                        fontSize: 11, padding: '3px 6px', width: 'auto',
-                        borderColor: pendingChange ? 'var(--accent3)' : undefined,
-                      }}
-                      onChange={e => stageRole(m.user_id, e.target.value)}
-                    >
+                    <select value={effRole} className="ca-input"
+                      style={{ fontSize: 11, padding: '3px 6px', width: 'auto', borderColor: pendingChange ? 'var(--accent3)' : undefined }}
+                      onChange={e => stageRole(m.user_id, e.target.value)}>
                       {isOwner && <option value="owner">owner</option>}
                       <option value="admin">admin</option>
                       <option value="member">member</option>
                     </select>
-                  ) : (
-                    <RoleBadge role={effRole} />
-                  )}
+                  ) : <RoleBadge role={effRole} />}
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   {canRemoveRow && !pendingRemoval && (
-                    <button
-                      className="ca-btn ca-btn-ghost ca-btn-sm"
+                    <button className="ca-btn ca-btn-ghost ca-btn-sm"
                       style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)', fontSize: 11 }}
-                      onClick={() => stageRemove(m.user_id)}
-                    >
-                      Remove
-                    </button>
+                      onClick={() => stageRemove(m.user_id)}>Remove</button>
                   )}
                   {pendingRemoval && (
-                    <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }} onClick={() => unstageRemove(m.user_id)}>
-                      Undo
-                    </button>
+                    <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }} onClick={() => unstageRemove(m.user_id)}>Undo</button>
                   )}
                 </td>
               </tr>
             );
           })}
-
           {pendingInvites.map((email, i) => (
             <tr key={`invite-${i}`} style={{ borderLeft: '2px solid var(--accent)', opacity: 0.7 }}>
-              <td style={{ fontSize: 12 }}>
-                {email}
-                <span style={{ marginLeft: 8, fontSize: 9, color: 'var(--accent)' }}>pending invite</span>
-              </td>
+              <td style={{ fontSize: 12 }}>{email}<span style={{ marginLeft: 8, fontSize: 9, color: 'var(--accent)' }}>pending invite</span></td>
               <td />
               <td style={{ textAlign: 'right' }}>
-                <button
-                  className="ca-btn ca-btn-ghost ca-btn-sm"
-                  style={{ fontSize: 11 }}
-                  onClick={() => setPendingInvites(p => p.filter((_, j) => j !== i))}
-                >
-                  Undo
-                </button>
+                <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }}
+                  onClick={() => setPendingInvites(p => p.filter((_, j) => j !== i))}>Undo</button>
               </td>
             </tr>
           ))}
@@ -379,39 +467,25 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
 
       {canManage && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <input
-            className="ca-input"
-            placeholder="Add member by email…"
-            value={inviteEmail}
-            onChange={e => setInviteEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && stageInvite()}
-            style={{ maxWidth: 280 }}
-          />
+          <input className="ca-input" placeholder="Add member by email…" value={inviteEmail}
+            onChange={e => setInviteEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && stageInvite()}
+            style={{ maxWidth: 280 }} />
           <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={stageInvite}>+ Add</button>
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          {/* Leave only available if not owner and not the active team (avoids breaking the session) */}
           {!isOwner && teamId !== activeTeamId && (
-            <button
-              className="ca-btn ca-btn-ghost ca-btn-sm"
+            <button className="ca-btn ca-btn-ghost ca-btn-sm"
               style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)', fontSize: 11 }}
-              onClick={handleLeave}
-            >
-              Leave Team
-            </button>
+              onClick={handleLeave}>Leave Team</button>
           )}
         </div>
         {hasPending && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              className="ca-btn ca-btn-ghost ca-btn-sm"
-              onClick={() => { setPendingRoles({}); setPendingRemovals(new Set()); setPendingInvites([]); }}
-            >
-              Discard
-            </button>
+            <button className="ca-btn ca-btn-ghost ca-btn-sm"
+              onClick={() => { setPendingRoles({}); setPendingRemovals(new Set()); setPendingInvites([]); }}>Discard</button>
             <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleSave}>
               Save {pendingCount} change{pendingCount !== 1 ? 's' : ''}
             </button>
@@ -422,6 +496,112 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
   );
 }
 
+// ─── Activity helpers ─────────────────────────────────────────────────────────
+
+function formatActivityDetail(log) {
+  const nv = log.new_value || {};
+  const pv = log.previous_value || {};
+  // Strip internal metadata keys before display
+  const { _impersonated_by, by, ...data } = nv;
+
+  const label = (k) => k.replace(/_/g, ' ');
+
+  switch (log.event_type) {
+    case 'create':
+      return nv.name ? `Created: ${nv.name}` : `Created ${log.entity_type}`;
+    case 'update': {
+      const parts = Object.entries(data).map(([k, v]) => {
+        if (v && typeof v === 'object' && 'from' in v && 'to' in v)
+          return `${label(k)}: ${v.from} → ${v.to}`;
+        return `${label(k)}: ${v}`;
+      });
+      return parts.length ? parts.join(' · ') : 'Updated';
+    }
+    case 'delete':
+      return pv.name ? `Deleted: ${pv.name}` : nv.name ? `Deleted: ${nv.name}` : `Deleted ${log.entity_type}`;
+    case 'clone':
+      return nv.cloned_from ? `Cloned from "${nv.cloned_from}"` : 'Cloned';
+    case 'invite':
+      return `Invited ${nv.email || '?'} as ${nv.role || 'member'}`;
+    case 'update_role': {
+      const from = pv.role || '?';
+      const to = nv.role || '?';
+      return `Role: ${from} → ${to}`;
+    }
+    case 'remove':
+      return `Removed from team${pv.role ? ` (was ${pv.role})` : ''}`;
+    case 'upload':
+      return `Uploaded: ${nv.filename || nv.name || 'file'}`;
+    case 'override':
+      return nv.index || nv.commodity
+        ? `Index override: ${nv.index || nv.commodity}`
+        : 'Index value overridden';
+    case 'scrape':
+      return `Index source scraped${nv.url ? `: ${nv.url}` : ''}`;
+    default: {
+      const parts = Object.entries(data)
+        .filter(([k]) => !k.startsWith('_'))
+        .map(([k, v]) => {
+          if (v && typeof v === 'object' && 'from' in v && 'to' in v)
+            return `${label(k)}: ${v.from} → ${v.to}`;
+          if (typeof v === 'object') return `${label(k)}: ${JSON.stringify(v)}`;
+          return `${label(k)}: ${v}`;
+        });
+      return parts.length ? parts.join(' · ') : '—';
+    }
+  }
+}
+
+function userLabel(log, membersMap) {
+  const m = membersMap[log.user_id];
+  const name = m?.display_name ? `${m.display_name} (${log.user_email})` : (log.user_email || '—');
+  if (log.new_value?._impersonated_by) {
+    return (
+      <span>
+        <span style={{
+          fontSize: 9, fontWeight: 700, background: 'var(--accent2-dim)', color: 'var(--accent2)',
+          borderRadius: 3, padding: '1px 4px', marginRight: 5, textTransform: 'uppercase', letterSpacing: 0.5,
+        }}>Impersonated</span>
+        {name}
+      </span>
+    );
+  }
+  return name;
+}
+
+const EVENT_TYPES = [
+  { value: '', label: 'All Events' },
+  { value: 'create', label: 'Create' },
+  { value: 'update', label: 'Update' },
+  { value: 'delete', label: 'Delete' },
+  { value: 'clone', label: 'Clone' },
+  { value: 'invite', label: 'Invite' },
+  { value: 'update_role', label: 'Role Change' },
+  { value: 'remove', label: 'Remove Member' },
+  { value: 'upload', label: 'Upload' },
+  { value: 'override', label: 'Index Override' },
+  { value: 'scrape', label: 'Scrape' },
+];
+
+const ENTITY_TYPES = [
+  { value: '', label: 'All Entities' },
+  { value: 'cost_model', label: 'Cost Model' },
+  { value: 'formula_version', label: 'Formula Version' },
+  { value: 'price_data', label: 'Price Data' },
+  { value: 'actual_volume', label: 'Volume' },
+  { value: 'supplier', label: 'Supplier' },
+  { value: 'product', label: 'Product' },
+  { value: 'index_override', label: 'Index Override' },
+  { value: 'index_overrides', label: 'Index Override File' },
+  { value: 'index_cell', label: 'Index Cell' },
+  { value: 'index_bulk', label: 'Index Bulk' },
+  { value: 'team_member', label: 'Team Member' },
+  { value: 'team_index_source', label: 'Index Source' },
+  { value: 'scenario', label: 'Scenario' },
+];
+
+// ─── Activity Tab ─────────────────────────────────────────────────────────────
+
 function ActivityTab() {
   const { activeTeamId } = useAuth();
   const [logs, setLogs] = useState([]);
@@ -429,6 +609,9 @@ function ActivityTab() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [entityType, setEntityType] = useState('');
+  const [eventType, setEventType] = useState('');
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [membersMap, setMembersMap] = useState({});
   const PAGE_SIZE = 50;
 
@@ -446,6 +629,8 @@ function ActivityTab() {
     setLoading(true);
     const params = { team_id: activeTeamId, skip: p * PAGE_SIZE, limit: PAGE_SIZE };
     if (entityType) params.entity_type = entityType;
+    if (eventType) params.event_type = eventType;
+    if (search) params.search = search;
     api.get('/api/audit', { params })
       .then(res => {
         const rows = res.data;
@@ -457,46 +642,74 @@ function ActivityTab() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchLogs(true); }, [activeTeamId, entityType]);
+  useEffect(() => { fetchLogs(true); }, [activeTeamId, entityType, eventType, search]);
 
-  const loadMore = () => {
-    setPage(p => p + 1);
-  };
+  const loadMore = () => setPage(p => p + 1);
+  useEffect(() => { if (page > 0) fetchLogs(); }, [page]);
 
-  useEffect(() => {
-    if (page > 0) fetchLogs();
-  }, [page]);
+  const commitSearch = () => setSearch(searchInput.trim());
 
-  const formatDate = (iso) => {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleString();
+  const formatDate = (iso) => iso ? new Date(iso).toLocaleString() : '—';
+
+  const EVENT_BADGE_STYLE = {
+    create:      { bg: 'var(--success-bg)',  color: 'var(--accent)' },
+    delete:      { bg: 'var(--danger-bg)',   color: 'var(--accent2)' },
+    update:      { bg: 'var(--info-bg)',     color: 'var(--accent3)' },
+    clone:       { bg: 'var(--info-bg)',     color: 'var(--accent3)' },
+    invite:      { bg: 'var(--success-bg)',  color: 'var(--accent)' },
+    update_role: { bg: 'var(--neutral-bg)',  color: 'var(--muted)' },
+    remove:      { bg: 'var(--danger-bg)',   color: 'var(--accent2)' },
+    upload:      { bg: 'var(--info-bg)',     color: 'var(--accent3)' },
+    override:    { bg: 'var(--neutral-bg)',  color: 'var(--muted)' },
+    scrape:      { bg: 'var(--neutral-bg)',  color: 'var(--muted)' },
   };
 
   return (
     <>
       <div className="ca-card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 220px' }}>
+            <label className="ca-label">Search</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                className="ca-input"
+                placeholder="User, event type, entity…"
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && commitSearch()}
+                style={{ flex: 1 }}
+              />
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={commitSearch}>Search</button>
+              {search && <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => { setSearch(''); setSearchInput(''); }}>✕</button>}
+            </div>
+          </div>
           <div>
-            <label className="ca-label">Entity Type</label>
-            <select className="ca-select" value={entityType} onChange={e => setEntityType(e.target.value)}>
-              <option value="">All</option>
-              <option value="cost_model">Cost Model</option>
-              <option value="formula_version">Formula Version</option>
-              <option value="price_data">Price Data</option>
-              <option value="actual_volume">Volume</option>
-              <option value="supplier">Supplier</option>
-              <option value="product">Product</option>
-              <option value="index_override">Index Override</option>
+            <label className="ca-label">Event</label>
+            <select className="ca-select" value={eventType} onChange={e => setEventType(e.target.value)}>
+              {EVENT_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
+          <div>
+            <label className="ca-label">Entity</label>
+            <select className="ca-select" value={entityType} onChange={e => setEntityType(e.target.value)}>
+              {ENTITY_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          {(search || eventType || entityType) && (
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => {
+                setSearch(''); setSearchInput(''); setEventType(''); setEntityType('');
+              }}>Clear All</button>
+            </div>
+          )}
         </div>
       </div>
 
       {loading && logs.length === 0 ? (
-        <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
+        <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
       ) : logs.length === 0 ? (
         <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
-          No audit events found.
+          No activity found.
         </div>
       ) : (
         <div className="ca-card">
@@ -504,55 +717,49 @@ function ActivityTab() {
             <table className="ca-table">
               <thead>
                 <tr>
-                  <th>Timestamp</th>
-                  <th>User</th>
+                  <th>When</th>
+                  <th>Who</th>
                   <th>Event</th>
                   <th>Entity</th>
                   <th>Details</th>
                 </tr>
               </thead>
               <tbody>
-                {logs.map(log => (
-                  <tr key={log.id}>
-                    <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                      {formatDate(log.timestamp)}
-                    </td>
-                    <td style={{ fontSize: 11 }}>{(() => {
-                      const m = membersMap[log.user_id];
-                      return m?.display_name ? `${m.display_name} (${log.user_email})` : (log.user_email || '—');
-                    })()}</td>
-                    <td>
-                      <span style={{
-                        display: 'inline-block', padding: '1px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
-                        background: log.event_type === 'create' ? 'var(--success-bg)' : log.event_type === 'delete' ? 'var(--danger-bg)' : 'var(--info-bg)',
-                        color: log.event_type === 'create' ? 'var(--accent)' : log.event_type === 'delete' ? 'var(--accent2)' : 'var(--accent3)',
-                      }}>
-                        {log.event_type}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: 11 }}>
-                      <span style={{ color: 'var(--text)' }}>{log.entity_type}</span>
-                      <span style={{ color: 'var(--muted)', marginLeft: 6, fontSize: 9 }}>{log.entity_id?.slice(0, 8)}</span>
-                    </td>
-                    <td style={{ maxWidth: 300 }}>
-                      {log.new_value ? (
-                        <details style={{ fontSize: 10 }}>
-                          <summary style={{ cursor: 'pointer', color: 'var(--accent3)' }}>View changes</summary>
-                          <pre style={{ marginTop: 4, padding: 8, background: 'var(--surface2)', borderRadius: 4, overflow: 'auto', maxHeight: 150, fontSize: 9 }}>
-                            {JSON.stringify(log.new_value, null, 2)}
-                          </pre>
-                        </details>
-                      ) : '—'}
-                    </td>
-                  </tr>
-                ))}
+                {logs.map(log => {
+                  const bs = EVENT_BADGE_STYLE[log.event_type] || { bg: 'var(--neutral-bg)', color: 'var(--muted)' };
+                  return (
+                    <tr key={log.id}>
+                      <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                        {formatDate(log.timestamp)}
+                      </td>
+                      <td style={{ fontSize: 11 }}>{userLabel(log, membersMap)}</td>
+                      <td>
+                        <span style={{
+                          display: 'inline-block', padding: '1px 8px', borderRadius: 4,
+                          fontSize: 10, fontWeight: 600, background: bs.bg, color: bs.color,
+                        }}>
+                          {EVENT_TYPES.find(e => e.value === log.event_type)?.label || log.event_type}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 11 }}>
+                        <span style={{ color: 'var(--text)' }}>
+                          {ENTITY_TYPES.find(e => e.value === log.entity_type)?.label || log.entity_type}
+                        </span>
+                        <span style={{ color: 'var(--muted)', marginLeft: 6, fontSize: 9 }}>{log.entity_id?.slice(0, 8)}</span>
+                      </td>
+                      <td style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                        {formatActivityDetail(log)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           {hasMore && (
             <div style={{ textAlign: 'center', marginTop: 12 }}>
               <button className="ca-btn ca-btn-ghost" onClick={loadMore} disabled={loading}>
-                {loading ? 'Loading...' : 'Load More'}
+                {loading ? 'Loading…' : 'Load More'}
               </button>
             </div>
           )}
@@ -561,6 +768,8 @@ function ActivityTab() {
     </>
   );
 }
+
+// ─── Settings Tab ─────────────────────────────────────────────────────────────
 
 function SettingsTab() {
   const { user } = useAuth();
