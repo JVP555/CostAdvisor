@@ -26,6 +26,8 @@ def _invite_to_pending_out(invite: TeamInvite) -> PendingInviteOut:
         invited_by_email=inviter.email if inviter else "",
         created_at=invite.created_at,
         expires_at=invite.expires_at,
+        status=invite.status,
+        accepted_at=invite.accepted_at,
     )
 
 
@@ -42,6 +44,27 @@ def list_pending_invites(
             TeamInvite.status == "pending",
             TeamInvite.expires_at > now,
         )
+        .all()
+    )
+    return [_invite_to_pending_out(i) for i in invites]
+
+
+@router.get("/history", response_model=list[PendingInviteOut])
+def list_invite_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the last 30 non-pending invites (accepted, declined, revoked, expired) for the current user."""
+    now = datetime.now(timezone.utc)
+    invites = (
+        db.query(TeamInvite)
+        .filter(TeamInvite.invited_email == current_user.email)
+        .filter(
+            (TeamInvite.status != "pending") |
+            (TeamInvite.expires_at <= now)
+        )
+        .order_by(TeamInvite.created_at.desc())
+        .limit(30)
         .all()
     )
     return [_invite_to_pending_out(i) for i in invites]

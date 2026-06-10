@@ -624,43 +624,73 @@ function RelativeTime({ iso }) {
   return <span>{Math.floor(hrs / 24)}d ago</span>;
 }
 
+const STATUS_STYLE = {
+  accepted: { bg: 'var(--success-bg)', color: 'var(--accent)', label: 'Accepted' },
+  declined: { bg: 'var(--danger-bg)', color: 'var(--accent2)', label: 'Declined' },
+  revoked:  { bg: 'var(--neutral-bg)', color: 'var(--muted)', label: 'Revoked' },
+  expired:  { bg: 'var(--neutral-bg)', color: 'var(--muted)', label: 'Expired' },
+};
+
 function RequestsTab() {
   const { refreshUser } = useAuth();
-  const [invites, setInvites] = useState([]);
+  const confirm = useConfirm();
+  const [pending, setPending] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(null);
+  const [error, setError] = useState(null);
 
-  const fetchInvites = () => {
+  const fetchAll = () => {
     setLoading(true);
-    api.get('/api/invites/pending')
-      .then(r => setInvites(r.data))
+    Promise.all([
+      api.get('/api/invites/pending'),
+      api.get('/api/invites/history'),
+    ])
+      .then(([pendingRes, historyRes]) => {
+        setPending(pendingRes.data);
+        setHistory(historyRes.data);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchInvites(); }, []);
+  useEffect(() => { fetchAll(); }, []);
 
   const handleAccept = async (invite) => {
+    const ok = await confirm({
+      title: `Join ${invite.team_name}?`,
+      message: `You'll be added as ${invite.role}. You can leave the team at any time.`,
+      confirmLabel: 'Accept Invite',
+    });
+    if (!ok) return;
     setActing(invite.id);
+    setError(null);
     try {
       await api.post(`/api/invites/${invite.token}/accept`);
       await refreshUser();
-      setInvites(prev => prev.filter(i => i.id !== invite.id));
+      fetchAll();
     } catch (err) {
-      alert(formatApiError(err));
+      setError(formatApiError(err));
     } finally {
       setActing(null);
     }
   };
 
   const handleDecline = async (invite) => {
-    if (!confirm(`Decline invitation to join ${invite.team_name}?`)) return;
+    const ok = await confirm({
+      title: 'Decline invitation?',
+      message: `Decline the invite to join ${invite.team_name} as ${invite.role}? This cannot be undone.`,
+      confirmLabel: 'Decline',
+      danger: true,
+    });
+    if (!ok) return;
     setActing(invite.id);
+    setError(null);
     try {
       await api.post(`/api/invites/${invite.token}/decline`);
-      setInvites(prev => prev.filter(i => i.id !== invite.id));
+      fetchAll();
     } catch (err) {
-      alert(formatApiError(err));
+      setError(formatApiError(err));
     } finally {
       setActing(null);
     }
@@ -668,56 +698,113 @@ function RequestsTab() {
 
   if (loading) return <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>;
 
-  if (invites.length === 0) {
-    return (
-      <div className="ca-card" style={{ textAlign: 'center', padding: 48 }}>
-        <div style={{ fontSize: 28, marginBottom: 12 }}>✉</div>
-        <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>No pending invitations</div>
-        <div style={{ color: 'var(--muted)', fontSize: 13 }}>
-          When someone invites you to a team, it will appear here.
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {invites.map(invite => {
-        const isBusy = acting === invite.id;
-        const daysLeft = Math.ceil((new Date(invite.expires_at) - Date.now()) / 86400000);
-        return (
-          <div key={invite.id} className="ca-card" style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 200 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{invite.team_name}</span>
-                <RoleBadge role={invite.role} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {error && (
+        <div style={{ padding: '10px 14px', borderRadius: 6, fontSize: 12, background: 'var(--accent2-dim)', color: 'var(--accent2)', display: 'flex', justifyContent: 'space-between' }}>
+          {error}
+          <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}>×</button>
+        </div>
+      )}
+
+      {/* Pending invitations */}
+      {pending.length === 0 ? (
+        <div className="ca-card" style={{ textAlign: 'center', padding: 40 }}>
+          <div style={{ fontSize: 26, marginBottom: 10 }}>✉</div>
+          <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>No pending invitations</div>
+          <div style={{ color: 'var(--muted)', fontSize: 13 }}>When someone invites you to a team, it will appear here.</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {pending.map(invite => {
+            const isBusy = acting === invite.id;
+            const daysLeft = Math.ceil((new Date(invite.expires_at) - Date.now()) / 86400000);
+            return (
+              <div key={invite.id} className="ca-card" style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{invite.team_name}</span>
+                    <RoleBadge role={invite.role} />
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    Invited by{' '}
+                    <span style={{ color: 'var(--text)' }}>
+                      {invite.invited_by_name
+                        ? `${invite.invited_by_name} (${invite.invited_by_email})`
+                        : invite.invited_by_email}
+                    </span>
+                    {' · '}
+                    <RelativeTime iso={invite.created_at} />
+                    {' · '}
+                    <span style={{ color: daysLeft <= 2 ? 'var(--accent2)' : 'var(--muted)' }}>
+                      Expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => handleAccept(invite)} disabled={isBusy}>
+                    {isBusy ? '...' : 'Accept'}
+                  </button>
+                  <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => handleDecline(invite)} disabled={isBusy}>
+                    Decline
+                  </button>
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                Invited by{' '}
-                <span style={{ color: 'var(--text)' }}>
-                  {invite.invited_by_name
-                    ? `${invite.invited_by_name} (${invite.invited_by_email})`
-                    : invite.invited_by_email}
-                </span>
-                {' · '}
-                <RelativeTime iso={invite.created_at} />
-                {' · '}
-                <span style={{ color: daysLeft <= 2 ? 'var(--accent2)' : 'var(--muted)' }}>
-                  Expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}
-                </span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => handleAccept(invite)} disabled={isBusy}>
-                {isBusy ? '...' : 'Accept'}
-              </button>
-              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => handleDecline(invite)} disabled={isBusy}>
-                Decline
-              </button>
-            </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* History */}
+      {history.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>
+            History
           </div>
-        );
-      })}
+          <div className="ca-card" style={{ padding: 0, overflow: 'hidden' }}>
+            <table className="ca-table">
+              <thead>
+                <tr>
+                  <th>Team</th>
+                  <th>Role</th>
+                  <th>Invited by</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map(inv => {
+                  const now = Date.now();
+                  const effectiveStatus = inv.status === 'pending' && new Date(inv.expires_at) <= now
+                    ? 'expired'
+                    : inv.status;
+                  const s = STATUS_STYLE[effectiveStatus] || STATUS_STYLE.expired;
+                  return (
+                    <tr key={inv.id}>
+                      <td style={{ fontSize: 12, fontWeight: 500 }}>{inv.team_name}</td>
+                      <td><RoleBadge role={inv.role} /></td>
+                      <td style={{ fontSize: 11, color: 'var(--muted)' }}>
+                        {inv.invited_by_name || inv.invited_by_email}
+                      </td>
+                      <td style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                        {inv.accepted_at
+                          ? new Date(inv.accepted_at).toLocaleDateString()
+                          : new Date(inv.created_at).toLocaleDateString()}
+                      </td>
+                      <td>
+                        <span style={{
+                          display: 'inline-block', padding: '1px 8px', borderRadius: 4,
+                          fontSize: 10, fontWeight: 600, background: s.bg, color: s.color,
+                        }}>{s.label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

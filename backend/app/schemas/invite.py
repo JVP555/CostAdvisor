@@ -26,5 +26,7 @@ class PendingInviteOut(BaseModel):
     invited_by_email: str
     created_at: datetime
     expires_at: datetime
+    status: str = "pending"
+    accepted_at: datetime | None = None
 
     model_config = {"from_attributes": True}
