@@ -55,6 +55,17 @@ export default function Admin() {
   }, []);
 
   const toggleSuperAdmin = async (userId, current) => {
+    const targetUser = users.find(u => u.id === userId);
+    const action = current ? 'Revoke Admin' : 'Make Admin';
+    const ok = await confirm({
+      title: `${action} — ${targetUser?.display_name || targetUser?.email}?`,
+      message: current
+        ? 'This user will lose super-admin privileges immediately.'
+        : 'This user will gain full super-admin access to all platform data.',
+      confirmLabel: action,
+      danger: current,
+    });
+    if (!ok) return;
     await api.put(`/api/admin/users/${userId}`, { is_super_admin: !current });
     fetchData();
   };
@@ -77,6 +88,14 @@ export default function Admin() {
   };
 
   const impersonate = async (userId) => {
+    const targetUser = users.find(u => u.id === userId);
+    const ok = await confirm({
+      title: `Impersonate ${targetUser?.display_name || targetUser?.email}?`,
+      message: 'You will be logged in as this user. All actions will be performed on their behalf until you stop impersonation.',
+      confirmLabel: 'Impersonate',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.post(`/api/admin/impersonate/${userId}`);
       setImpersonating(true);
