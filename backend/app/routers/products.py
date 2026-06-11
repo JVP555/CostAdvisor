@@ -5,21 +5,12 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.product import Product
-from app.models.team import TeamMembership
 from app.routers.auth import get_current_user
 from app.schemas.product import ProductCreate, ProductUpdate, ProductOut
 from app.services.audit import log_event
+from app.services.permissions import require_permission
 
 router = APIRouter()
-
-
-def require_team_access(db: Session, user: User, team_id: uuid.UUID):
-    membership = db.query(TeamMembership).filter(
-        TeamMembership.user_id == user.id,
-        TeamMembership.team_id == team_id,
-    ).first()
-    if not membership:
-        raise HTTPException(status_code=403, detail="Not a member of this team")
 
 
 @router.get("/", response_model=list[ProductOut])
@@ -28,7 +19,7 @@ def list_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_team_access(db, current_user, team_id)
+    require_permission(db, current_user, team_id, "products.view")
     return db.query(Product).filter(Product.team_id == team_id).all()
 
 
@@ -39,7 +30,7 @@ def create_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_team_access(db, current_user, team_id)
+    require_permission(db, current_user, team_id, "products.edit")
     product = Product(
         team_id=team_id,
         created_by=current_user.id,
@@ -73,7 +64,7 @@ def get_product(
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    require_team_access(db, current_user, product.team_id)
+    require_permission(db, current_user, product.team_id, "products.view")
     return product
 
 
@@ -87,7 +78,7 @@ def update_product(
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    require_team_access(db, current_user, product.team_id)
+    require_permission(db, current_user, product.team_id, "products.edit")
 
     prev = {"name": product.name, "formula": product.formula, "unit": product.unit}
     for field in ["name", "formula", "active_content", "unit", "chemical_family_id", "custom_attributes"]:
@@ -112,7 +103,7 @@ def delete_product(
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    require_team_access(db, current_user, product.team_id)
+    require_permission(db, current_user, product.team_id, "products.delete")
     log_event(db, product.team_id, current_user.id, "delete", "product", str(product.id),
               previous_value={"name": product.name})
     db.delete(product)

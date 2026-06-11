@@ -8,13 +8,13 @@ from app.models.user import User
 from app.models.product import Product
 from app.models.cost_model import CostModel, FormulaVersion, FormulaComponent
 from app.models.index_data import CommodityIndex
-from app.models.team import TeamMembership
 from app.routers.auth import get_current_user
 from app.schemas.cost_model import (
     CostModelCreate, CostModelUpdate, CostModelOut,
     FormulaVersionCreate, FormulaVersionOut,
 )
 from app.services.audit import log_event
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
@@ -24,15 +24,6 @@ def resolve_commodity_id(db: Session, name: str) -> int | None:
         return None
     commodity = db.query(CommodityIndex).filter(CommodityIndex.name == name).first()
     return commodity.id if commodity else None
-
-
-def require_team_access(db: Session, user: User, team_id: uuid.UUID):
-    membership = db.query(TeamMembership).filter(
-        TeamMembership.user_id == user.id,
-        TeamMembership.team_id == team_id,
-    ).first()
-    if not membership:
-        raise HTTPException(status_code=403, detail="Not a member of this team")
 
 
 def _build_cost_model_out(cm: CostModel) -> CostModelOut:
@@ -51,7 +42,7 @@ def list_cost_models(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_team_access(db, current_user, team_id)
+    require_permission(db, current_user, team_id, "cost_models.view")
     models = db.query(CostModel).filter(CostModel.team_id == team_id).all()
     return [_build_cost_model_out(cm) for cm in models]
 
@@ -63,7 +54,7 @@ def create_cost_model(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_team_access(db, current_user, team_id)
+    require_permission(db, current_user, team_id, "cost_models.edit")
 
     # Verify product exists and belongs to team
     product = db.query(Product).filter(Product.id == data.product_id).first()
@@ -130,7 +121,7 @@ def get_cost_model(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_team_access(db, current_user, cm.team_id)
+    require_permission(db, current_user, cm.team_id, "cost_models.view")
     return _build_cost_model_out(cm)
 
 
@@ -144,7 +135,7 @@ def update_cost_model(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_team_access(db, current_user, cm.team_id)
+    require_permission(db, current_user, cm.team_id, "cost_models.edit")
 
     changes = {}
     for field in ["supplier_id", "destination_country", "destination_region", "region", "currency", "incoterm"]:
@@ -169,7 +160,7 @@ def delete_cost_model(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_team_access(db, current_user, cm.team_id)
+    require_permission(db, current_user, cm.team_id, "cost_models.delete")
     team_id = cm.team_id
     log_event(db, team_id, current_user.id, "delete", "cost_model", str(cm.id),
               previous_value={"product_id": str(cm.product_id), "region": cm.region})
@@ -189,7 +180,7 @@ def renegotiate(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_team_access(db, current_user, cm.team_id)
+    require_permission(db, current_user, cm.team_id, "cost_models.edit")
 
     # Check if a version exists for this quarter
     existing = db.query(FormulaVersion).filter(
@@ -275,7 +266,7 @@ def list_versions(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_team_access(db, current_user, cm.team_id)
+    require_permission(db, current_user, cm.team_id, "cost_models.view")
     return (
         db.query(FormulaVersion)
         .filter(FormulaVersion.cost_model_id == cost_model_id)
@@ -294,7 +285,7 @@ def delete_version(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_team_access(db, current_user, cm.team_id)
+    require_permission(db, current_user, cm.team_id, "cost_models.delete")
 
     fv = db.query(FormulaVersion).filter(
         FormulaVersion.id == version_id,
@@ -326,7 +317,7 @@ def clone_cost_model(
     original = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not original:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_team_access(db, current_user, original.team_id)
+    require_permission(db, current_user, original.team_id, "cost_models.edit")
 
     clone = CostModel(
         team_id=original.team_id,

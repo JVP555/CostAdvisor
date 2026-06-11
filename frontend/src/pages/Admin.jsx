@@ -10,6 +10,7 @@ export default function Admin() {
   const showAlert = useAlert();
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [plans, setPlans] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [accessRequests, setAccessRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,11 +29,13 @@ export default function Admin() {
       api.get('/api/admin/users', { params: { include_deleted: showDeleted } }),
       api.get('/api/admin/teams'),
       api.get('/api/admin/access-requests'),
+      api.get('/api/settings/plans'),
     ])
-      .then(([uRes, tRes, rRes]) => {
+      .then(([uRes, tRes, rRes, pRes]) => {
         setUsers(uRes.data);
         setTeams(tRes.data);
         setAccessRequests(rRes.data);
+        setPlans(pRes.data);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -59,7 +62,7 @@ export default function Admin() {
   useEffect(() => {
     if (tab === 'audit') fetchAuditLogs();
     else if (tab === 'requests') fetchAccessRequests();
-    else fetchData();
+    else if (tab !== 'settings') fetchData();
   }, [tab, showDeleted]);
 
   useEffect(() => {
@@ -152,7 +155,7 @@ export default function Admin() {
       </div>
       <p className="ca-subtitle">Manage users, teams, and platform activity.</p>
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
           { key: 'users', label: `Users (${users.length})` },
           { key: 'teams', label: `Teams (${teams.length})` },
@@ -164,6 +167,7 @@ export default function Admin() {
               return pending > 0 ? `Requests (${pending})` : 'Requests';
             })(),
           },
+          { key: 'settings', label: 'Settings' },
         ].map(t => (
           <button
             key={t.key}
@@ -200,6 +204,7 @@ export default function Admin() {
         <TeamsTab
           teams={teams}
           allUsers={users}
+          plans={plans}
           onRefresh={fetchData}
           targetTeamId={targetTeamId}
           onTeamExpanded={() => setTargetTeamId(null)}
@@ -209,6 +214,8 @@ export default function Admin() {
           requests={accessRequests}
           onRefresh={fetchAccessRequests}
         />
+      ) : tab === 'settings' ? (
+        <AdminSettingsTab />
       ) : (
         <AuditTab
           logs={auditLogs}
@@ -369,8 +376,9 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
 }
 
 
-function TeamsTab({ teams, allUsers, onRefresh, targetTeamId, onTeamExpanded }) {
+function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpanded }) {
   const confirm = useConfirm();
+  const showAlert = useAlert();
   const [expanded, setExpanded] = useState(null);
   const [error, setError] = useState(null);
   const [teamSearch, setTeamSearch] = useState('');
@@ -475,6 +483,15 @@ function TeamsTab({ teams, allUsers, onRefresh, targetTeamId, onTeamExpanded }) 
     catch (e) { setError(e.response?.data?.detail || e.message || 'Error'); }
   };
 
+  const handlePlanChange = async (teamId, planId) => {
+    try {
+      await api.put(`/api/admin/teams/${teamId}/plan`, { plan_id: planId || null });
+      onRefresh();
+    } catch (e) {
+      showAlert({ title: 'Error', message: e.response?.data?.detail || e.message || 'Plan update failed' });
+    }
+  };
+
   const filteredTeams = teamSearch
     ? teams.filter(t => {
         const q = teamSearch.toLowerCase();
@@ -513,13 +530,14 @@ function TeamsTab({ teams, allUsers, onRefresh, targetTeamId, onTeamExpanded }) 
               <tr>
                 <th>Team</th>
                 <th className="center">Members</th>
+                <th className="center">Plan</th>
                 <th className="center">Created</th>
                 <th className="center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredTeams.length === 0 && (
-                <tr><td colSpan={4} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No teams found.</td></tr>
+                <tr><td colSpan={5} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No teams found.</td></tr>
               )}
               {filteredTeams.map(t => {
                 const isOpen = expanded === t.id;
@@ -532,6 +550,19 @@ function TeamsTab({ teams, allUsers, onRefresh, targetTeamId, onTeamExpanded }) 
                       <td style={{ fontWeight: 600, fontSize: 13 }}>{t.name}</td>
                       <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>
                         {t.member_count} member{t.member_count !== 1 ? 's' : ''}
+                      </td>
+                      <td className="center">
+                        <select
+                          className="ca-input"
+                          style={{ fontSize: 11, padding: '3px 6px', width: 'auto' }}
+                          value={t.plan_id || ''}
+                          onChange={e => handlePlanChange(t.id, e.target.value)}
+                        >
+                          <option value="">No plan</option>
+                          {plans.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}{p.is_default ? ' (default)' : ''}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="center" style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                         {t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}
@@ -554,7 +585,7 @@ function TeamsTab({ teams, allUsers, onRefresh, targetTeamId, onTeamExpanded }) 
 
                     {isOpen && (
                       <tr>
-                        <td colSpan={4} style={{ padding: '16px 20px', background: 'var(--surface2)', borderLeft: '3px solid var(--accent)' }}>
+                        <td colSpan={5} style={{ padding: '16px 20px', background: 'var(--surface2)', borderLeft: '3px solid var(--accent)' }}>
                           <table className="ca-table" style={{ marginBottom: 14 }}>
                             <thead>
                               <tr>
@@ -1087,6 +1118,361 @@ function RequestsTab({ requests, onRefresh }) {
         </div>
       </div>
     </>
+  );
+}
+
+
+function AdminSettingsTab() {
+  const showAlert = useAlert();
+  const confirm = useConfirm();
+  const [section, setSection] = useState('permissions');
+  const [permissions, setPermissions] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [loadingPerms, setLoadingPerms] = useState(true);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [editingPlan, setEditingPlan] = useState(null);
+  const [newPlan, setNewPlan] = useState(null);
+  const [newPerm, setNewPerm] = useState(null);
+
+  useEffect(() => {
+    api.get('/api/settings/permissions')
+      .then(r => setPermissions(r.data))
+      .catch(console.error)
+      .finally(() => setLoadingPerms(false));
+    fetchPlans();
+  }, []);
+
+  const fetchPlans = () => {
+    setLoadingPlans(true);
+    Promise.all([
+      api.get('/api/settings/plans'),
+      api.get('/api/settings/permissions'),
+    ])
+      .then(([pRes, permRes]) => {
+        setPlans(pRes.data);
+        setPermissions(permRes.data);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingPlans(false));
+  };
+
+  // Group permissions by category
+  const permsByCategory = permissions.reduce((acc, p) => {
+    if (!acc[p.category]) acc[p.category] = [];
+    acc[p.category].push(p);
+    return acc;
+  }, {});
+
+  const savePlan = async (planData, planId) => {
+    try {
+      if (planId) {
+        await api.put(`/api/settings/plans/${planId}`, planData);
+      } else {
+        await api.post('/api/settings/plans', planData);
+      }
+      setEditingPlan(null);
+      setNewPlan(null);
+      fetchPlans();
+    } catch (e) {
+      showAlert({ title: 'Error', message: e.response?.data?.detail || e.message });
+    }
+  };
+
+  const deletePlan = async (plan) => {
+    if (plan.is_default) {
+      showAlert({ title: 'Cannot delete', message: 'The default plan cannot be deleted.' });
+      return;
+    }
+    const ok = await confirm({ title: `Delete plan "${plan.name}"?`, message: 'Teams on this plan will lose their plan assignment.', confirmLabel: 'Delete', danger: true });
+    if (!ok) return;
+    try {
+      await api.delete(`/api/settings/plans/${plan.id}`);
+      fetchPlans();
+    } catch (e) {
+      showAlert({ title: 'Error', message: e.response?.data?.detail || e.message });
+    }
+  };
+
+  const createPermission = async (data) => {
+    try {
+      await api.post('/api/settings/permissions', data);
+      const r = await api.get('/api/settings/permissions');
+      setPermissions(r.data);
+      setNewPerm(null);
+    } catch (e) {
+      showAlert({ title: 'Error', message: e.response?.data?.detail || e.message });
+    }
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {[
+          { key: 'permissions', label: `Permissions (${permissions.length})` },
+          { key: 'plans', label: `Plans (${plans.length})` },
+        ].map(s => (
+          <button
+            key={s.key}
+            className={`ca-btn ca-btn-sm ${section === s.key ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+            onClick={() => setSection(s.key)}
+          >{s.label}</button>
+        ))}
+      </div>
+
+      {section === 'permissions' && (
+        <>
+          <div className="ca-card" style={{ marginBottom: 16 }}>
+            {loadingPerms ? (
+              <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
+            ) : (
+              Object.entries(permsByCategory).map(([cat, perms]) => (
+                <div key={cat} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--muted)', marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid var(--border)' }}>{cat}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {perms.map(p => (
+                      <div key={p.id} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        background: 'var(--surface2)', border: '1px solid var(--border)',
+                        borderRadius: 6, padding: '5px 10px', fontSize: 11,
+                      }}>
+                        <span style={{ fontFamily: 'monospace', color: 'var(--accent)', fontSize: 10 }}>{p.key}</span>
+                        <span style={{ color: 'var(--muted)' }}>·</span>
+                        <span>{p.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {newPerm ? (
+            <div className="ca-card" style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>New Permission</div>
+              <PermissionForm onSave={createPermission} onCancel={() => setNewPerm(null)} />
+            </div>
+          ) : (
+            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setNewPerm({})}>+ Add Permission</button>
+          )}
+        </>
+      )}
+
+      {section === 'plans' && (
+        <>
+          <div className="ca-card" style={{ marginBottom: 16 }}>
+            {loadingPlans ? (
+              <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
+            ) : (
+              <table className="ca-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th className="center">Default</th>
+                    <th className="center">Permissions</th>
+                    <th className="center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {plans.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>No plans yet.</td></tr>
+                  )}
+                  {plans.map(p => (
+                    <Fragment key={p.id}>
+                      <tr>
+                        <td style={{ fontWeight: 600, fontSize: 13 }}>
+                          {p.name}
+                          {p.is_default && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: 'var(--accent-dim)', color: 'var(--accent)' }}>DEFAULT</span>}
+                        </td>
+                        <td style={{ fontSize: 11, color: 'var(--muted)' }}>{p.description || '—'}</td>
+                        <td className="center" style={{ fontSize: 11, color: p.is_default ? 'var(--accent)' : 'var(--muted)' }}>{p.is_default ? 'Yes' : 'No'}</td>
+                        <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>{p.permission_count}</td>
+                        <td className="center">
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                            <button
+                              className="ca-btn ca-btn-ghost ca-btn-sm"
+                              onClick={() => setEditingPlan(editingPlan?.id === p.id ? null : p)}
+                            >
+                              {editingPlan?.id === p.id ? 'Close' : 'Edit'}
+                            </button>
+                            {!p.is_default && (
+                              <button
+                                className="ca-btn ca-btn-ghost ca-btn-sm"
+                                style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                                onClick={() => deletePlan(p)}
+                              >Delete</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {editingPlan?.id === p.id && (
+                        <tr>
+                          <td colSpan={5} style={{ padding: '16px 20px', background: 'var(--surface2)', borderLeft: '3px solid var(--accent3)' }}>
+                            <PlanForm
+                              initial={editingPlan}
+                              permissions={permissions}
+                              onSave={data => savePlan(data, p.id)}
+                              onCancel={() => setEditingPlan(null)}
+                              fetchInitialDetail={() => api.get(`/api/settings/plans/${p.id}`).then(r => r.data)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {newPlan ? (
+            <div className="ca-card" style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>New Plan</div>
+              <PlanForm
+                initial={{ name: '', description: '', is_default: false, permission_ids: [] }}
+                permissions={permissions}
+                onSave={data => savePlan(data, null)}
+                onCancel={() => setNewPlan(null)}
+              />
+            </div>
+          ) : (
+            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setNewPlan({})}>+ New Plan</button>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function PermissionForm({ onSave, onCancel }) {
+  const [form, setForm] = useState({ key: '', label: '', category: '', action: '' });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSubmit = () => {
+    if (!form.key || !form.label || !form.category || !form.action) return;
+    onSave(form);
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, alignItems: 'end' }}>
+      <div>
+        <label className="ca-label">Key</label>
+        <input className="ca-input" value={form.key} onChange={e => set('key', e.target.value)} placeholder="e.g. products.view" />
+      </div>
+      <div>
+        <label className="ca-label">Label</label>
+        <input className="ca-input" value={form.label} onChange={e => set('label', e.target.value)} placeholder="e.g. View Products" />
+      </div>
+      <div>
+        <label className="ca-label">Category</label>
+        <input className="ca-input" value={form.category} onChange={e => set('category', e.target.value)} placeholder="e.g. products" />
+      </div>
+      <div>
+        <label className="ca-label">Action</label>
+        <input className="ca-input" value={form.action} onChange={e => set('action', e.target.value)} placeholder="e.g. view" />
+      </div>
+      <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={onCancel}>Cancel</button>
+        <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleSubmit}>Create</button>
+      </div>
+    </div>
+  );
+}
+
+function PlanForm({ initial, permissions, onSave, onCancel, fetchInitialDetail }) {
+  const [name, setName] = useState(initial?.name || '');
+  const [description, setDescription] = useState(initial?.description || '');
+  const [isDefault, setIsDefault] = useState(initial?.is_default || false);
+  const [selectedIds, setSelectedIds] = useState(new Set(initial?.permission_ids || []));
+  const [loadingDetail, setLoadingDetail] = useState(!!fetchInitialDetail);
+
+  useEffect(() => {
+    if (!fetchInitialDetail) return;
+    fetchInitialDetail().then(detail => {
+      setName(detail.name);
+      setDescription(detail.description || '');
+      setIsDefault(detail.is_default);
+      setSelectedIds(new Set(detail.permissions.map(p => p.id)));
+    }).finally(() => setLoadingDetail(false));
+  }, []);
+
+  const permsByCategory = permissions.reduce((acc, p) => {
+    if (!acc[p.category]) acc[p.category] = [];
+    acc[p.category].push(p);
+    return acc;
+  }, {});
+
+  const togglePerm = (id) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleCategory = (perms) => {
+    const allSelected = perms.every(p => selectedIds.has(p.id));
+    setSelectedIds(prev => {
+      const n = new Set(prev);
+      perms.forEach(p => allSelected ? n.delete(p.id) : n.add(p.id));
+      return n;
+    });
+  };
+
+  if (loadingDetail) return <div style={{ padding: 12, color: 'var(--muted)' }}>Loading…</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 8, marginBottom: 16, alignItems: 'end' }}>
+        <div>
+          <label className="ca-label">Name</label>
+          <input className="ca-input" value={name} onChange={e => setName(e.target.value)} />
+        </div>
+        <div>
+          <label className="ca-label">Description</label>
+          <input className="ca-input" value={description} onChange={e => setDescription(e.target.value)} />
+        </div>
+        <div style={{ paddingBottom: 2 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={isDefault} onChange={e => setIsDefault(e.target.checked)} />
+            Default plan
+          </label>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.6px' }}>Permissions ({selectedIds.size}/{permissions.length})</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 16 }}>
+        {Object.entries(permsByCategory).map(([cat, perms]) => {
+          const allSel = perms.every(p => selectedIds.has(p.id));
+          const someSel = perms.some(p => selectedIds.has(p.id));
+          return (
+            <div key={cat} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: allSel ? 'var(--accent)' : someSel ? 'var(--accent3)' : 'var(--muted)' }}>{cat}</span>
+                <button
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 10, color: 'var(--muted)', padding: 0 }}
+                  onClick={() => toggleCategory(perms)}
+                >{allSel ? 'Deselect all' : 'Select all'}</button>
+              </div>
+              {perms.map(p => (
+                <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, marginBottom: 4 }}>
+                  <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => togglePerm(p.id)} />
+                  {p.label}
+                </label>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={onCancel}>Cancel</button>
+        <button
+          className="ca-btn ca-btn-primary ca-btn-sm"
+          onClick={() => onSave({ name, description, is_default: isDefault, permission_ids: [...selectedIds] })}
+        >Save</button>
+      </div>
+    </div>
   );
 }
 

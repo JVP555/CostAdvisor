@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.models.audit_log import AuditLog
 from app.models.access_request import PlatformAccessRequest
+from app.models.rbac import Plan
 from app.config import get_settings
 from app.routers.auth import get_current_user, create_jwt
 from app.schemas.user import UserOut
@@ -380,6 +381,7 @@ def list_all_teams(
             "name": t.name,
             "created_at": t.created_at.isoformat() if t.created_at else "",
             "member_count": len(members),
+            "plan_id": str(t.plan_id) if t.plan_id else None,
             "members": [
                 {
                     "user_id": str(m.user_id),
@@ -452,6 +454,32 @@ def admin_remove_member(
     db.delete(membership)
     db.commit()
     return {"status": "removed"}
+
+
+class PlanAssignRequest(BaseModel):
+    plan_id: uuid.UUID | None
+
+
+@router.put("/teams/{team_id}/plan")
+def assign_team_plan(
+    team_id: uuid.UUID,
+    data: PlanAssignRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    if data.plan_id is not None:
+        plan = db.query(Plan).filter(Plan.id == data.plan_id).first()
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+    team.plan_id = data.plan_id
+    log_event(db, team_id, current_user.id, "admin_assign_plan", "team", str(team_id),
+              new_value={"plan_id": str(data.plan_id) if data.plan_id else None,
+                         "by": current_user.email})
+    db.commit()
+    return {"status": "ok"}
 
 
 @router.delete("/teams/{team_id}")

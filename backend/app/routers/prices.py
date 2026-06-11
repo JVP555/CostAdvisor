@@ -6,22 +6,13 @@ from app.database import get_db
 from app.models.user import User
 from app.models.cost_model import CostModel
 from app.models.price_data import ActualPrice
-from app.models.team import TeamMembership
 from app.routers.auth import get_current_user
 from app.schemas.price_data import ActualPriceOut, ActualPriceCreate
 from app.services.file_parser import parse_price_upload
 from app.services.audit import log_event
+from app.services.permissions import require_permission
 
 router = APIRouter()
-
-
-def require_model_access(db: Session, user: User, cm: CostModel):
-    membership = db.query(TeamMembership).filter(
-        TeamMembership.user_id == user.id,
-        TeamMembership.team_id == cm.team_id,
-    ).first()
-    if not membership:
-        raise HTTPException(status_code=403, detail="Not a member of this team")
 
 
 @router.get("/{cost_model_id}", response_model=list[ActualPriceOut])
@@ -33,7 +24,7 @@ def get_actual_prices(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "prices.view")
     prices = (
         db.query(ActualPrice)
         .filter(ActualPrice.cost_model_id == cost_model_id)
@@ -53,7 +44,7 @@ async def upload_prices(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "prices.import")
 
     content = await file.read()
     filename = file.filename or "upload"
@@ -123,7 +114,7 @@ def update_price(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "prices.edit")
 
     existing = db.query(ActualPrice).filter(
         ActualPrice.cost_model_id == cost_model_id,
@@ -175,7 +166,7 @@ def delete_price(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "prices.delete")
 
     price = db.query(ActualPrice).filter(
         ActualPrice.cost_model_id == cost_model_id,

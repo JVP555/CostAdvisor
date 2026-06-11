@@ -165,6 +165,17 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Team ownership is a single-owner transfer — setting a new owner auto-demotes the old owner to admin
   - 🟢 Owner role manageable by team owner (transfer, role change, remove) from Team page
 
+- 🟢 **Scrum 8b** — RBAC + Plans (granular permissions, subscription tiers, team-scoped roles)
+  - 🟢 38 permissions seeded across 11 categories (products, cost_models, suppliers, indexes, prices, volumes, fx_rates, costing, evolution, briefs, squeeze, scenarios)
+  - 🟢 Free plan (default, view+export) and Dream Plan (all 38 permissions) seeded
+  - 🟢 Roles are team-scoped — each team gets Owner/Admin/Member defaults (editable); custom roles can be created
+  - 🟢 Alembic migration: creates permissions/plans/roles/team_member_roles tables, seeds data, migrates existing memberships
+  - 🟢 `has_permission()` service: super_admin bypass → plan ceiling → custom roles → membership.role fallback
+  - 🟢 All resource endpoints enforced: products, cost_models, suppliers, indexes, prices, volumes, costing, evolution, squeeze, briefs, scenarios, portfolio
+  - 🟢 Admin Settings tab (5th tab): Permissions list + create, Plans CRUD with permission checkboxes
+  - 🟢 Admin TeamsTab: Plan column with inline dropdown per team
+  - 🟢 Team Settings → Role Settings section: role CRUD with permission checkboxes, member-role assignment table
+
 - 🔴 **Scrum 9** — Hardened authentication on OAuth 2.0
   - 🔴 PKCE `code_verifier`/`code_challenge` used on every OAuth flow
   - 🟡 `state` generated per-request, validated, and deleted after use (generated but never validated on callback)

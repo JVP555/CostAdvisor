@@ -8,10 +8,10 @@ from app.models.user import User
 from app.models.cost_model import CostModel
 from app.models.price_data import ActualPrice
 from app.models.actual_volume import ActualVolume
-from app.models.team import TeamMembership
 from app.routers.auth import get_current_user
 from app.services.costing_engine import calculate_should_cost
 from app.services.fx_converter import convert_price
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
@@ -52,13 +52,7 @@ def portfolio_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not current_user.is_super_admin:
-        membership = db.query(TeamMembership).filter(
-            TeamMembership.user_id == current_user.id,
-            TeamMembership.team_id == team_id,
-        ).first()
-        if not membership:
-            raise HTTPException(status_code=403, detail="Not a member of this team")
+    require_permission(db, current_user, team_id, "costing.view")
 
     cost_models = db.query(CostModel).filter(CostModel.team_id == team_id).all()
 

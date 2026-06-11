@@ -1090,7 +1090,8 @@ function ActivityTab() {
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
 function SettingsTab() {
-  const { user } = useAuth();
+  const { user, teams, activeTeamId } = useAuth();
+  const [settingsSection, setSettingsSection] = useState('roles');
   const [rates, setRates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterFrom, setFilterFrom] = useState('');
@@ -1118,88 +1119,437 @@ function SettingsTab() {
     pairs[key].push(r);
   }
 
+  // active team where user is owner or admin
+  const activeTeam = teams?.find(t => t.id === activeTeamId);
+  const canManageRoles = activeTeam && (activeTeam.role === 'owner' || activeTeam.role === 'admin');
+
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => rates.length > 0 && exportCsv(
-          'fx_rates.csv',
-          ['From', 'To', 'Year', 'Quarter', 'Rate'],
-          rates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate])
-        )}>Export CSV</button>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {canManageRoles && (
+          <button
+            className={`ca-btn ca-btn-sm ${settingsSection === 'roles' ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+            onClick={() => setSettingsSection('roles')}
+          >Role Settings</button>
+        )}
+        <button
+          className={`ca-btn ca-btn-sm ${settingsSection === 'fx' ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+          onClick={() => setSettingsSection('fx')}
+        >FX Rates</button>
       </div>
 
-      <div className="ca-card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-          <div>
-            <label className="ca-label">From Currency</label>
-            <select className="ca-select" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}>
-              <option value="">All</option>
-              {currencies.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="ca-label">To Currency</label>
-            <select className="ca-select" value={filterTo} onChange={e => setFilterTo(e.target.value)}>
-              <option value="">All</option>
-              {currencies.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <button className="ca-btn ca-btn-ghost" onClick={() => { setFilterFrom(''); setFilterTo(''); }}>Clear</button>
-          </div>
-        </div>
-      </div>
-
-      {user?.is_super_admin && (
-        <div style={{ marginBottom: 16 }}>
-          <FileUpload endpoint="/api/fx-rates/upload" onSuccess={fetchRates} />
-        </div>
+      {settingsSection === 'roles' && canManageRoles && activeTeamId && (
+        <RoleSettingsSection teamId={activeTeamId} userRole={activeTeam.role} />
       )}
 
-      {loading ? (
-        <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
-      ) : rates.length === 0 ? (
-        <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
-          No FX rates found. {user?.is_super_admin ? 'Upload a CSV to get started.' : 'Ask a super admin to upload rates.'}
-        </div>
-      ) : (
-        Object.entries(pairs).map(([pair, pairRates]) => (
-          <div key={pair} className="ca-card" style={{ marginBottom: 12 }}>
-            <div className="ca-card-title">{pair}</div>
-            <div className="ca-scroll-x">
-              <table className="ca-table">
-                <thead>
-                  <tr>
-                    <th>Year</th>
-                    <th className="center">Q1</th>
-                    <th className="center">Q2</th>
-                    <th className="center">Q3</th>
-                    <th className="center">Q4</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const years = [...new Set(pairRates.map(r => r.year))].sort();
-                    return years.map(y => (
-                      <tr key={y}>
-                        <td style={{ fontWeight: 600 }}>{y}</td>
-                        {[1, 2, 3, 4].map(q => {
-                          const val = pairRates.find(r => r.year === y && r.quarter === q);
-                          return (
-                            <td key={q} className="center" style={{ fontFamily: "'JetBrains Mono', monospace", color: val ? 'var(--text)' : 'var(--muted)' }}>
-                              {val ? val.rate.toFixed(4) : '—'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ));
-                  })()}
-                </tbody>
-              </table>
+      {settingsSection === 'fx' && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => rates.length > 0 && exportCsv(
+              'fx_rates.csv',
+              ['From', 'To', 'Year', 'Quarter', 'Rate'],
+              rates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate])
+            )}>Export CSV</button>
+          </div>
+
+          <div className="ca-card" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              <div>
+                <label className="ca-label">From Currency</label>
+                <select className="ca-select" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}>
+                  <option value="">All</option>
+                  {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="ca-label">To Currency</label>
+                <select className="ca-select" value={filterTo} onChange={e => setFilterTo(e.target.value)}>
+                  <option value="">All</option>
+                  {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button className="ca-btn ca-btn-ghost" onClick={() => { setFilterFrom(''); setFilterTo(''); }}>Clear</button>
+              </div>
             </div>
           </div>
-        ))
+
+          {user?.is_super_admin && (
+            <div style={{ marginBottom: 16 }}>
+              <FileUpload endpoint="/api/fx-rates/upload" onSuccess={fetchRates} />
+            </div>
+          )}
+
+          {loading ? (
+            <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
+          ) : rates.length === 0 ? (
+            <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
+              No FX rates found. {user?.is_super_admin ? 'Upload a CSV to get started.' : 'Ask a super admin to upload rates.'}
+            </div>
+          ) : (
+            Object.entries(pairs).map(([pair, pairRates]) => (
+              <div key={pair} className="ca-card" style={{ marginBottom: 12 }}>
+                <div className="ca-card-title">{pair}</div>
+                <div className="ca-scroll-x">
+                  <table className="ca-table">
+                    <thead>
+                      <tr>
+                        <th>Year</th>
+                        <th className="center">Q1</th>
+                        <th className="center">Q2</th>
+                        <th className="center">Q3</th>
+                        <th className="center">Q4</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const years = [...new Set(pairRates.map(r => r.year))].sort();
+                        return years.map(y => (
+                          <tr key={y}>
+                            <td style={{ fontWeight: 600 }}>{y}</td>
+                            {[1, 2, 3, 4].map(q => {
+                              const val = pairRates.find(r => r.year === y && r.quarter === q);
+                              return (
+                                <td key={q} className="center" style={{ fontFamily: "'JetBrains Mono', monospace", color: val ? 'var(--text)' : 'var(--muted)' }}>
+                                  {val ? val.rate.toFixed(4) : '—'}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ));
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))
+          )}
+        </>
       )}
     </>
+  );
+}
+
+// ─── Role Settings Section ────────────────────────────────────────────────────
+
+function RoleSettingsSection({ teamId, userRole }) {
+  const confirm = useConfirm();
+  const [roles, setRoles] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [permissions, setPermissions] = useState([]);
+  const [memberRoles, setMemberRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editingRole, setEditingRole] = useState(null);
+  const [showNewRole, setShowNewRole] = useState(false);
+  const [error, setError] = useState(null);
+
+  const DEFAULT_ROLE_NAMES = ['Owner', 'Admin', 'Member'];
+
+  const fetchAll = () => {
+    setLoading(true);
+    Promise.all([
+      api.get(`/api/teams/${teamId}/roles`),
+      api.get(`/api/teams/${teamId}/member-roles`),
+      api.get('/api/settings/permissions'),
+    ])
+      .then(([rRes, mrRes, pRes]) => {
+        setRoles(rRes.data);
+        setMemberRoles(mrRes.data);
+        setPermissions(pRes.data);
+        setMembers(mrRes.data.map(m => ({ user_id: m.user_id, email: m.email, display_name: m.display_name, membership_role: m.membership_role })));
+      })
+      .catch(e => setError(formatApiError(e)))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchAll(); }, [teamId]);
+
+  const saveRole = async (data, roleId) => {
+    try {
+      if (roleId) {
+        await api.put(`/api/teams/${teamId}/roles/${roleId}`, data);
+      } else {
+        await api.post(`/api/teams/${teamId}/roles`, data);
+      }
+      setEditingRole(null);
+      setShowNewRole(false);
+      fetchAll();
+    } catch (e) { setError(formatApiError(e)); }
+  };
+
+  const deleteRole = async (role) => {
+    const ok = await confirm({
+      title: `Delete role "${role.name}"?`,
+      message: 'Members with this role will lose it. This cannot be undone.',
+      confirmLabel: 'Delete role',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/api/teams/${teamId}/roles/${role.id}`);
+      fetchAll();
+    } catch (e) { setError(formatApiError(e)); }
+  };
+
+  const assignRole = async (userId, roleId) => {
+    try {
+      await api.post(`/api/teams/${teamId}/member-roles`, { user_id: userId, role_id: roleId });
+      fetchAll();
+    } catch (e) { setError(formatApiError(e)); }
+  };
+
+  const removeAssignment = async (userId, roleId) => {
+    try {
+      await api.delete(`/api/teams/${teamId}/member-roles`, { data: { user_id: userId, role_id: roleId } });
+      fetchAll();
+    } catch (e) { setError(formatApiError(e)); }
+  };
+
+  if (loading) return <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>;
+
+  const permsByCategory = permissions.reduce((acc, p) => {
+    if (!acc[p.category]) acc[p.category] = [];
+    acc[p.category].push(p);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      {error && (
+        <div style={{ padding: '10px 16px', marginBottom: 12, borderRadius: 8, fontSize: 12, background: 'var(--accent2-dim)', color: 'var(--accent2)', border: '1px solid var(--danger-bg-strong)', display: 'flex', justifyContent: 'space-between' }}>
+          {error}
+          <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent2)', fontWeight: 700 }}>×</button>
+        </div>
+      )}
+
+      <div className="ca-card" style={{ marginBottom: 16 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>Roles</div>
+        <table className="ca-table" style={{ marginBottom: 12 }}>
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Description</th>
+              <th className="center">Permissions</th>
+              <th className="center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {roles.map(r => (
+              <Fragment key={r.id}>
+                <tr>
+                  <td style={{ fontWeight: 600, fontSize: 13 }}>
+                    {r.name}
+                    {DEFAULT_ROLE_NAMES.includes(r.name) && (
+                      <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: 'var(--surface2)', color: 'var(--muted)' }}>default</span>
+                    )}
+                  </td>
+                  <td style={{ fontSize: 11, color: 'var(--muted)' }}>{r.description || '—'}</td>
+                  <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>{r.permission_count}</td>
+                  <td className="center">
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                      <button
+                        className="ca-btn ca-btn-ghost ca-btn-sm"
+                        onClick={() => setEditingRole(editingRole?.id === r.id ? null : r)}
+                      >
+                        {editingRole?.id === r.id ? 'Close' : 'Edit'}
+                      </button>
+                      {!DEFAULT_ROLE_NAMES.includes(r.name) && (
+                        <button
+                          className="ca-btn ca-btn-ghost ca-btn-sm"
+                          style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                          onClick={() => deleteRole(r)}
+                        >Delete</button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+                {editingRole?.id === r.id && (
+                  <tr>
+                    <td colSpan={4} style={{ padding: '16px 20px', background: 'var(--surface2)', borderLeft: '3px solid var(--accent3)' }}>
+                      <RoleForm
+                        roleId={r.id}
+                        teamId={teamId}
+                        permissions={permissions}
+                        permsByCategory={permsByCategory}
+                        onSave={data => saveRole(data, r.id)}
+                        onCancel={() => setEditingRole(null)}
+                      />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+
+        {showNewRole ? (
+          <div style={{ padding: '16px', background: 'var(--surface2)', borderRadius: 8, borderLeft: '3px solid var(--accent)' }}>
+            <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 12 }}>New Role</div>
+            <RoleForm
+              roleId={null}
+              teamId={teamId}
+              permissions={permissions}
+              permsByCategory={permsByCategory}
+              onSave={data => saveRole(data, null)}
+              onCancel={() => setShowNewRole(false)}
+            />
+          </div>
+        ) : (
+          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setShowNewRole(true)}>+ New Role</button>
+        )}
+      </div>
+
+      <div className="ca-card">
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>Member Role Assignments</div>
+        <table className="ca-table">
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th className="center">Membership Role</th>
+              <th>Custom Roles</th>
+              <th className="center">Assign Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {memberRoles.length === 0 && (
+              <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>No members.</td></tr>
+            )}
+            {memberRoles.map(m => (
+              <tr key={m.user_id}>
+                <td>
+                  <div style={{ fontSize: 12, fontWeight: 500 }}>{m.display_name || m.email}</div>
+                  {m.display_name && <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.email}</div>}
+                </td>
+                <td className="center"><RoleBadge role={m.membership_role} /></td>
+                <td>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {m.assigned_roles.length === 0 ? (
+                      <span style={{ fontSize: 11, color: 'var(--muted)' }}>None</span>
+                    ) : m.assigned_roles.map(r => (
+                      <span key={r.id} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        background: 'var(--surface2)', border: '1px solid var(--border)',
+                        borderRadius: 4, padding: '2px 6px 2px 8px', fontSize: 11,
+                      }}>
+                        {r.name}
+                        <button
+                          onClick={() => removeAssignment(m.user_id, r.id)}
+                          style={{ background: 'none', border: 'none', color: 'var(--accent2)', cursor: 'pointer', fontSize: 11, padding: '0 2px', lineHeight: 1 }}
+                        >×</button>
+                      </span>
+                    ))}
+                  </div>
+                </td>
+                <td className="center">
+                  <select
+                    className="ca-input"
+                    style={{ fontSize: 11, padding: '3px 6px', width: 'auto' }}
+                    value=""
+                    onChange={e => e.target.value && assignRole(m.user_id, e.target.value)}
+                  >
+                    <option value="">+ Assign…</option>
+                    {roles.filter(r => !m.assigned_roles.some(ar => ar.id === r.id)).map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function RoleForm({ roleId, teamId, permissions, permsByCategory, onSave, onCancel }) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [loading, setLoading] = useState(!!roleId);
+
+  useEffect(() => {
+    if (!roleId) return;
+    api.get(`/api/teams/${teamId}/roles/${roleId}`)
+      .then(r => {
+        setName(r.data.name);
+        setDescription(r.data.description || '');
+        setSelectedIds(new Set(r.data.permissions.map(p => p.id)));
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [roleId]);
+
+  const togglePerm = (id) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleCategory = (perms) => {
+    const allSel = perms.every(p => selectedIds.has(p.id));
+    setSelectedIds(prev => {
+      const n = new Set(prev);
+      perms.forEach(p => allSel ? n.delete(p.id) : n.add(p.id));
+      return n;
+    });
+  };
+
+  if (loading) return <div style={{ padding: 12, color: 'var(--muted)' }}>Loading…</div>;
+
+  return (
+    <div>
+      {!roleId && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8, marginBottom: 14 }}>
+          <div>
+            <label className="ca-label">Name</label>
+            <input className="ca-input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Analyst" />
+          </div>
+          <div>
+            <label className="ca-label">Description</label>
+            <input className="ca-input" value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" />
+          </div>
+        </div>
+      )}
+      {roleId && description !== undefined && (
+        <div style={{ marginBottom: 14 }}>
+          <label className="ca-label">Description</label>
+          <input className="ca-input" value={description} onChange={e => setDescription(e.target.value)} style={{ maxWidth: 400 }} />
+        </div>
+      )}
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.6px' }}>Permissions ({selectedIds.size}/{permissions.length})</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10, marginBottom: 14 }}>
+        {Object.entries(permsByCategory).map(([cat, perms]) => {
+          const allSel = perms.every(p => selectedIds.has(p.id));
+          const someSel = perms.some(p => selectedIds.has(p.id));
+          return (
+            <div key={cat} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.6px', color: allSel ? 'var(--accent)' : someSel ? 'var(--accent3)' : 'var(--muted)' }}>{cat}</span>
+                <button
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 10, color: 'var(--muted)', padding: 0 }}
+                  onClick={() => toggleCategory(perms)}
+                >{allSel ? 'None' : 'All'}</button>
+              </div>
+              {perms.map(p => (
+                <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', fontSize: 11, marginBottom: 3 }}>
+                  <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => togglePerm(p.id)} />
+                  {p.label}
+                </label>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={onCancel}>Cancel</button>
+        <button
+          className="ca-btn ca-btn-primary ca-btn-sm"
+          onClick={() => onSave({ name, description, permission_ids: [...selectedIds] })}
+        >Save</button>
+      </div>
+    </div>
   );
 }

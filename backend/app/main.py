@@ -15,7 +15,7 @@ from app.routers import (
     auth, teams, products, cost_models, indexes, prices,
     volumes, costing, scenarios, suppliers, chemical_families,
     fx_rates, audit, portfolio, admin, ai, account, freight_lanes,
-    invites, access_requests,
+    invites, access_requests, settings as settings_router,
 )
 
 
@@ -69,6 +69,7 @@ app.include_router(account.router, prefix="/api/account", tags=["account"])
 app.include_router(freight_lanes.router, prefix="/api/freight-lanes", tags=["freight-lanes"])
 app.include_router(invites.router, prefix="/api/invites", tags=["invites"])
 app.include_router(access_requests.router, prefix="/api/access-requests", tags=["access-requests"])
+app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
 
 
 @app.get("/health")
