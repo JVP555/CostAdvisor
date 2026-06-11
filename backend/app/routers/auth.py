@@ -139,7 +139,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
         if not settings.allow_signup:
             bypass_rls_var.set(False)
             return RedirectResponse(
-                url=f"{"http://localhost:5173"}?login_error=signup_disabled", status_code=302
+                url="http://localhost:5173?login_error=signup_disabled", status_code=302
             )
 
         # Gate: new users must have a pending team invite OR an accepted access request.
@@ -172,7 +172,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
                 error = "access_needed"
             bypass_rls_var.set(False)
             return RedirectResponse(
-                url=f"{"http://localhost:5173"}?login_error={error}", status_code=302
+                url=f"http://localhost:5173?login_error={error}", status_code=302
             )
 
         user = User(
