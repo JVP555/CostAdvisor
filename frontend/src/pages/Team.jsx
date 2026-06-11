@@ -1250,7 +1250,7 @@ function RoleSettingsSection({ teamId, userRole }) {
     Promise.all([
       api.get(`/api/teams/${teamId}/roles`),
       api.get(`/api/teams/${teamId}/member-roles`),
-      api.get('/api/settings/permissions'),
+      api.get(`/api/teams/${teamId}/available-permissions`),
     ])
       .then(([rRes, mrRes, pRes]) => {
         setRoles(rRes.data);

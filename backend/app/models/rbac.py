@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Boolean, ForeignKey, Index, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,11 +18,17 @@ class Permission(Base):
 
 class Role(Base):
     __tablename__ = "roles"
-    __table_args__ = (UniqueConstraint("team_id", "name", name="uq_roles_team_name"),)
+    # Partial indexes enforce uniqueness separately for team roles vs platform roles (team_id IS NULL).
+    __table_args__ = (
+        Index("uq_roles_team_name", "team_id", "name", unique=True,
+              postgresql_where=text("team_id IS NOT NULL")),
+        Index("uq_platform_role_name", "name", unique=True,
+              postgresql_where=text("team_id IS NULL")),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    team_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False
+    team_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=True
     )
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     description: Mapped[str | None] = mapped_column(String(256), nullable=True)

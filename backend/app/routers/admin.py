@@ -12,7 +12,7 @@ from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.models.audit_log import AuditLog
 from app.models.access_request import PlatformAccessRequest
-from app.models.rbac import Plan
+from app.models.rbac import Plan, Role, TeamMemberRole
 from app.config import get_settings
 from app.routers.auth import get_current_user, create_jwt
 from app.schemas.user import UserOut
@@ -367,6 +367,32 @@ def _get_owner(db: Session, team_id: uuid.UUID) -> TeamMembership | None:
     ).first()
 
 
+def _build_members_with_roles(db, team_id, memberships):
+    """Batch-load custom roles for all team members to avoid N+1 queries."""
+    member_role_rows = db.query(TeamMemberRole).filter(
+        TeamMemberRole.team_id == team_id
+    ).all()
+    role_ids = {r.role_id for r in member_role_rows}
+    roles_by_id = (
+        {r.id: r.name for r in db.query(Role).filter(Role.id.in_(role_ids)).all()}
+        if role_ids else {}
+    )
+    by_user: dict = {}
+    for row in member_role_rows:
+        by_user.setdefault(row.user_id, []).append(
+            {"id": str(row.role_id), "name": roles_by_id.get(row.role_id, "?")}
+        )
+    return [
+        {
+            "user_id": str(m.user_id),
+            "role": m.role,
+            "email": m.user.email if m.user else None,
+            "custom_roles": by_user.get(m.user_id, []),
+        }
+        for m in memberships
+    ]
+
+
 @router.get("/teams", response_model=list[dict])
 def list_all_teams(
     db: Session = Depends(get_db),
@@ -382,14 +408,7 @@ def list_all_teams(
             "created_at": t.created_at.isoformat() if t.created_at else "",
             "member_count": len(members),
             "plan_id": str(t.plan_id) if t.plan_id else None,
-            "members": [
-                {
-                    "user_id": str(m.user_id),
-                    "role": m.role,
-                    "email": m.user.email if m.user else None,
-                }
-                for m in members
-            ],
+            "members": _build_members_with_roles(db, t.id, members),
         })
     return result
 

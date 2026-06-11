@@ -172,9 +172,11 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Alembic migration: creates permissions/plans/roles/team_member_roles tables, seeds data, migrates existing memberships
   - 🟢 `has_permission()` service: super_admin bypass → plan ceiling → custom roles → membership.role fallback
   - 🟢 All resource endpoints enforced: products, cost_models, suppliers, indexes, prices, volumes, costing, evolution, squeeze, briefs, scenarios, portfolio
-  - 🟢 Admin Settings tab (5th tab): Permissions list + create, Plans CRUD with permission checkboxes
-  - 🟢 Admin TeamsTab: Plan column with inline dropdown per team
+  - 🟢 Admin Settings tab (5th tab): Permissions list (scrollable, read-only — dev-managed), Plans CRUD, Platform Roles CRUD (User + SuperAdmin defaults)
+  - 🟢 Admin TeamsTab: Plan column with inline dropdown per team; custom roles shown as chips in expanded member view
   - 🟢 Team Settings → Role Settings section: role CRUD with permission checkboxes, member-role assignment table
+  - 🟢 Team roles limited to plan-allowed permissions — validated at API level; UI shows only plan-scoped permissions
+  - 🟢 Team owner gets all plan-allowed permissions (plan ceiling enforced before owner fallback)
 
 - 🔴 **Scrum 9** — Hardened authentication on OAuth 2.0
   - 🔴 PKCE `code_verifier`/`code_challenge` used on every OAuth flow

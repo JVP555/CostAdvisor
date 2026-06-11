@@ -1,4 +1,4 @@
-"""Admin-only CRUD for global permissions and plans.
+"""Admin-only CRUD for global permissions, plans, and platform roles.
 Also exposes a read-only /permissions endpoint accessible to any authenticated user
 (needed by Team.jsx role editor to build permission checkboxes).
 """
@@ -7,13 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.rbac import Permission, Plan, PlanPermission, RolePermission
+from app.models.rbac import Permission, Plan, PlanPermission, Role, RolePermission
 from app.models.user import User
 from app.routers.auth import get_current_user
 from app.routers.admin import require_super_admin
 from app.schemas.rbac import (
     PermissionOut, PermissionCreate,
     PlanOut, PlanDetailOut, PlanCreate, PlanUpdate,
+    RoleOut, RoleDetailOut, RoleCreate, RoleUpdate,
 )
 
 router = APIRouter()
@@ -163,5 +164,112 @@ def delete_plan(
     if plan.is_default:
         raise HTTPException(400, detail="Cannot delete the default plan")
     db.delete(plan)
+    db.commit()
+    return {"status": "deleted"}
+
+
+# ── Platform Roles (team_id IS NULL) ──────────────────────────────────────────
+
+PROTECTED_PLATFORM_ROLES = {"User", "SuperAdmin"}
+
+
+def _role_out(role: Role) -> RoleOut:
+    return RoleOut(
+        id=role.id, team_id=role.team_id, name=role.name,
+        description=role.description, permission_count=len(role.permissions),
+    )
+
+
+def _role_detail_out(role: Role) -> RoleDetailOut:
+    return RoleDetailOut(
+        id=role.id, team_id=role.team_id, name=role.name,
+        description=role.description,
+        permissions=[
+            PermissionOut(id=p.id, key=p.key, label=p.label,
+                          category=p.category, action=p.action)
+            for p in role.permissions
+        ],
+    )
+
+
+@router.get("/roles", response_model=list[RoleOut])
+def list_platform_roles(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    roles = db.query(Role).filter(Role.team_id == None).order_by(Role.name).all()  # noqa: E711
+    return [_role_out(r) for r in roles]
+
+
+@router.post("/roles", response_model=RoleDetailOut, status_code=201)
+def create_platform_role(
+    data: RoleCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    if db.query(Role).filter(Role.team_id == None, Role.name == data.name).first():  # noqa: E711
+        raise HTTPException(400, detail="Platform role name already exists")
+    role = Role(team_id=None, name=data.name, description=data.description)
+    db.add(role)
+    db.flush()
+    for perm_id in data.permission_ids:
+        if db.query(Permission).filter(Permission.id == perm_id).first():
+            db.add(RolePermission(role_id=role.id, permission_id=perm_id))
+    db.commit()
+    db.refresh(role)
+    return _role_detail_out(role)
+
+
+@router.get("/roles/{role_id}", response_model=RoleDetailOut)
+def get_platform_role(
+    role_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    role = db.query(Role).filter(Role.id == role_id, Role.team_id == None).first()  # noqa: E711
+    if not role:
+        raise HTTPException(404, detail="Platform role not found")
+    return _role_detail_out(role)
+
+
+@router.put("/roles/{role_id}", response_model=RoleDetailOut)
+def update_platform_role(
+    role_id: uuid.UUID,
+    data: RoleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    role = db.query(Role).filter(Role.id == role_id, Role.team_id == None).first()  # noqa: E711
+    if not role:
+        raise HTTPException(404, detail="Platform role not found")
+    if data.name is not None and data.name != role.name:
+        if role.name in PROTECTED_PLATFORM_ROLES:
+            raise HTTPException(400, detail=f"Cannot rename the '{role.name}' platform role")
+        if db.query(Role).filter(Role.team_id == None, Role.name == data.name).first():  # noqa: E711
+            raise HTTPException(400, detail="Platform role name already exists")
+        role.name = data.name
+    if data.description is not None:
+        role.description = data.description
+    db.query(RolePermission).filter(RolePermission.role_id == role_id).delete()
+    for perm_id in data.permission_ids:
+        if db.query(Permission).filter(Permission.id == perm_id).first():
+            db.add(RolePermission(role_id=role_id, permission_id=perm_id))
+    db.commit()
+    db.refresh(role)
+    return _role_detail_out(role)
+
+
+@router.delete("/roles/{role_id}")
+def delete_platform_role(
+    role_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    role = db.query(Role).filter(Role.id == role_id, Role.team_id == None).first()  # noqa: E711
+    if not role:
+        raise HTTPException(404, detail="Platform role not found")
+    if role.name in PROTECTED_PLATFORM_ROLES:
+        raise HTTPException(400, detail=f"Cannot delete the default '{role.name}' role")
+    db.delete(role)
     db.commit()
     return {"status": "deleted"}

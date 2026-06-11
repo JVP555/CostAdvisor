@@ -20,7 +20,7 @@ class PermissionCreate(BaseModel):
 
 class RoleOut(BaseModel):
     id: uuid.UUID
-    team_id: uuid.UUID
+    team_id: uuid.UUID | None
     name: str
     description: str | None
     permission_count: int = 0
@@ -29,7 +29,7 @@ class RoleOut(BaseModel):
 
 class RoleDetailOut(BaseModel):
     id: uuid.UUID
-    team_id: uuid.UUID
+    team_id: uuid.UUID | None
     name: str
     description: str | None
     permissions: list[PermissionOut]

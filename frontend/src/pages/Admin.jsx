@@ -590,7 +590,8 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
                             <thead>
                               <tr>
                                 <th>Member</th>
-                                <th className="center">Role</th>
+                                <th className="center">Membership Role</th>
+                                <th>Custom Roles</th>
                                 <th className="center">Action</th>
                               </tr>
                             </thead>
@@ -611,10 +612,7 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
                                         <select
                                           value={effRole}
                                           className="ca-input"
-                                          style={{
-                                            fontSize: 11, padding: '3px 6px', width: 'auto',
-                                            borderColor: pendingRole ? 'var(--accent3)' : undefined,
-                                          }}
+                                          style={{ fontSize: 11, padding: '3px 6px', width: 'auto', borderColor: pendingRole ? 'var(--accent3)' : undefined }}
                                           onChange={e => stageRole(m.user_id, e.target.value, m.role)}
                                         >
                                           <option value="owner">owner</option>
@@ -625,20 +623,25 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
                                         <span style={{ fontSize: 10, color: 'var(--accent2)' }}>removing</span>
                                       )}
                                     </td>
+                                    <td>
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                        {(m.custom_roles || []).length === 0 ? (
+                                          <span style={{ fontSize: 10, color: 'var(--muted)' }}>—</span>
+                                        ) : (m.custom_roles || []).map(r => (
+                                          <span key={r.id} style={{ display: 'inline-block', padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                                            {r.name}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </td>
                                     <td className="center">
                                       {m.role !== 'owner' && !pendingRemoval && (
-                                        <button
-                                          className="ca-btn ca-btn-ghost ca-btn-sm"
-                                          style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
-                                          onClick={() => stageRemove(m.user_id)}
-                                        >
+                                        <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }} onClick={() => stageRemove(m.user_id)}>
                                           Remove
                                         </button>
                                       )}
                                       {pendingRemoval && (
-                                        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => unstageRemove(m.user_id)}>
-                                          Undo
-                                        </button>
+                                        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => unstageRemove(m.user_id)}>Undo</button>
                                       )}
                                       {m.role === 'owner' && !pendingRemoval && (
                                         <span style={{ fontSize: 10, color: 'var(--muted)' }}>transfer to remove</span>
@@ -652,11 +655,9 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
                                 <tr key={userId} style={{ borderLeft: '2px solid var(--accent)', opacity: 0.75 }}>
                                   <td style={{ fontSize: 12 }}>{displayName ? `${displayName} (${email})` : email}</td>
                                   <td className="center"><span style={{ fontSize: 10, color: 'var(--accent)' }}>member (pending)</span></td>
+                                  <td></td>
                                   <td className="center">
-                                    <button
-                                      className="ca-btn ca-btn-ghost ca-btn-sm"
-                                      onClick={() => setPendingAdditions(p => p.filter(a => a.userId !== userId))}
-                                    >
+                                    <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setPendingAdditions(p => p.filter(a => a.userId !== userId))}>
                                       Undo
                                     </button>
                                   </td>
@@ -1128,35 +1129,43 @@ function AdminSettingsTab() {
   const [section, setSection] = useState('permissions');
   const [permissions, setPermissions] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loadingPerms, setLoadingPerms] = useState(true);
-  const [loadingPlans, setLoadingPlans] = useState(true);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [loadingRoles, setLoadingRoles] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
   const [newPlan, setNewPlan] = useState(null);
-  const [newPerm, setNewPerm] = useState(null);
+  const [editingRole, setEditingRole] = useState(null);
+  const [newRole, setNewRole] = useState(null);
 
   useEffect(() => {
     api.get('/api/settings/permissions')
       .then(r => setPermissions(r.data))
       .catch(console.error)
       .finally(() => setLoadingPerms(false));
-    fetchPlans();
   }, []);
+
+  useEffect(() => {
+    if (section === 'plans') fetchPlans();
+    if (section === 'roles') fetchRoles();
+  }, [section]);
 
   const fetchPlans = () => {
     setLoadingPlans(true);
-    Promise.all([
-      api.get('/api/settings/plans'),
-      api.get('/api/settings/permissions'),
-    ])
-      .then(([pRes, permRes]) => {
-        setPlans(pRes.data);
-        setPermissions(permRes.data);
-      })
+    Promise.all([api.get('/api/settings/plans'), api.get('/api/settings/permissions')])
+      .then(([pRes, permRes]) => { setPlans(pRes.data); setPermissions(permRes.data); })
       .catch(console.error)
       .finally(() => setLoadingPlans(false));
   };
 
-  // Group permissions by category
+  const fetchRoles = () => {
+    setLoadingRoles(true);
+    Promise.all([api.get('/api/settings/roles'), api.get('/api/settings/permissions')])
+      .then(([rRes, permRes]) => { setRoles(rRes.data); setPermissions(permRes.data); })
+      .catch(console.error)
+      .finally(() => setLoadingRoles(false));
+  };
+
   const permsByCategory = permissions.reduce((acc, p) => {
     if (!acc[p.category]) acc[p.category] = [];
     acc[p.category].push(p);
@@ -1165,43 +1174,33 @@ function AdminSettingsTab() {
 
   const savePlan = async (planData, planId) => {
     try {
-      if (planId) {
-        await api.put(`/api/settings/plans/${planId}`, planData);
-      } else {
-        await api.post('/api/settings/plans', planData);
-      }
-      setEditingPlan(null);
-      setNewPlan(null);
-      fetchPlans();
-    } catch (e) {
-      showAlert({ title: 'Error', message: e.response?.data?.detail || e.message });
-    }
+      planId ? await api.put(`/api/settings/plans/${planId}`, planData)
+             : await api.post('/api/settings/plans', planData);
+      setEditingPlan(null); setNewPlan(null); fetchPlans();
+    } catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
   };
 
   const deletePlan = async (plan) => {
-    if (plan.is_default) {
-      showAlert({ title: 'Cannot delete', message: 'The default plan cannot be deleted.' });
-      return;
-    }
-    const ok = await confirm({ title: `Delete plan "${plan.name}"?`, message: 'Teams on this plan will lose their plan assignment.', confirmLabel: 'Delete', danger: true });
+    if (plan.is_default) { showAlert({ title: 'Cannot delete', message: 'The default plan cannot be deleted.' }); return; }
+    const ok = await confirm({ title: `Delete plan "${plan.name}"?`, message: 'Teams on this plan will lose their assignment.', confirmLabel: 'Delete', danger: true });
     if (!ok) return;
-    try {
-      await api.delete(`/api/settings/plans/${plan.id}`);
-      fetchPlans();
-    } catch (e) {
-      showAlert({ title: 'Error', message: e.response?.data?.detail || e.message });
-    }
+    try { await api.delete(`/api/settings/plans/${plan.id}`); fetchPlans(); }
+    catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
   };
 
-  const createPermission = async (data) => {
+  const saveRole = async (roleData, roleId) => {
     try {
-      await api.post('/api/settings/permissions', data);
-      const r = await api.get('/api/settings/permissions');
-      setPermissions(r.data);
-      setNewPerm(null);
-    } catch (e) {
-      showAlert({ title: 'Error', message: e.response?.data?.detail || e.message });
-    }
+      roleId ? await api.put(`/api/settings/roles/${roleId}`, roleData)
+             : await api.post('/api/settings/roles', roleData);
+      setEditingRole(null); setNewRole(null); fetchRoles();
+    } catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
+  };
+
+  const deleteRole = async (role) => {
+    const ok = await confirm({ title: `Delete role "${role.name}"?`, message: 'This cannot be undone.', confirmLabel: 'Delete', danger: true });
+    if (!ok) return;
+    try { await api.delete(`/api/settings/roles/${role.id}`); fetchRoles(); }
+    catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
   };
 
   return (
@@ -1210,18 +1209,19 @@ function AdminSettingsTab() {
         {[
           { key: 'permissions', label: `Permissions (${permissions.length})` },
           { key: 'plans', label: `Plans (${plans.length})` },
+          { key: 'roles', label: `Roles (${roles.length})` },
         ].map(s => (
-          <button
-            key={s.key}
-            className={`ca-btn ca-btn-sm ${section === s.key ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
-            onClick={() => setSection(s.key)}
-          >{s.label}</button>
+          <button key={s.key} className={`ca-btn ca-btn-sm ${section === s.key ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+            onClick={() => setSection(s.key)}>{s.label}</button>
         ))}
       </div>
 
       {section === 'permissions' && (
-        <>
-          <div className="ca-card" style={{ marginBottom: 16 }}>
+        <div className="ca-card">
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+            Permissions are managed by developers when new features are added. They cannot be edited here.
+          </div>
+          <div style={{ maxHeight: 520, overflowY: 'auto', paddingRight: 4 }}>
             {loadingPerms ? (
               <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
             ) : (
@@ -1230,11 +1230,7 @@ function AdminSettingsTab() {
                   <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--muted)', marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid var(--border)' }}>{cat}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {perms.map(p => (
-                      <div key={p.id} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        background: 'var(--surface2)', border: '1px solid var(--border)',
-                        borderRadius: 6, padding: '5px 10px', fontSize: 11,
-                      }}>
+                      <div key={p.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', fontSize: 11 }}>
                         <span style={{ fontFamily: 'monospace', color: 'var(--accent)', fontSize: 10 }}>{p.key}</span>
                         <span style={{ color: 'var(--muted)' }}>·</span>
                         <span>{p.label}</span>
@@ -1245,16 +1241,7 @@ function AdminSettingsTab() {
               ))
             )}
           </div>
-
-          {newPerm ? (
-            <div className="ca-card" style={{ marginBottom: 16 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>New Permission</div>
-              <PermissionForm onSave={createPermission} onCancel={() => setNewPerm(null)} />
-            </div>
-          ) : (
-            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setNewPerm({})}>+ Add Permission</button>
-          )}
-        </>
+        </div>
       )}
 
       {section === 'plans' && (
@@ -1264,19 +1251,9 @@ function AdminSettingsTab() {
               <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
             ) : (
               <table className="ca-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th className="center">Default</th>
-                    <th className="center">Permissions</th>
-                    <th className="center">Actions</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Name</th><th>Description</th><th className="center">Default</th><th className="center">Permissions</th><th className="center">Actions</th></tr></thead>
                 <tbody>
-                  {plans.length === 0 && (
-                    <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>No plans yet.</td></tr>
-                  )}
+                  {plans.length === 0 && <tr><td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>No plans yet.</td></tr>}
                   {plans.map(p => (
                     <Fragment key={p.id}>
                       <tr>
@@ -1289,18 +1266,11 @@ function AdminSettingsTab() {
                         <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>{p.permission_count}</td>
                         <td className="center">
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                            <button
-                              className="ca-btn ca-btn-ghost ca-btn-sm"
-                              onClick={() => setEditingPlan(editingPlan?.id === p.id ? null : p)}
-                            >
+                            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setEditingPlan(editingPlan?.id === p.id ? null : p)}>
                               {editingPlan?.id === p.id ? 'Close' : 'Edit'}
                             </button>
                             {!p.is_default && (
-                              <button
-                                className="ca-btn ca-btn-ghost ca-btn-sm"
-                                style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
-                                onClick={() => deletePlan(p)}
-                              >Delete</button>
+                              <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }} onClick={() => deletePlan(p)}>Delete</button>
                             )}
                           </div>
                         </td>
@@ -1308,12 +1278,69 @@ function AdminSettingsTab() {
                       {editingPlan?.id === p.id && (
                         <tr>
                           <td colSpan={5} style={{ padding: '16px 20px', background: 'var(--surface2)', borderLeft: '3px solid var(--accent3)' }}>
+                            <PlanForm initial={editingPlan} permissions={permissions} onSave={data => savePlan(data, p.id)} onCancel={() => setEditingPlan(null)}
+                              fetchInitialDetail={() => api.get(`/api/settings/plans/${p.id}`).then(r => r.data)} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          {newPlan ? (
+            <div className="ca-card" style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>New Plan</div>
+              <PlanForm initial={{ name: '', description: '', is_default: false, permission_ids: [] }} permissions={permissions} onSave={data => savePlan(data, null)} onCancel={() => setNewPlan(null)} />
+            </div>
+          ) : (
+            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setNewPlan({})}>+ New Plan</button>
+          )}
+        </>
+      )}
+
+      {section === 'roles' && (
+        <>
+          <div className="ca-card" style={{ marginBottom: 16 }}>
+            {loadingRoles ? (
+              <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
+            ) : (
+              <table className="ca-table">
+                <thead><tr><th>Role</th><th>Description</th><th className="center">Permissions</th><th className="center">Actions</th></tr></thead>
+                <tbody>
+                  {roles.length === 0 && <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>No platform roles yet.</td></tr>}
+                  {roles.map(r => (
+                    <Fragment key={r.id}>
+                      <tr>
+                        <td style={{ fontWeight: 600, fontSize: 13 }}>
+                          {r.name}
+                          {['User', 'SuperAdmin'].includes(r.name) && (
+                            <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: 'var(--accent-dim)', color: 'var(--accent)' }}>default</span>
+                          )}
+                        </td>
+                        <td style={{ fontSize: 11, color: 'var(--muted)' }}>{r.description || '—'}</td>
+                        <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>{r.permission_count}</td>
+                        <td className="center">
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setEditingRole(editingRole?.id === r.id ? null : r)}>
+                              {editingRole?.id === r.id ? 'Close' : 'Edit'}
+                            </button>
+                            {!['User', 'SuperAdmin'].includes(r.name) && (
+                              <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }} onClick={() => deleteRole(r)}>Delete</button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {editingRole?.id === r.id && (
+                        <tr>
+                          <td colSpan={4} style={{ padding: '16px 20px', background: 'var(--surface2)', borderLeft: '3px solid var(--accent3)' }}>
                             <PlanForm
-                              initial={editingPlan}
+                              initial={editingRole}
                               permissions={permissions}
-                              onSave={data => savePlan(data, p.id)}
-                              onCancel={() => setEditingPlan(null)}
-                              fetchInitialDetail={() => api.get(`/api/settings/plans/${p.id}`).then(r => r.data)}
+                              onSave={data => saveRole({ name: r.name, description: data.description, permission_ids: data.permission_ids }, r.id)}
+                              onCancel={() => setEditingRole(null)}
+                              fetchInitialDetail={() => api.get(`/api/settings/roles/${r.id}`).then(res => res.data)}
                             />
                           </td>
                         </tr>
@@ -1324,19 +1351,19 @@ function AdminSettingsTab() {
               </table>
             )}
           </div>
-
-          {newPlan ? (
+          {newRole ? (
             <div className="ca-card" style={{ marginBottom: 16 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>New Plan</div>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>New Platform Role</div>
               <PlanForm
                 initial={{ name: '', description: '', is_default: false, permission_ids: [] }}
                 permissions={permissions}
-                onSave={data => savePlan(data, null)}
-                onCancel={() => setNewPlan(null)}
+                showNameField
+                onSave={data => saveRole(data, null)}
+                onCancel={() => setNewRole(null)}
               />
             </div>
           ) : (
-            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setNewPlan({})}>+ New Plan</button>
+            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setNewRole({})}>+ New Role</button>
           )}
         </>
       )}
@@ -1344,7 +1371,8 @@ function AdminSettingsTab() {
   );
 }
 
-function PermissionForm({ onSave, onCancel }) {
+// dummy placeholder (old PermissionForm removed — permissions are dev-managed)
+function _unused_PermissionForm({ onSave, onCancel }) {
   const [form, setForm] = useState({ key: '', label: '', category: '', action: '' });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -1379,7 +1407,7 @@ function PermissionForm({ onSave, onCancel }) {
   );
 }
 
-function PlanForm({ initial, permissions, onSave, onCancel, fetchInitialDetail }) {
+function PlanForm({ initial, permissions, onSave, onCancel, fetchInitialDetail, showNameField = true }) {
   const [name, setName] = useState(initial?.name || '');
   const [description, setDescription] = useState(initial?.description || '');
   const [isDefault, setIsDefault] = useState(initial?.is_default || false);
@@ -1423,21 +1451,25 @@ function PlanForm({ initial, permissions, onSave, onCancel, fetchInitialDetail }
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 8, marginBottom: 16, alignItems: 'end' }}>
-        <div>
-          <label className="ca-label">Name</label>
-          <input className="ca-input" value={name} onChange={e => setName(e.target.value)} />
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: showNameField ? '1fr 2fr auto' : '2fr auto', gap: 8, marginBottom: 16, alignItems: 'end' }}>
+        {showNameField && (
+          <div>
+            <label className="ca-label">Name</label>
+            <input className="ca-input" value={name} onChange={e => setName(e.target.value)} />
+          </div>
+        )}
         <div>
           <label className="ca-label">Description</label>
           <input className="ca-input" value={description} onChange={e => setDescription(e.target.value)} />
         </div>
-        <div style={{ paddingBottom: 2 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-            <input type="checkbox" checked={isDefault} onChange={e => setIsDefault(e.target.checked)} />
-            Default plan
-          </label>
-        </div>
+        {showNameField === true && (
+          <div style={{ paddingBottom: 2 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={isDefault} onChange={e => setIsDefault(e.target.checked)} />
+              Default plan
+            </label>
+          </div>
+        )}
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.6px' }}>Permissions ({selectedIds.size}/{permissions.length})</div>

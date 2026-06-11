@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.models.invite import TeamInvite
-from app.models.rbac import Role, RolePermission, Permission, TeamMemberRole
+from app.models.rbac import Role, RolePermission, Permission, TeamMemberRole, Plan, PlanPermission
 from app.routers.auth import get_current_user
 from app.schemas.team import TeamCreate, TeamOut, TeamMemberOut, InviteRequest, RoleUpdate
 from app.schemas.invite import TeamInviteOut
@@ -274,6 +274,37 @@ def remove_member(
 
 # ── Team-scoped roles ─────────────────────────────────────────────────────────
 
+@router.get("/{team_id}/available-permissions", response_model=list[PermissionOut])
+def get_available_permissions(
+    team_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return permissions available to this team based on their plan.
+    If team has no plan, return all permissions."""
+    require_team_role(db, current_user, team_id, ["owner", "admin", "member"])
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team or not team.plan_id:
+        return db.query(Permission).order_by(Permission.category, Permission.action).all()
+    # Return only plan-allowed permissions
+    return (
+        db.query(Permission)
+        .join(PlanPermission, PlanPermission.permission_id == Permission.id)
+        .filter(PlanPermission.plan_id == team.plan_id)
+        .order_by(Permission.category, Permission.action)
+        .all()
+    )
+
+
+def _get_plan_permission_ids(db: Session, team_id: uuid.UUID) -> set | None:
+    """Returns set of allowed permission IDs for the team's plan, or None if no plan."""
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team or not team.plan_id:
+        return None
+    rows = db.query(PlanPermission).filter(PlanPermission.plan_id == team.plan_id).all()
+    return {r.permission_id for r in rows}
+
+
 @router.get("/{team_id}/roles", response_model=list[RoleOut])
 def list_team_roles(
     team_id: uuid.UUID,
@@ -299,6 +330,11 @@ def create_team_role(
     require_team_role(db, current_user, team_id, ["owner", "admin"])
     if db.query(Role).filter(Role.team_id == team_id, Role.name == data.name).first():
         raise HTTPException(400, detail="Role name already exists in this team")
+    allowed_ids = _get_plan_permission_ids(db, team_id)
+    if allowed_ids is not None:
+        denied = [str(p) for p in data.permission_ids if p not in allowed_ids]
+        if denied:
+            raise HTTPException(400, detail=f"Permissions not included in team plan: {', '.join(denied)}")
     role = Role(team_id=team_id, name=data.name, description=data.description)
     db.add(role)
     db.flush()
@@ -345,6 +381,11 @@ def update_team_role(
     if data.description is not None:
         role.description = data.description
 
+    allowed_ids = _get_plan_permission_ids(db, team_id)
+    if allowed_ids is not None:
+        denied = [str(p) for p in data.permission_ids if p not in allowed_ids]
+        if denied:
+            raise HTTPException(400, detail=f"Permissions not included in team plan: {', '.join(denied)}")
     db.query(RolePermission).filter(RolePermission.role_id == role_id).delete()
     for perm_id in data.permission_ids:
         if db.query(Permission).filter(Permission.id == perm_id).first():
