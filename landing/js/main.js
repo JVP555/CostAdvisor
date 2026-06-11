@@ -56,6 +56,9 @@ fetch(`${API_URL}/auth/me`, { credentials: 'include' })
   })
   .catch(() => {/* backend not reachable — leave page as-is */});
 
+// ─── Motion preference ───
+const lpReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 // ─── Gap chart ───
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -117,7 +120,7 @@ function initGapChart() {
       ],
     },
     options: {
-      animation: { duration: 2000, easing: 'easeInOutCubic' },
+      animation: { duration: lpReducedMotion ? 0 : 2000, easing: 'easeInOutCubic' },
       responsive: true,
       plugins: {
         legend: { display: false },
@@ -230,6 +233,10 @@ function animateLpStat(el) {
   const target   = parseFloat(el.dataset.countTo);
   const prefix   = el.dataset.countPrefix  || '';
   const suffix   = el.dataset.countSuffix  || '';
+  if (lpReducedMotion) {
+    el.textContent = prefix + target + suffix;
+    return;
+  }
   const duration = 2000;
   const startTime = performance.now();
 
@@ -242,8 +249,63 @@ function animateLpStat(el) {
   requestAnimationFrame(step);
 }
 
+// ─── Spotlight hover: track pointer per tile via --mx/--my ───
+function initLpSpotlight() {
+  if (lpReducedMotion) return;
+  document.querySelectorAll('.lp-tile').forEach((tile) => {
+    tile.addEventListener('pointermove', (e) => {
+      const r = tile.getBoundingClientRect();
+      tile.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+      tile.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    });
+  });
+}
+
+// ─── Mobile menu ───
+function initLpMobileMenu() {
+  const burger = document.getElementById('lpBurger');
+  const menu   = document.getElementById('lpMobileMenu');
+  if (!burger || !menu) return;
+
+  burger.addEventListener('click', () => {
+    const open = menu.classList.toggle('open');
+    burger.setAttribute('aria-expanded', String(open));
+    burger.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  });
+
+  // close after navigating to a section
+  menu.querySelectorAll('a').forEach((a) => {
+    a.addEventListener('click', () => {
+      menu.classList.remove('open');
+      burger.setAttribute('aria-expanded', 'false');
+    });
+  });
+}
+
+// ─── Scroll progress: JS fallback when CSS scroll-timeline is unsupported ───
+function initLpProgress() {
+  const bar = document.getElementById('lpProgress');
+  if (!bar || lpReducedMotion) return;
+  if (CSS.supports && CSS.supports('animation-timeline: scroll()')) return;
+
+  let ticking = false;
+  function update() {
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`;
+    ticking = false;
+  }
+  window.addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(update); }
+  }, { passive: true });
+  update();
+}
+
 // ─── DOMContentLoaded ───
 document.addEventListener('DOMContentLoaded', () => {
+
+  initLpSpotlight();
+  initLpMobileMenu();
+  initLpProgress();
 
   // Theme swatches
   let currentTheme = 'default';
@@ -274,6 +336,8 @@ document.addEventListener('DOMContentLoaded', () => {
     '.lp-roi-card',
     '.lp-faq-item',
     '.lp-tab-bar',
+    '.lp-wave-rail',
+    '.lp-tile',
   ];
 
   const elements = document.querySelectorAll(selectors.join(', '));
@@ -285,6 +349,13 @@ document.addEventListener('DOMContentLoaded', () => {
   ).forEach((container) => {
     Array.from(container.children).forEach((child, i) => {
       child.style.transitionDelay = `${i * 60}ms`;
+    });
+  });
+
+  // Bento tiles: stagger within each viewport row, capped so late tiles don't lag
+  document.querySelectorAll('.lp-bento').forEach((bento) => {
+    Array.from(bento.children).forEach((child, i) => {
+      child.style.transitionDelay = `${(i % 4) * 50}ms`;
     });
   });
 

@@ -45,6 +45,7 @@
   <link rel="stylesheet" href="css/tabs.css" />
   <link rel="stylesheet" href="css/how.css" />
   <link rel="stylesheet" href="css/showcase.css" />
+  <link rel="stylesheet" href="css/platform.css" />
   <link rel="stylesheet" href="css/roi.css" />
   <link rel="stylesheet" href="css/principles.css" />
   <link rel="stylesheet" href="css/social.css" />
@@ -52,8 +53,64 @@
   <link rel="stylesheet" href="css/security.css" />
   <link rel="stylesheet" href="css/cta.css" />
   <link rel="stylesheet" href="css/footer.css" />
+
+  <!-- Structured data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "CostAdvisor",
+    "url": "https://www.costadvisor.org/",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "description": "Buyer-side should-cost intelligence for procurement teams. Build should-cost models from live commodity indices, track quarterly evolution, and export AI negotiation briefs.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR", "description": "Invite-only early access" },
+    "publisher": { "@type": "Organization", "name": "CostAdvisor", "url": "https://www.costadvisor.org/" }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "Do I need technical knowledge to set up CostAdvisor?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. If you know which commodity indices affect your products, you can build a cost model in under 30 minutes. CostAdvisor connects your components to public indices automatically. No coding, no integrations, no data engineering." }
+      },
+      {
+        "@type": "Question",
+        "name": "Where does the index data come from?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Nightly pulls from ECB (FX rates), EIA (energy), Eurostat (EU industrial prices), FRED (US PPI), and World Bank (commodities). You can also override any index with your own data or configure team-specific URL sources." }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I upload my own pricing and index data?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Yes. Supplier prices can be uploaded via Excel or CSV. For indices, you can configure team-level URL sources scraped nightly, or enter manual override values. Your data is isolated to your team." }
+      },
+      {
+        "@type": "Question",
+        "name": "How long does it take to build a first should-cost model?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Most users have a working model within 30 minutes of their first login. Define the product, add 3–6 weighted components, select an index per component, and enter your supplier price — the gap shows immediately." }
+      },
+      {
+        "@type": "Question",
+        "name": "How is my cost data protected?",
+        "acceptedAnswer": { "@type": "Answer", "text": "All data is encrypted in transit (TLS) and at rest. Multi-tenancy is enforced at the database layer via Postgres row-level security, and every sensitive action is written to an append-only audit log." }
+      },
+      {
+        "@type": "Question",
+        "name": "Which industries is CostAdvisor built for?",
+        "acceptedAnswer": { "@type": "Answer", "text": "Procurement teams buying commodity-linked products: specialty chemicals, paper and pulp, water treatment, oil and gas, food and beverage, agriculture, mining, and automotive." }
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
+
+  <a class="lp-skip" href="#hero">Skip to content</a>
+  <div class="lp-progress" id="lpProgress" aria-hidden="true"></div>
 
   <!-- ═══════════════════════════════════════ NAV ═══ -->
   <nav class="lp-nav" aria-label="Main navigation">
@@ -62,6 +119,7 @@
       <div class="lp-nav-links">
         <a href="#how-it-works" class="lp-nav-link">How it works</a>
         <a href="#features"     class="lp-nav-link">Features</a>
+        <a href="#platform"     class="lp-nav-link">Platform</a>
         <a href="#faq"          class="lp-nav-link">FAQ</a>
         <a href="#security"     class="lp-nav-link">Security</a>
         <div class="lp-theme-swatches" aria-label="Choose theme">
@@ -71,7 +129,17 @@
           <button class="lp-swatch" data-theme-id="staminachem" title="StaminaChem" aria-label="StaminaChem theme"></button>
         </div>
         <a id="nav-auth-btn" href="https://api.costadvisor.org/auth/login" class="lp-btn lp-btn-outline" style="margin-left:2px;padding:7px 16px;font-size:11px;">Sign in →</a>
+        <button class="lp-nav-burger" id="lpBurger" aria-label="Open menu" aria-expanded="false" aria-controls="lpMobileMenu">
+          <span></span><span></span><span></span>
+        </button>
       </div>
+    </div>
+    <div class="lp-nav-mobile" id="lpMobileMenu">
+      <a href="#how-it-works" class="lp-nav-link">How it works</a>
+      <a href="#features"     class="lp-nav-link">Features</a>
+      <a href="#platform"     class="lp-nav-link">Platform</a>
+      <a href="#faq"          class="lp-nav-link">FAQ</a>
+      <a href="#security"     class="lp-nav-link">Security</a>
     </div>
   </nav>
 
@@ -764,58 +832,223 @@
         </div>
       </div>
 
-      <!-- Row D: Portfolio Intelligence (Wave 2) -->
-      <div class="lp-showcase-row lp-showcase-row-flip">
-        <div class="lp-showcase-text">
-          <div class="lp-label">Portfolio Intelligence <span class="lp-coming-badge">Coming</span></div>
-          <h3 class="lp-showcase-h3">See where the money<br />is at stake — at a glance.</h3>
-          <p>The dashboard will surface which products are above should-cost, ranked by total gap value.
-            Automatic flagging, a procurement priority matrix, and directional index forecasts —
-            so you know where to focus this quarter without running the analysis yourself.</p>
-        </div>
-        <div class="lp-showcase-visual" aria-hidden="true">
-          <div class="lp-sv-card">
-            <div class="lp-sv-header">Portfolio · Gap Triage · Q2 2025</div>
-            <table class="lp-sv-gap-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Gap %</th>
-                  <th>Gap value</th>
-                  <th style="width:80px">Exposure</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Sodium Hydroxide</td>
-                  <td class="lp-sv-gap-bad">+11.4%</td>
-                  <td class="lp-sv-gap-bad">+€39.10/t</td>
-                  <td><span class="lp-sv-gap-bar" style="width:72px"></span></td>
-                </tr>
-                <tr>
-                  <td>Polyethylene (LDPE)</td>
-                  <td class="lp-sv-gap-warn">+6.8%</td>
-                  <td class="lp-sv-gap-warn">+€82.40/t</td>
-                  <td><span class="lp-sv-gap-bar" style="width:52px;opacity:0.55"></span></td>
-                </tr>
-                <tr>
-                  <td>Sulphuric Acid</td>
-                  <td class="lp-sv-gap-warn">+4.2%</td>
-                  <td class="lp-sv-gap-warn">+€18.60/t</td>
-                  <td><span class="lp-sv-gap-bar" style="width:34px;opacity:0.4"></span></td>
-                </tr>
-                <tr>
-                  <td>Aluminium Sulphate</td>
-                  <td class="lp-sv-gap-ok">−1.1%</td>
-                  <td class="lp-sv-gap-ok">−€4.20/t</td>
-                  <td><span class="lp-sv-gap-bar" style="width:12px;opacity:0.2;background:var(--accent)"></span></td>
-                </tr>
-              </tbody>
-            </table>
+    </section>
+
+    <!-- ═══════════════════ PLATFORM ROADMAP (bento) ═══ -->
+    <section class="lp-platform" id="platform" aria-labelledby="platform-title">
+      <div class="lp-container">
+        <div class="lp-label">Platform</div>
+        <h2 class="lp-platform-headline" id="platform-title">
+          A calculator today.<br />A negotiation system next.
+        </h2>
+        <p class="lp-platform-sub">
+          CostAdvisor ships in three waves. The core value loop is live now —
+          intelligence that tells you where to look comes next, and deep negotiation
+          tooling after that. Here's the honest map.
+        </p>
+
+        <div class="lp-wave-rail">
+          <div class="lp-wave-stop lp-wave-live">
+            <span class="lp-wave-dot" aria-hidden="true"></span>
+            <span class="lp-wave-name">Wave 1 · Live now</span>
+            <span class="lp-wave-desc">Should-cost models, evolution, gap analysis, AI briefs, import &amp; export.</span>
+          </div>
+          <div class="lp-wave-stop lp-wave-w2">
+            <span class="lp-wave-dot" aria-hidden="true"></span>
+            <span class="lp-wave-name">Wave 2 · Intelligence</span>
+            <span class="lp-wave-desc">The app does the analysis — flags gaps, forecasts indices, recommends when to buy.</span>
+          </div>
+          <div class="lp-wave-stop lp-wave-w3">
+            <span class="lp-wave-dot" aria-hidden="true"></span>
+            <span class="lp-wave-name">Wave 3 · Negotiation depth</span>
+            <span class="lp-wave-desc">Nested formulas, guided negotiation aid, supplier grading, PDF price extraction.</span>
           </div>
         </div>
-      </div>
 
+        <div class="lp-bento">
+
+          <!-- ── Wave 1: live ── -->
+          <article class="lp-tile lp-tile-wide">
+            <span class="lp-tile-status lp-tile-live">Live</span>
+            <span class="lp-tile-icon" aria-hidden="true">⬡</span>
+            <h3>Should-cost engine</h3>
+            <p>Weighted commodity components, each linked to a live public index.
+               FX conversion, unit normalisation, and full Incoterms 2020 landed-cost handling built in.</p>
+            <div class="lp-tile-visual" aria-hidden="true">
+              <div class="lp-tile-rank">
+                <div class="lp-tile-rank-row lp-tile-rank-ok"><span>Natural Gas · 35%</span><span class="lp-tile-rank-bar" style="width:74%"></span><span>+18.2%</span></div>
+                <div class="lp-tile-rank-row lp-tile-rank-ok"><span>Chlorine · 28%</span><span class="lp-tile-rank-bar" style="width:44%"></span><span>+7.4%</span></div>
+                <div class="lp-tile-rank-row lp-tile-rank-ok"><span>Labor · 22%</span><span class="lp-tile-rank-bar" style="width:28%"></span><span>+4.8%</span></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-live">Live</span>
+            <span class="lp-tile-icon" aria-hidden="true">◈</span>
+            <h3>Quarterly evolution</h3>
+            <p>Should-cost vs. actual, quarter by quarter. See the exact inflection point where over-pricing began.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-live">Live</span>
+            <span class="lp-tile-icon" aria-hidden="true">✦</span>
+            <h3>AI negotiation briefs</h3>
+            <p>Verdict, ranked drivers, financial impact, and a narrative written for the supplier conversation.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-live">Live</span>
+            <span class="lp-tile-icon" aria-hidden="true">⇅</span>
+            <h3>Import &amp; export everywhere</h3>
+            <p>Forgiving CSV and Excel import with per-row errors. Anything you can see, you can export.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-soon">Soon</span>
+            <span class="lp-tile-icon" aria-hidden="true">◳</span>
+            <h3>Inspectable numbers</h3>
+            <p>Every figure expands into its breakdown: index values, weights, ratios, FX rate, Incoterm adjustment — summing exactly.</p>
+          </article>
+
+          <!-- ── Wave 2: intelligence ── -->
+          <article class="lp-tile lp-tile-wide">
+            <span class="lp-tile-status lp-tile-w2">Wave 2</span>
+            <span class="lp-tile-icon" aria-hidden="true">▲</span>
+            <h3>Automatic gap flagging</h3>
+            <p>The dashboard becomes a triage screen — every product ranked by money at stake,
+               biggest opportunity first. You log in and see where to act.</p>
+            <div class="lp-tile-visual" aria-hidden="true">
+              <div class="lp-tile-rank">
+                <div class="lp-tile-rank-row"><span>Sodium Hydroxide</span><span class="lp-tile-rank-bar" style="width:84%"></span><span>+11.4%</span></div>
+                <div class="lp-tile-rank-row"><span>LDPE</span><span class="lp-tile-rank-bar" style="width:52%;opacity:0.5"></span><span>+6.8%</span></div>
+                <div class="lp-tile-rank-row lp-tile-rank-ok"><span>Al. Sulphate</span><span class="lp-tile-rank-bar" style="width:9%"></span><span>−1.1%</span></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w2">Wave 2</span>
+            <span class="lp-tile-icon" aria-hidden="true">◧</span>
+            <h3>Priority matrix</h3>
+            <p>Volatility × spend exposure per category: act now, hedge, monitor, or deprioritise.</p>
+            <div class="lp-tile-visual" aria-hidden="true">
+              <div class="lp-tile-matrix">
+                <div class="lp-tile-quad">Hedge</div>
+                <div class="lp-tile-quad lp-tile-quad-hot">Act now
+                  <span class="lp-tile-quad-dot" style="top:30%;left:55%"></span>
+                  <span class="lp-tile-quad-dot lp-tile-quad-dot-2" style="top:55%;left:75%"></span>
+                </div>
+                <div class="lp-tile-quad">Low priority</div>
+                <div class="lp-tile-quad">Monitor
+                  <span class="lp-tile-quad-dot lp-tile-quad-dot-3" style="top:35%;left:40%"></span>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w2">Wave 2</span>
+            <span class="lp-tile-icon" aria-hidden="true">↗</span>
+            <h3>Index forecasting</h3>
+            <p>Directional 2-quarter projections with a confidence band. An estimate, clearly labelled — never a guarantee.</p>
+            <div class="lp-tile-visual" aria-hidden="true">
+              <svg class="lp-tile-spark" viewBox="0 0 120 40" preserveAspectRatio="none">
+                <polygon points="80,18 120,4 120,22" fill="var(--info-bg)" />
+                <path d="M0,31 L16,29 L32,25 L48,26 L64,21 L80,18" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" />
+                <path d="M80,18 L100,14 L120,11" fill="none" stroke="var(--accent3)" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round" />
+                <circle cx="80" cy="18" r="2.6" fill="var(--accent)" />
+              </svg>
+            </div>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w2">Wave 2</span>
+            <span class="lp-tile-icon" aria-hidden="true">◷</span>
+            <h3>Buy windows</h3>
+            <p>Current should-cost vs. the 4-quarter average — a "cheap now / expensive now" signal per product.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w2">Wave 2</span>
+            <span class="lp-tile-icon" aria-hidden="true">◬</span>
+            <h3>Alerts — email &amp; Slack</h3>
+            <p>Pushed to you when an index moves past your threshold, a new gap opens, or a buy window appears.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w2">Wave 2</span>
+            <span class="lp-tile-icon" aria-hidden="true">⬨</span>
+            <h3>Supplier benchmarking</h3>
+            <p>Who prices near should-cost, who pads margin — average gap and trend per supplier, ranked.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w2">Wave 2</span>
+            <span class="lp-tile-icon" aria-hidden="true">❖</span>
+            <h3>Team collaboration</h3>
+            <p>Notes on models, negotiation status flags, @mentions — a shared position before you walk in.</p>
+          </article>
+
+          <!-- ── Wave 3: depth ── -->
+          <article class="lp-tile lp-tile-wide">
+            <span class="lp-tile-status lp-tile-w3">Wave 3</span>
+            <span class="lp-tile-icon" aria-hidden="true">⌘</span>
+            <h3>Guided negotiation aid</h3>
+            <p>Enter the supplier's position, get the counter: your defensible floor, their likely response,
+               and auto-generated talking points from the gap, drivers, and index movement.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w3">Wave 3</span>
+            <span class="lp-tile-icon" aria-hidden="true">⬢</span>
+            <h3>Nested "Lego" formulas</h3>
+            <p>Sub-models composed into parent models — packaging inside finished goods, resin inside packaging.</p>
+            <div class="lp-tile-visual" aria-hidden="true">
+              <div class="lp-tile-tree">Finished good
+ ├─ <em>Bottle (sub-model)</em>
+ │   └─ PET resin · 61%
+ └─ Filling &amp; labor · 24%</div>
+            </div>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w3">Wave 3</span>
+            <span class="lp-tile-icon" aria-hidden="true">≋</span>
+            <h3>Non-linear formulas</h3>
+            <p>Thresholds, min/max bounds, step functions, yield and conversion factors — evaluated deterministically.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w3">Wave 3</span>
+            <span class="lp-tile-icon" aria-hidden="true">⎘</span>
+            <h3>PDF price extraction</h3>
+            <p>Upload a supplier quote — prices, dates, and currencies extracted for review, with confidence per value.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w3">Wave 3</span>
+            <span class="lp-tile-icon" aria-hidden="true">★</span>
+            <h3>Supplier trust grading</h3>
+            <p>A reputation score from gap trend, volatility, and response to index moves — methodology fully documented.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w3">Wave 3</span>
+            <span class="lp-tile-icon" aria-hidden="true">✧</span>
+            <h3>AI cost modeler</h3>
+            <p>Name a product and sector — get a suggested component breakdown to refine. Clearly labelled as an estimate.</p>
+          </article>
+
+          <article class="lp-tile">
+            <span class="lp-tile-status lp-tile-w3">Wave 3</span>
+            <span class="lp-tile-icon" aria-hidden="true">◎</span>
+            <h3>Multi-source validation</h3>
+            <p>Cross-check index values across sources; anomalies flagged with full provenance per data point.</p>
+          </article>
+
+        </div>
+      </div>
     </section>
 
     <!-- ════════════════════════════════ ROI CALC ═══ -->
@@ -1099,6 +1332,7 @@
             <div class="lp-footer-col-title">Product</div>
             <a href="#how-it-works" class="lp-footer-link">How it works</a>
             <a href="#features"     class="lp-footer-link">Features</a>
+            <a href="#platform"     class="lp-footer-link">Platform roadmap</a>
             <a href="#faq"          class="lp-footer-link">FAQ</a>
             <a href="#security"     class="lp-footer-link">Security</a>
           </div>

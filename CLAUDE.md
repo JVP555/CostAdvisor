@@ -201,6 +201,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Invite-only messaging: "request access" mailto flow
   - 🟢 Theme selector (4 swatches) in nav; persists via `localStorage.ca_theme`
   - 🟢 Redesigned — hero 2-col with product mockup, trust strip, editorial problem section, numbered how-it-works, 3 alternating showcase rows, principles block, social proof, security tiles
+  - 🟢 Modernised — Platform roadmap bento section covering all waves/scrums with Live/Wave-2/Wave-3 status badges and wave rail; spotlight hover tiles; scroll progress bar (CSS scroll-timeline + JS fallback); mobile burger menu; JSON-LD structured data (SoftwareApplication + FAQPage); skip link, `:focus-visible`, `text-wrap: balance`, full `prefers-reduced-motion` support; hero grid backdrop
   - 🔴 Landing page deployed and live at `www.costadvisor.org` (Cloudflare dashboard wiring)
   - 🔴 Google Search Console shows page indexed
   - 🔴 Core Web Vitals pass (LCP < 2.5 s)
