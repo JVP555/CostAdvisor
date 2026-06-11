@@ -11,6 +11,7 @@ export default function Admin() {
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [platformRoles, setPlatformRoles] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [accessRequests, setAccessRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,12 +31,14 @@ export default function Admin() {
       api.get('/api/admin/teams'),
       api.get('/api/admin/access-requests'),
       api.get('/api/settings/plans'),
+      api.get('/api/settings/roles'),
     ])
-      .then(([uRes, tRes, rRes, pRes]) => {
+      .then(([uRes, tRes, rRes, pRes, rolesRes]) => {
         setUsers(uRes.data);
         setTeams(tRes.data);
         setAccessRequests(rRes.data);
         setPlans(pRes.data);
+        setPlatformRoles(rolesRes.data);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -69,20 +72,22 @@ export default function Admin() {
     setImpersonating(document.cookie.split(';').some(c => c.trim().startsWith('ca_impersonating=')));
   }, []);
 
-  const toggleSuperAdmin = async (userId, current) => {
-    const targetUser = users.find(u => u.id === userId);
-    const action = current ? 'Revoke Admin' : 'Make Admin';
-    const ok = await confirm({
-      title: `${action} — ${targetUser?.display_name || targetUser?.email}?`,
-      message: current
-        ? 'This user will lose super-admin privileges immediately.'
-        : 'This user will gain full super-admin access to all platform data.',
-      confirmLabel: action,
-      danger: current,
-    });
-    if (!ok) return;
-    await api.put(`/api/admin/users/${userId}`, { is_super_admin: !current });
-    fetchData();
+  const setPlatformRole = async (userId, roleName, grant) => {
+    if (roleName === 'SuperAdmin') {
+      const targetUser = users.find(u => u.id === userId);
+      const action = grant ? 'Grant SuperAdmin' : 'Revoke SuperAdmin';
+      const ok = await confirm({
+        title: `${action} — ${targetUser?.display_name || targetUser?.email}?`,
+        message: grant
+          ? 'This user will gain full super-admin access to all platform data.'
+          : 'This user will lose super-admin privileges immediately.',
+        confirmLabel: action,
+        danger: !grant,
+      });
+      if (!ok) return;
+      await api.put(`/api/admin/users/${userId}`, { is_super_admin: grant });
+      fetchData();
+    }
   };
 
   const deleteUser = async (u) => {
@@ -190,7 +195,8 @@ export default function Admin() {
           showDeleted={showDeleted}
           setShowDeleted={setShowDeleted}
           currentUser={user}
-          onToggleSuperAdmin={toggleSuperAdmin}
+          platformRoles={platformRoles}
+          onSetPlatformRole={setPlatformRole}
           onImpersonate={impersonate}
           onDelete={deleteUser}
           onRestore={restoreUser}
@@ -236,7 +242,8 @@ export default function Admin() {
             user={selectedUser}
             onClose={() => setSelectedUser(null)}
             onNavigateToTeam={handleNavigateToTeam}
-            onToggleSuperAdmin={(id, cur) => { toggleSuperAdmin(id, cur); setSelectedUser(null); }}
+            platformRoles={platformRoles}
+            onSetPlatformRole={(id, name, grant) => { setPlatformRole(id, name, grant); setSelectedUser(null); }}
             onImpersonate={(id) => { impersonate(id); setSelectedUser(null); }}
             onDelete={(u) => { deleteUser(u); setSelectedUser(null); }}
             onRestore={(u) => { restoreUser(u); setSelectedUser(null); }}
@@ -250,9 +257,61 @@ export default function Admin() {
 }
 
 
+function PlatformRoleChips({ user }) {
+  const chips = [{ name: 'User', color: 'var(--muted)', bg: 'var(--neutral-bg)' }];
+  if (user.is_super_admin) chips.push({ name: 'SuperAdmin', color: 'var(--accent)', bg: 'var(--success-bg)' });
+  return (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      {chips.map(c => (
+        <span key={c.name} style={{
+          display: 'inline-block', padding: '2px 8px', borderRadius: 4,
+          fontSize: 10, fontWeight: 600, background: c.bg, color: c.color,
+        }}>{c.name}</span>
+      ))}
+    </div>
+  );
+}
+
+function EditRolePanel({ user, platformRoles, onSetRole, onClose }) {
+  return (
+    <div style={{
+      position: 'absolute', zIndex: 20, right: 0, top: '100%', marginTop: 4,
+      background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+      boxShadow: '0 4px 20px rgba(0,0,0,0.15)', padding: '12px 16px', minWidth: 200,
+    }}
+      onClick={e => e.stopPropagation()}
+    >
+      <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 10, color: 'var(--text)' }}>Platform Roles</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'not-allowed', opacity: 0.6 }}>
+          <input type="checkbox" checked disabled />
+          User <span style={{ fontSize: 10, color: 'var(--muted)' }}>(default)</span>
+        </label>
+        {(platformRoles || []).filter(r => r.name !== 'User').map(r => (
+          <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={r.name === 'SuperAdmin' ? !!user.is_super_admin : false}
+              onChange={e => onSetRole(user.id, r.name, e.target.checked)}
+            />
+            {r.name}
+          </label>
+        ))}
+      </div>
+      <button
+        className="ca-btn ca-btn-ghost ca-btn-sm"
+        style={{ marginTop: 12, width: '100%', fontSize: 11 }}
+        onClick={onClose}
+      >Done</button>
+    </div>
+  );
+}
+
 function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDeleted,
-  currentUser, onToggleSuperAdmin, onImpersonate, onDelete, onRestore, onChanged,
+  currentUser, platformRoles, onSetPlatformRole, onImpersonate, onDelete, onRestore, onChanged,
   isImpersonating, roleFilter, setRoleFilter, onSelectUser }) {
+  const [editRoleUserId, setEditRoleUserId] = useState(null);
+
   return (
     <>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -283,6 +342,10 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
         </label>
       </div>
 
+      {editRoleUserId && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 15 }} onClick={() => setEditRoleUserId(null)} />
+      )}
+
       <div className="ca-card">
         <div className="ca-scroll-x" style={{ minHeight: 300 }}>
           <table className="ca-table">
@@ -290,7 +353,7 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
               <tr>
                 <th>User</th>
                 <th>Email</th>
-                <th className="center">Role</th>
+                <th>Roles</th>
                 <th className="center">Last Login</th>
                 <th className="center">Actions</th>
               </tr>
@@ -313,16 +376,7 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
                     </div>
                   </td>
                   <td style={{ fontSize: 11, color: 'var(--muted)' }}>{u.email}</td>
-                  <td className="center">
-                    <span style={{
-                      display: 'inline-block', padding: '2px 8px', borderRadius: 4,
-                      fontSize: 10, fontWeight: 600,
-                      background: u.is_super_admin ? 'var(--success-bg)' : 'var(--neutral-bg)',
-                      color: u.is_super_admin ? 'var(--accent)' : 'var(--muted)',
-                    }}>
-                      {u.is_super_admin ? 'SUPER ADMIN' : 'USER'}
-                    </span>
-                  </td>
+                  <td><PlatformRoleChips user={u} /></td>
                   <td className="center" style={{ fontSize: 11, color: 'var(--muted)' }}>
                     {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString() : '—'}
                   </td>
@@ -330,13 +384,23 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
                       {!u.deleted_at && u.id !== currentUser?.id && (
                         <>
-                          <Tooltip text={u.is_super_admin ? 'Revoke Admin' : 'Make Admin'}>
-                            <button
-                              className="ca-btn ca-btn-ghost ca-btn-sm"
-                              style={{ padding: '4px 8px', fontSize: 13, lineHeight: 1 }}
-                              onClick={e => { e.stopPropagation(); onToggleSuperAdmin(u.id, u.is_super_admin); }}
-                            >⚙</button>
-                          </Tooltip>
+                          <div style={{ position: 'relative' }}>
+                            <Tooltip text="Edit platform roles">
+                              <button
+                                className="ca-btn ca-btn-ghost ca-btn-sm"
+                                style={{ padding: '4px 8px', fontSize: 11 }}
+                                onClick={e => { e.stopPropagation(); setEditRoleUserId(prev => prev === u.id ? null : u.id); }}
+                              >Edit Role</button>
+                            </Tooltip>
+                            {editRoleUserId === u.id && (
+                              <EditRolePanel
+                                user={u}
+                                platformRoles={platformRoles}
+                                onSetRole={onSetPlatformRole}
+                                onClose={() => setEditRoleUserId(null)}
+                              />
+                            )}
+                          </div>
                           <Tooltip text={u.is_super_admin ? 'Cannot impersonate a super admin' : isImpersonating ? 'Stop current impersonation first' : 'Impersonate'}>
                             <button
                               className="ca-btn ca-btn-ghost ca-btn-sm"
@@ -382,6 +446,8 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
   const [expanded, setExpanded] = useState(null);
   const [error, setError] = useState(null);
   const [teamSearch, setTeamSearch] = useState('');
+  // Available roles per expanded team: { [teamId]: [{id, name}] }
+  const [teamRoles, setTeamRoles] = useState({});
 
   useEffect(() => {
     if (targetTeamId) {
@@ -391,30 +457,26 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
     }
   }, [targetTeamId]);
 
-  const [pendingRoles, setPendingRoles] = useState({});
   const [pendingRemovals, setPendingRemovals] = useState(new Set());
   const [pendingAdditions, setPendingAdditions] = useState([]);
 
-  const hasPending = Object.keys(pendingRoles).length > 0 || pendingRemovals.size > 0 || pendingAdditions.length > 0;
+  const hasPending = pendingRemovals.size > 0 || pendingAdditions.length > 0;
 
   const clearPending = () => {
-    setPendingRoles({});
     setPendingRemovals(new Set());
     setPendingAdditions([]);
   };
 
   const handleExpand = (teamId) => {
-    if (expanded !== teamId) clearPending();
+    if (expanded !== teamId) {
+      clearPending();
+      // Fetch available roles for this team
+      api.get(`/api/teams/${teamId}/roles`).then(r => {
+        setTeamRoles(prev => ({ ...prev, [teamId]: r.data }));
+      }).catch(() => {});
+    }
     setExpanded(prev => prev === teamId ? null : teamId);
     setError(null);
-  };
-
-  const stageRole = (userId, role, currentRole) => {
-    if (role === currentRole) {
-      setPendingRoles(p => { const n = { ...p }; delete n[userId]; return n; });
-    } else {
-      setPendingRoles(p => ({ ...p, [userId]: role }));
-    }
   };
 
   const stageRemove = (userId) => setPendingRemovals(p => new Set([...p, userId]));
@@ -432,15 +494,27 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
     return u.display_name ? `${u.display_name} (${u.email})` : u.email;
   };
 
+  const addMemberRole = async (teamId, userId, roleId) => {
+    try {
+      await api.post(`/api/teams/${teamId}/member-roles`, { user_id: userId, role_id: roleId });
+      onRefresh();
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to add role');
+    }
+  };
+
+  const removeMemberRole = async (teamId, userId, roleId) => {
+    try {
+      await api.delete(`/api/teams/${teamId}/member-roles`, { data: { user_id: userId, role_id: roleId } });
+      onRefresh();
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Failed to remove role');
+    }
+  };
+
   const handleSave = async (team) => {
     const lines = [];
-    for (const [uid, role] of Object.entries(pendingRoles)) {
-      const m = team.members.find(m => m.user_id === uid);
-      lines.push(`· ${memberLabel(uid)}: ${m?.role} → ${role}`);
-    }
-    for (const uid of pendingRemovals) {
-      lines.push(`· Remove ${memberLabel(uid)}`);
-    }
+    for (const uid of pendingRemovals) lines.push(`· Remove ${memberLabel(uid)}`);
     for (const { userId, email, displayName } of pendingAdditions) {
       lines.push(`· Add ${displayName ? `${displayName} (${email})` : email}`);
     }
@@ -453,10 +527,6 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
     if (!ok) return;
 
     const errors = [];
-    for (const [uid, role] of Object.entries(pendingRoles)) {
-      try { await api.patch(`/api/admin/teams/${team.id}/members/${uid}`, { role }); }
-      catch (e) { errors.push(e.response?.data?.detail || 'Role update failed'); }
-    }
     for (const uid of pendingRemovals) {
       try { await api.delete(`/api/admin/teams/${team.id}/members/${uid}`); }
       catch (e) { errors.push(e.response?.data?.detail || 'Remove failed'); }
@@ -590,48 +660,54 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
                             <thead>
                               <tr>
                                 <th>Member</th>
-                                <th className="center">Membership Role</th>
-                                <th>Custom Roles</th>
+                                <th>Roles</th>
                                 <th className="center">Action</th>
                               </tr>
                             </thead>
                             <tbody>
                               {t.members.map(m => {
-                                const pendingRole = pendingRoles[m.user_id];
                                 const pendingRemoval = pendingRemovals.has(m.user_id);
-                                const effRole = pendingRole ?? m.role;
-
+                                const availRoles = (teamRoles[t.id] || []).filter(
+                                  r => !(m.custom_roles || []).some(cr => cr.id === r.id)
+                                );
                                 return (
                                   <tr key={m.user_id} style={{
                                     opacity: pendingRemoval ? 0.4 : 1,
-                                    borderLeft: pendingRole ? '2px solid var(--accent3)' : pendingRemoval ? '2px solid var(--accent2)' : undefined,
+                                    borderLeft: pendingRemoval ? '2px solid var(--accent2)' : undefined,
                                   }}>
                                     <td style={{ fontSize: 12 }}>{memberLabel(m.user_id)}</td>
-                                    <td className="center">
-                                      {!pendingRemoval ? (
-                                        <select
-                                          value={effRole}
-                                          className="ca-input"
-                                          style={{ fontSize: 11, padding: '3px 6px', width: 'auto', borderColor: pendingRole ? 'var(--accent3)' : undefined }}
-                                          onChange={e => stageRole(m.user_id, e.target.value, m.role)}
-                                        >
-                                          <option value="owner">owner</option>
-                                          <option value="admin">admin</option>
-                                          <option value="member">member</option>
-                                        </select>
-                                      ) : (
-                                        <span style={{ fontSize: 10, color: 'var(--accent2)' }}>removing</span>
-                                      )}
-                                    </td>
                                     <td>
-                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                        {(m.custom_roles || []).length === 0 ? (
-                                          <span style={{ fontSize: 10, color: 'var(--muted)' }}>—</span>
-                                        ) : (m.custom_roles || []).map(r => (
-                                          <span key={r.id} style={{ display: 'inline-block', padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                                        {m.role === 'owner' && (
+                                          <span style={{ display: 'inline-block', padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
+                                            OWNER
+                                          </span>
+                                        )}
+                                        {(m.custom_roles || []).map(r => (
+                                          <span key={r.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                                             {r.name}
+                                            {!pendingRemoval && (
+                                              <button
+                                                onClick={() => removeMemberRole(t.id, m.user_id, r.id)}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 11, lineHeight: 1, padding: 0 }}
+                                              >×</button>
+                                            )}
                                           </span>
                                         ))}
+                                        {!pendingRemoval && availRoles.length > 0 && (
+                                          <select
+                                            className="ca-input"
+                                            style={{ fontSize: 10, padding: '1px 4px', width: 'auto', minWidth: 70 }}
+                                            value=""
+                                            onChange={e => { if (e.target.value) addMemberRole(t.id, m.user_id, e.target.value); }}
+                                          >
+                                            <option value="">+ Role</option>
+                                            {availRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                          </select>
+                                        )}
+                                        {(m.custom_roles || []).length === 0 && m.role !== 'owner' && (
+                                          <span style={{ fontSize: 10, color: 'var(--muted)' }}>No roles</span>
+                                        )}
                                       </div>
                                     </td>
                                     <td className="center">
@@ -654,8 +730,7 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
                               {pendingAdditions.map(({ userId, email, displayName }) => (
                                 <tr key={userId} style={{ borderLeft: '2px solid var(--accent)', opacity: 0.75 }}>
                                   <td style={{ fontSize: 12 }}>{displayName ? `${displayName} (${email})` : email}</td>
-                                  <td className="center"><span style={{ fontSize: 10, color: 'var(--accent)' }}>member (pending)</span></td>
-                                  <td></td>
+                                  <td><span style={{ fontSize: 10, color: 'var(--accent)' }}>pending</span></td>
                                   <td className="center">
                                     <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setPendingAdditions(p => p.filter(a => a.userId !== userId))}>
                                       Undo
@@ -848,8 +923,9 @@ function AuditTab({ logs, eventType, setEventType, onRefresh, users }) {
 }
 
 
-function UserDetailPanel({ user, onClose, onNavigateToTeam, onToggleSuperAdmin,
-  onImpersonate, onDelete, onRestore, currentUser, isImpersonating }) {
+function UserDetailPanel({ user, onClose, onNavigateToTeam, platformRoles,
+  onSetPlatformRole, onImpersonate, onDelete, onRestore, currentUser, isImpersonating }) {
+  const [showEditRole, setShowEditRole] = useState(false);
   if (!user) return null;
   return (
     <div style={{
@@ -885,15 +961,8 @@ function UserDetailPanel({ user, onClose, onNavigateToTeam, onToggleSuperAdmin,
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6 }}>Role</div>
-        <span style={{
-          display: 'inline-block', padding: '3px 10px', borderRadius: 4,
-          fontSize: 10, fontWeight: 600,
-          background: user.is_super_admin ? 'var(--success-bg)' : 'var(--neutral-bg)',
-          color: user.is_super_admin ? 'var(--accent)' : 'var(--muted)',
-        }}>
-          {user.is_super_admin ? 'SUPER ADMIN' : 'USER'}
-        </span>
+        <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6 }}>Platform Roles</div>
+        <PlatformRoleChips user={user} />
       </div>
 
       <div style={{ marginBottom: 16 }}>
@@ -932,12 +1001,26 @@ function UserDetailPanel({ user, onClose, onNavigateToTeam, onToggleSuperAdmin,
 
       {!user.deleted_at && user.id !== currentUser?.id && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <button
-            className="ca-btn ca-btn-ghost ca-btn-sm"
-            onClick={() => onToggleSuperAdmin(user.id, user.is_super_admin)}
-          >
-            ⚙ {user.is_super_admin ? 'Revoke Admin' : 'Make Admin'}
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              className="ca-btn ca-btn-ghost ca-btn-sm"
+              style={{ width: '100%' }}
+              onClick={() => setShowEditRole(p => !p)}
+            >
+              ⚙ Edit Role
+            </button>
+            {showEditRole && (
+              <>
+                <div style={{ position: 'fixed', inset: 0, zIndex: 19 }} onClick={() => setShowEditRole(false)} />
+                <EditRolePanel
+                  user={user}
+                  platformRoles={platformRoles}
+                  onSetRole={onSetPlatformRole}
+                  onClose={() => setShowEditRole(false)}
+                />
+              </>
+            )}
+          </div>
           <button
             className="ca-btn ca-btn-ghost ca-btn-sm"
             style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)', opacity: (isImpersonating || user.is_super_admin) ? 0.4 : 1 }}

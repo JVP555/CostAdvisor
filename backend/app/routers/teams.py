@@ -21,12 +21,14 @@ from app.services.email import send_invite_email
 router = APIRouter()
 
 
-def require_team_role(db: Session, user: User, team_id: uuid.UUID, roles: list[str]) -> TeamMembership:
-    """Check that user has one of the required roles on the team."""
+def require_team_role(db: Session, user: User, team_id: uuid.UUID, roles: list[str]) -> TeamMembership | None:
+    """Check that user has one of the required roles on the team. Super admins bypass the check."""
     membership = db.query(TeamMembership).filter(
         TeamMembership.user_id == user.id,
         TeamMembership.team_id == team_id,
     ).first()
+    if user.is_super_admin:
+        return membership
     if not membership or membership.role not in roles:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     return membership
@@ -78,15 +80,27 @@ def list_members(
 ):
     require_team_role(db, current_user, team_id, ["owner", "admin", "member"])
     memberships = db.query(TeamMembership).filter(TeamMembership.team_id == team_id).all()
+    # Batch-load custom role assignments to avoid N+1
+    member_ids = [m.user_id for m in memberships]
+    role_rows = db.query(TeamMemberRole).filter(
+        TeamMemberRole.team_id == team_id,
+        TeamMemberRole.user_id.in_(member_ids),
+    ).all()
+    role_ids = {r.role_id for r in role_rows}
+    roles_by_id = {r.id: r.name for r in db.query(Role).filter(Role.id.in_(role_ids)).all()} if role_ids else {}
+    roles_by_user: dict = {}
+    for row in role_rows:
+        roles_by_user.setdefault(row.user_id, []).append({"id": row.role_id, "name": roles_by_id.get(row.role_id, "?")})
     result = []
     for m in memberships:
-        user = db.query(User).filter(User.id == m.user_id).first()
+        u = db.query(User).filter(User.id == m.user_id).first()
         result.append(TeamMemberOut(
             user_id=m.user_id,
             role=m.role,
             joined_at=m.joined_at,
-            email=user.email if user else None,
-            display_name=user.display_name if user else None,
+            email=u.email if u else None,
+            display_name=u.display_name if u else None,
+            custom_roles=[{"id": r["id"], "name": r["name"]} for r in roles_by_user.get(m.user_id, [])],
         ))
     return result
 
@@ -223,7 +237,7 @@ def update_member_role(
         return {"status": "no change"}
 
     # Admins may only toggle between admin and member — never touch owner
-    if caller.role == "admin":
+    if caller and caller.role == "admin":
         if data.role == "owner" or membership.role == "owner":
             raise HTTPException(status_code=403, detail="Only the owner can transfer ownership or change the owner's role")
 

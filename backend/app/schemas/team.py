@@ -25,12 +25,18 @@ class TeamMembershipOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class RoleChip(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class TeamMemberOut(BaseModel):
     user_id: uuid.UUID
     role: str
     joined_at: datetime
     email: str | None = None
     display_name: str | None = None
+    custom_roles: list[RoleChip] = []
 
     model_config = {"from_attributes": True}
 

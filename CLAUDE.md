@@ -106,7 +106,7 @@ React 18 + React Router 6 SPA. Auth state lives in `AuthContext.jsx` (Google OAu
 _Enterprise data isolation & access control_
 - Tenancy is team-scoped. Every tenant-facing table has a Postgres RLS policy (`tenant_isolation`) enforced at the DB level — see the `h8i9j0k1l2m3_enable_rls` migration. Never write a raw query that bypasses this; the `bypass_rls_var` context in `database.py` exists only for Celery tasks, seed scripts, and migrations.
 - Production data access or debugging must go through `routers/admin.py` (authenticated, logged) — never via direct DB queries.
-- RBAC roles (`owner`, `admin`, `member`) in `TeamMembership` govern what actions a user may take within their team. When adding features that touch sensitive outputs (e.g. exporting negotiation briefs, viewing raw cost data), gate them on the appropriate role.
+- `TeamMembership.role` stores `owner/admin/member` as a system field (used for access-control fallback and ownership tracking). Displayed team roles are created via the Role model and assigned through `TeamMemberRole`. When adding features that touch sensitive outputs (e.g. exporting negotiation briefs, viewing raw cost data), gate them on the appropriate `require_permission()` key.
 
 _Data protection & environment security_
 - All data encrypted at rest (Railway Postgres) and in transit (HTTPS/TLS). Never make unencrypted HTTP calls between services. The Ollama endpoint is Tailscale-only — never expose it to the public internet.
@@ -168,15 +168,18 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
 - 🟢 **Scrum 8b** — RBAC + Plans (granular permissions, subscription tiers, team-scoped roles)
   - 🟢 38 permissions seeded across 11 categories (products, cost_models, suppliers, indexes, prices, volumes, fx_rates, costing, evolution, briefs, squeeze, scenarios)
   - 🟢 Free plan (default, view+export) and Dream Plan (all 38 permissions) seeded
-  - 🟢 Roles are team-scoped — each team gets Owner/Admin/Member defaults (editable); custom roles can be created
+  - 🟢 Roles are team-scoped; created and managed per team — no hardcoded admin/member display roles
   - 🟢 Alembic migration: creates permissions/plans/roles/team_member_roles tables, seeds data, migrates existing memberships
   - 🟢 `has_permission()` service: super_admin bypass → plan ceiling → custom roles → membership.role fallback
   - 🟢 All resource endpoints enforced: products, cost_models, suppliers, indexes, prices, volumes, costing, evolution, squeeze, briefs, scenarios, portfolio
   - 🟢 Admin Settings tab (5th tab): Permissions list (scrollable, read-only — dev-managed), Plans CRUD, Platform Roles CRUD (User + SuperAdmin defaults)
-  - 🟢 Admin TeamsTab: Plan column with inline dropdown per team; custom roles shown as chips in expanded member view
+  - 🟢 Admin Users tab: role chips (User/SuperAdmin) + "Edit Role" popover instead of Make Admin/Revoke buttons
+  - 🟢 Admin TeamsTab: Plan column per team; expanded member view shows Roles chips (team-scoped) with + add/× remove — no Membership Role dropdown
+  - 🟢 Team Manage panel: Roles chips per member with + add / × remove; owner shown as OWNER badge; no admin/member dropdown
   - 🟢 Team Settings → Role Settings section: role CRUD with permission checkboxes, member-role assignment table
   - 🟢 Team roles limited to plan-allowed permissions — validated at API level; UI shows only plan-scoped permissions
   - 🟢 Team owner gets all plan-allowed permissions (plan ceiling enforced before owner fallback)
+  - 🟢 `require_team_role` has super_admin bypass; `GET /api/teams/{id}/members` includes custom_roles batch-loaded
 
 - 🔴 **Scrum 9** — Hardened authentication on OAuth 2.0
   - 🔴 PKCE `code_verifier`/`code_challenge` used on every OAuth flow

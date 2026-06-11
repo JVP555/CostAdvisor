@@ -362,6 +362,7 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
   const confirm = useConfirm();
   const [members, setMembers] = useState([]);
   const [pendingInvites, setPendingInvites] = useState([]);
+  const [teamRoles, setTeamRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [message, setMessage] = useState(null);
@@ -373,28 +374,32 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
   const fetchMembers = async () => {
     setLoading(true);
     try {
-      const [membersRes, invitesRes] = await Promise.all([
+      const [membersRes, invitesRes, rolesRes] = await Promise.all([
         api.get(`/api/teams/${teamId}/members`),
         canManage ? api.get(`/api/teams/${teamId}/invites`) : Promise.resolve({ data: [] }),
+        canManage ? api.get(`/api/teams/${teamId}/roles`) : Promise.resolve({ data: [] }),
       ]);
       setMembers(membersRes.data);
       setPendingInvites(invitesRes.data);
+      setTeamRoles(rolesRes.data);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
 
   useEffect(() => { fetchMembers(); }, [teamId]);
 
-  const handleRoleChange = async (userId, newRole) => {
-    const m = members.find(m => m.user_id === userId);
-    const ok = await confirm({
-      title: 'Change role?',
-      message: `Change ${m?.display_name || m?.email}'s role to ${newRole}?`,
-      confirmLabel: 'Change Role',
-    });
-    if (!ok) return;
+  const handleAddRole = async (userId, roleId) => {
     try {
-      await api.patch(`/api/teams/${teamId}/members/${userId}`, { role: newRole });
+      await api.post(`/api/teams/${teamId}/member-roles`, { user_id: userId, role_id: roleId });
+      await fetchMembers();
+    } catch (err) {
+      setMessage({ type: 'error', text: formatApiError(err) });
+    }
+  };
+
+  const handleRemoveRole = async (userId, roleId) => {
+    try {
+      await api.delete(`/api/teams/${teamId}/member-roles`, { data: { user_id: userId, role_id: roleId } });
       await fetchMembers();
     } catch (err) {
       setMessage({ type: 'error', text: formatApiError(err) });
@@ -505,7 +510,7 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
         <thead>
           <tr>
             <th>Member</th>
-            <th>Role</th>
+            <th>Roles</th>
             <th>Added On</th>
             <th>Action</th>
           </tr>
@@ -520,8 +525,8 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
           ) : members.map(m => {
             const isOwnerRow = m.role === 'owner';
             const isSelf = m.user_id === currentUserId;
-            const canEditRole = canManage && !isSelf && !(isOwnerRow && !isOwner);
             const canRemove = canManage && !isSelf && !isOwnerRow;
+            const availRoles = teamRoles.filter(r => !(m.custom_roles || []).some(cr => cr.id === r.id));
             return (
               <tr key={m.user_id}>
                 <td style={{ fontSize: 12 }}>
@@ -529,20 +534,38 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
                   {isSelf && <span style={{ marginLeft: 6, fontSize: 9, color: 'var(--muted)' }}>you</span>}
                 </td>
                 <td>
-                  {canEditRole ? (
-                    <select
-                      value={m.role}
-                      className="ca-input"
-                      style={{ fontSize: 11, padding: '3px 6px', width: 'auto' }}
-                      onChange={e => handleRoleChange(m.user_id, e.target.value)}
-                    >
-                      {isOwner && <option value="owner">owner</option>}
-                      <option value="admin">admin</option>
-                      <option value="member">member</option>
-                    </select>
-                  ) : (
-                    <RoleBadge role={m.role} />
-                  )}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                    {isOwnerRow && (
+                      <span style={{ display: 'inline-block', padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
+                        OWNER
+                      </span>
+                    )}
+                    {(m.custom_roles || []).map(r => (
+                      <span key={r.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                        {r.name}
+                        {canManage && !isSelf && (
+                          <button
+                            onClick={() => handleRemoveRole(m.user_id, r.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 11, lineHeight: 1, padding: 0 }}
+                          >×</button>
+                        )}
+                      </span>
+                    ))}
+                    {canManage && !isSelf && availRoles.length > 0 && (
+                      <select
+                        className="ca-input"
+                        style={{ fontSize: 10, padding: '1px 4px', width: 'auto', minWidth: 70 }}
+                        value=""
+                        onChange={e => { if (e.target.value) handleAddRole(m.user_id, e.target.value); }}
+                      >
+                        <option value="">+ Role</option>
+                        {availRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </select>
+                    )}
+                    {(m.custom_roles || []).length === 0 && !isOwnerRow && (
+                      <span style={{ fontSize: 10, color: 'var(--muted)' }}>No roles</span>
+                    )}
+                  </div>
                 </td>
                 <td style={{ fontSize: 11, color: 'var(--muted)' }}>{formatDate(m.joined_at)}</td>
                 <td style={{ textAlign: 'right' }}>
