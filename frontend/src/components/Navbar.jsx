@@ -65,6 +65,17 @@ export default function Navbar() {
       ))}
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
         <TeamSelector />
+        {user?.company && (
+          <span style={{
+            fontSize: 10, fontWeight: 600, letterSpacing: '0.4px',
+            padding: '3px 10px', borderRadius: 999,
+            background: 'var(--surface2)', border: '1px solid var(--border)',
+            color: 'var(--muted)', whiteSpace: 'nowrap', maxWidth: 160,
+            overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>
+            {user.company}
+          </span>
+        )}
         <div ref={menuRef} style={{ position: 'relative' }}>
           <button
             type="button"

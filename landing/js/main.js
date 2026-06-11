@@ -213,64 +213,77 @@ function toggleLpFaq(btn) {
   }
 }
 
-// ─── CTA form ───
+// ─── Access request modal ───
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function handleCtaSubmit(e) {
-  e.preventDefault();
-  const emailEl = document.getElementById('ctaEmail');
-  if (!emailEl) return;
-  const email = emailEl.value.trim();
+function openAccessModal() {
+  const modal = document.getElementById('lpAccessModal');
+  if (!modal) return;
+  // Reset to form view
+  document.getElementById('lpModalForm').style.display    = '';
+  document.getElementById('lpModalSuccess').style.display = 'none';
+  document.getElementById('lpModalError').style.display   = 'none';
+  document.getElementById('lpModalEmail').value   = '';
+  document.getElementById('lpModalName').value    = '';
+  document.getElementById('lpModalCompany').value = '';
+  const btn = document.getElementById('lpModalSubmit');
+  if (btn) { btn.disabled = false; btn.textContent = 'Send request'; }
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('lpModalEmail').focus(), 50);
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAccessModal() {
+  const modal = document.getElementById('lpAccessModal');
+  if (modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function handleModalBackdrop(e) {
+  if (e.target === document.getElementById('lpAccessModal')) closeAccessModal();
+}
+
+async function submitAccessModal() {
+  const email   = (document.getElementById('lpModalEmail')?.value   || '').trim();
+  const name    = (document.getElementById('lpModalName')?.value    || '').trim();
+  const company = (document.getElementById('lpModalCompany')?.value || '').trim();
+  const errEl   = document.getElementById('lpModalError');
+  const btn     = document.getElementById('lpModalSubmit');
+
   if (!email || !EMAIL_RE.test(email)) {
-    emailEl.focus();
+    if (errEl) { errEl.textContent = 'Please enter a valid work email.'; errEl.style.display = 'block'; }
+    document.getElementById('lpModalEmail').focus();
     return;
   }
-  // Show confirm panel
-  const form    = document.getElementById('ctaForm');
-  const confirm = document.getElementById('ctaConfirm');
-  const label   = document.getElementById('ctaConfirmEmail');
-  if (form)    form.style.display = 'none';
-  if (label)   label.textContent  = email;
-  if (confirm) confirm.style.display = 'block';
-}
-
-function cancelAccessRequest() {
-  const form    = document.getElementById('ctaForm');
-  const confirm = document.getElementById('ctaConfirm');
-  if (confirm) confirm.style.display = 'none';
-  if (form)    form.style.display = '';
-}
-
-async function confirmAccessRequest() {
-  const emailEl = document.getElementById('ctaEmail');
-  const confirm = document.getElementById('ctaConfirm');
-  const ok      = document.getElementById('ctaFormOk');
-  const email   = emailEl ? emailEl.value.trim() : '';
-
-  const yesBtn = confirm ? confirm.querySelector('button') : null;
-  if (yesBtn) { yesBtn.disabled = true; yesBtn.textContent = 'Sending…'; }
+  if (errEl) errEl.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
 
   try {
     const res  = await fetch(`${API_URL}/api/access-requests`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, name: name || undefined, company: company || undefined }),
     });
     const data = await res.json().catch(() => ({}));
 
-    if (confirm) confirm.style.display = 'none';
-    if (ok) {
-      ok.style.display = 'block';
-      if (data.status === 'accepted' || data.status === 'exists') {
-        ok.textContent = '✓ Access already granted — sign in to continue.';
-      } else {
-        ok.textContent = 'Request sent! The admin will contact you soon.';
-      }
+    if (data.status === 'accepted' || data.status === 'exists') {
+      if (errEl) { errEl.textContent = 'Access already granted — sign in to continue.'; errEl.style.display = 'block'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Send request'; }
+      return;
     }
+    // Success
+    document.getElementById('lpModalForm').style.display    = 'none';
+    document.getElementById('lpModalSuccess').style.display = 'block';
   } catch {
-    if (yesBtn) { yesBtn.disabled = false; yesBtn.textContent = 'Yes, request access'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Send request'; }
+    if (errEl) { errEl.textContent = 'Something went wrong. Try again or email access@costadvisor.org.'; errEl.style.display = 'block'; }
   }
 }
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeAccessModal();
+});
 
 // ─── Count-up for stat numbers ───
 function animateLpStat(el) {

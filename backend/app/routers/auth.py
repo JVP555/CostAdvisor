@@ -180,6 +180,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
             email=email,
             display_name=display_name,
             avatar_url=avatar_url,
+            company=has_access.company if has_access else None,
         )
         db.add(user)
         db.flush()
@@ -235,6 +236,11 @@ def update_me(
         if len(name) > 128:
             raise HTTPException(status_code=400, detail="display_name too long")
         current_user.display_name = name
+    if "company" in payload:
+        company = (payload.get("company") or "").strip() or None
+        if company and len(company) > 128:
+            raise HTTPException(status_code=400, detail="company too long")
+        current_user.company = company
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
