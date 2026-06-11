@@ -29,8 +29,8 @@ function applyTheme(id) {
 
 // ─── Auth probe ───
 // ca_token is HttpOnly so we probe /auth/me instead of reading the cookie.
-const API_URL = 'https://api.costadvisor.org';
-const APP_URL = 'https://costadvisor.org';
+const API_URL = 'http://localhost:8000';
+const APP_URL = 'http://localhost:5173';
 
 fetch(`${API_URL}/auth/me`, { credentials: 'include' })
   .then((r) => {
