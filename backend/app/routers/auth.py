@@ -139,7 +139,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
         if not settings.allow_signup:
             bypass_rls_var.set(False)
             return RedirectResponse(
-                url=f"{settings.app_url}?login_error=signup_disabled", status_code=302
+                url=f"{"http://localhost:5173"}?login_error=signup_disabled", status_code=302
             )
 
         # Gate: new users must have a pending team invite OR an accepted access request.
@@ -172,7 +172,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
                 error = "access_needed"
             bypass_rls_var.set(False)
             return RedirectResponse(
-                url=f"{settings.app_url}?login_error={error}", status_code=302
+                url=f"{"http://localhost:5173"}?login_error={error}", status_code=302
             )
 
         user = User(
@@ -188,7 +188,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
         # Send welcome email for users coming through the team-invite bypass.
         # (Access-request approvals get their own email at accept time via admin.)
         if has_team_invite and not has_access:
-            send_welcome_email(email, display_name, settings.app_url)
+            send_welcome_email(email, display_name, "http://localhost:5173")
     else:
         user.last_login_at = datetime.now(timezone.utc)
         # Don't overwrite display_name on returning users — they may have set
@@ -202,7 +202,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
 
     # Issue JWT cookie and redirect to frontend
     token_str = create_jwt(user.id)
-    response = RedirectResponse(url=settings.app_url, status_code=302)
+    response = RedirectResponse(url="http://localhost:5173", status_code=302)
     is_prod = settings.environment != "development"
     response.set_cookie(
         key="ca_token",
