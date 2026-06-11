@@ -92,7 +92,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setTeams([]);
     setActiveTeamId(null);
-    window.location.href = '/login';
+    window.location.href = 'http://localhost:3333';
   };
 
   return (
