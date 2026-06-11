@@ -11,11 +11,14 @@ from app.database import get_db, bypass_rls_var
 from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.models.audit_log import AuditLog
+from app.models.access_request import PlatformAccessRequest
 from app.config import get_settings
 from app.routers.auth import get_current_user, create_jwt
 from app.schemas.user import UserOut
 from app.schemas.audit_log import AuditLogOut
+from app.schemas.access_request import AccessRequestOut
 from app.services.audit import log_event
+from app.services.email import send_access_granted_email, send_welcome_email
 
 router = APIRouter()
 settings = get_settings()
@@ -464,6 +467,101 @@ def admin_delete_team(
     db.delete(team)
     db.commit()
     return {"status": "deleted"}
+
+
+# ── Platform access requests ──────────────────────────────────────────────────
+
+@router.get("/access-requests", response_model=list[AccessRequestOut])
+def list_access_requests(
+    status: str | None = Query(None),
+    search: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    query = db.query(PlatformAccessRequest)
+    if status:
+        query = query.filter(PlatformAccessRequest.status == status)
+    if search:
+        term = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                PlatformAccessRequest.email.ilike(term),
+                PlatformAccessRequest.name.ilike(term),
+                PlatformAccessRequest.company.ilike(term),
+            )
+        )
+    requests = query.order_by(PlatformAccessRequest.created_at.desc()).all()
+
+    result = []
+    for r in requests:
+        reviewer_email = None
+        if r.reviewed_by_id:
+            reviewer = db.query(User).filter(User.id == r.reviewed_by_id).first()
+            reviewer_email = reviewer.email if reviewer else None
+        result.append(AccessRequestOut(
+            id=r.id,
+            email=r.email,
+            name=r.name,
+            company=r.company,
+            status=r.status,
+            created_at=r.created_at,
+            reviewed_at=r.reviewed_at,
+            reviewed_by_email=reviewer_email,
+        ))
+    return result
+
+
+@router.post("/access-requests/{request_id}/accept")
+def accept_access_request(
+    request_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    req = db.query(PlatformAccessRequest).filter(PlatformAccessRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Access request not found")
+    if req.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Request is already {req.status}")
+
+    req.status = "accepted"
+    req.reviewed_at = datetime.now(timezone.utc)
+    req.reviewed_by_id = current_user.id
+
+    send_access_granted_email(req.email, settings.app_url)
+    send_welcome_email(req.email, req.name or "", settings.app_url)
+
+    team_id = _first_team_id(db, current_user.id)
+    if team_id:
+        log_event(db, team_id, current_user.id, "admin_accept_access_request", "access_request",
+                  str(request_id),
+                  new_value={"email": req.email, "by": current_user.email})
+    db.commit()
+    return {"status": "accepted"}
+
+
+@router.post("/access-requests/{request_id}/reject")
+def reject_access_request(
+    request_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    req = db.query(PlatformAccessRequest).filter(PlatformAccessRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Access request not found")
+    if req.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Request is already {req.status}")
+
+    req.status = "rejected"
+    req.reviewed_at = datetime.now(timezone.utc)
+    req.reviewed_by_id = current_user.id
+
+    team_id = _first_team_id(db, current_user.id)
+    if team_id:
+        log_event(db, team_id, current_user.id, "admin_reject_access_request", "access_request",
+                  str(request_id),
+                  new_value={"email": req.email, "by": current_user.email})
+    db.commit()
+    return {"status": "rejected"}
 
 
 # ── Audit logs (cross-team admin view) ────────────────────────────────────────

@@ -198,7 +198,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 All content sections: hero, problem, how-it-works, features, security, CTA
   - 🟢 CTA links to app login (`https://costadvisor.org`); Privacy and Terms in footer
   - 🟢 Scroll-reveal animations are progressive enhancement — page fully renders without JS
-  - 🟢 Invite-only messaging: "request access" mailto flow
+  - 🟢 Invite-only messaging: CTA form submits to `POST /api/access-requests` (replaced mailto)
   - 🟢 Theme selector (4 swatches) in nav; persists via `localStorage.ca_theme`
   - 🟢 Redesigned — hero 2-col with product mockup, trust strip, editorial problem section, numbered how-it-works, 3 alternating showcase rows, principles block, social proof, security tiles
   - 🟢 Modernised — Platform roadmap bento section covering all waves/scrums with Live/Wave-2/Wave-3 status badges and wave rail; spotlight hover tiles; scroll progress bar (CSS scroll-timeline + JS fallback); mobile burger menu; JSON-LD structured data (SoftwareApplication + FAQPage); skip link, `:focus-visible`, `text-wrap: balance`, full `prefers-reduced-motion` support; hero grid backdrop
@@ -219,6 +219,18 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Pending invites visible and revocable in TeamManagePanel
   - 🟢 `TeamInvite` model with token, status (pending/accepted/revoked/declined), 7-day expiry; migration applied
   - 🟢 Duplicate pending invite blocked; existing member invite blocked
+
+- 🟡 **Scrum 13b** — Platform-level access gating (invite-only sign-up with admin approval)
+  - 🟢 `PlatformAccessRequest` model + Alembic migration (partial unique index on pending email)
+  - 🟢 Public `POST /api/access-requests` endpoint — submits request, returns status without 409 to allow landing page messaging
+  - 🟢 OAuth callback gates new users: must have accepted access request OR pending team invite
+  - 🟢 Blocked users redirected to app with `?login_error=access_pending|access_rejected|access_needed|signup_disabled`
+  - 🟢 Login page shows contextual error message per `login_error` value; `loginError` exposed via `AuthContext`
+  - 🟢 Admin "Requests" 4th tab — lists all requests with pending badge, Accept/Reject actions, history
+  - 🟢 Admin accept: sets status=accepted, sends access-granted email + welcome email; reject: no email
+  - 🟢 Team-invite bypass users receive welcome email on first sign-in (account creation)
+  - 🟢 CORS updated for `www.costadvisor.org`; router registered in `main.py`
+  - 🟢 Landing page CTA form submits email to API via `fetch POST` (replaced mailto fallback)
 
 - 🟡 **Scrum 14** — End-to-end win-a-negotiation flow (product → components → indices → should-cost → actuals → gap → export brief)
   - 🔴 A new user can complete the full flow (steps 1–8) without external help

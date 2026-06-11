@@ -10,8 +10,11 @@ from authlib.integrations.httpx_client import AsyncOAuth2Client
 from app.config import get_settings
 from app.database import get_db, current_user_id_var, bypass_rls_var, impersonating_admin_email_var
 from app.models.user import User
+from app.models.invite import TeamInvite
+from app.models.access_request import PlatformAccessRequest
 from app.rate_limit import limiter
 from app.schemas.user import UserOut, UserWithTeams
+from app.services.email import send_welcome_email
 
 router = APIRouter()
 settings = get_settings()
@@ -134,10 +137,44 @@ async def callback(request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.google_id == google_id).first()
     if user is None:
         if not settings.allow_signup:
-            raise HTTPException(
-                status_code=403,
-                detail=f"New signups are disabled. Contact {settings.support_email} for access.",
+            bypass_rls_var.set(False)
+            return RedirectResponse(
+                url=f"{settings.app_url}?login_error=signup_disabled", status_code=302
             )
+
+        # Gate: new users must have a pending team invite OR an accepted access request.
+        has_team_invite = db.query(TeamInvite).filter(
+            TeamInvite.invited_email == email,
+            TeamInvite.status == "pending",
+            TeamInvite.expires_at > datetime.now(timezone.utc),
+        ).first()
+
+        has_access = db.query(PlatformAccessRequest).filter(
+            PlatformAccessRequest.email == email,
+            PlatformAccessRequest.status == "accepted",
+        ).first()
+
+        if not has_team_invite and not has_access:
+            # Determine the right error to show in the UI
+            pending_req = db.query(PlatformAccessRequest).filter(
+                PlatformAccessRequest.email == email,
+                PlatformAccessRequest.status == "pending",
+            ).first()
+            rejected_req = db.query(PlatformAccessRequest).filter(
+                PlatformAccessRequest.email == email,
+                PlatformAccessRequest.status == "rejected",
+            ).first()
+            if pending_req:
+                error = "access_pending"
+            elif rejected_req:
+                error = "access_rejected"
+            else:
+                error = "access_needed"
+            bypass_rls_var.set(False)
+            return RedirectResponse(
+                url=f"{settings.app_url}?login_error={error}", status_code=302
+            )
+
         user = User(
             google_id=google_id,
             email=email,
@@ -147,7 +184,11 @@ async def callback(request: Request, db: Session = Depends(get_db)):
         db.add(user)
         db.flush()
         user.last_login_at = datetime.now(timezone.utc)
-        # No auto-team: super admin assigns users to teams via the admin console
+
+        # Send welcome email for users coming through the team-invite bypass.
+        # (Access-request approvals get their own email at accept time via admin.)
+        if has_team_invite and not has_access:
+            send_welcome_email(email, display_name, settings.app_url)
     else:
         user.last_login_at = datetime.now(timezone.utc)
         # Don't overwrite display_name on returning users — they may have set

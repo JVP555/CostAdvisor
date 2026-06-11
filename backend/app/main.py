@@ -15,7 +15,7 @@ from app.routers import (
     auth, teams, products, cost_models, indexes, prices,
     volumes, costing, scenarios, suppliers, chemical_families,
     fx_rates, audit, portfolio, admin, ai, account, freight_lanes,
-    invites,
+    invites, access_requests,
 )
 
 
@@ -38,7 +38,11 @@ app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.app_url, "http://localhost:3333"],
+    allow_origins=[
+        settings.app_url,
+        "http://localhost:3333",
+        "https://www.costadvisor.org",  # landing page submitting access requests
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,6 +68,7 @@ app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
 app.include_router(account.router, prefix="/api/account", tags=["account"])
 app.include_router(freight_lanes.router, prefix="/api/freight-lanes", tags=["freight-lanes"])
 app.include_router(invites.router, prefix="/api/invites", tags=["invites"])
+app.include_router(access_requests.router, prefix="/api/access-requests", tags=["access-requests"])
 
 
 @app.get("/health")

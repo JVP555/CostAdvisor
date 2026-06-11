@@ -214,18 +214,45 @@ function toggleLpFaq(btn) {
 }
 
 // ─── CTA form ───
-function handleCtaSubmit(e) {
+async function handleCtaSubmit(e) {
   e.preventDefault();
   const emailEl = document.getElementById('ctaEmail');
   if (!emailEl) return;
-  const email   = emailEl.value.trim();
-  const subject = encodeURIComponent('Early Access Request');
-  const body    = encodeURIComponent(`Email: ${email}\nCompany:\nRole:\nCategory:\nUse case:`);
-  window.location.href = `mailto:access@costadvisor.org?subject=${subject}&body=${body}`;
+  const email = emailEl.value.trim();
+  if (!email) return;
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+
   const form = document.getElementById('ctaForm');
   const ok   = document.getElementById('ctaFormOk');
-  if (form) form.style.display = 'none';
-  if (ok)   ok.style.display = 'block';
+
+  try {
+    const res = await fetch(`${API_URL}/api/access-requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (form) form.style.display = 'none';
+    if (ok) {
+      ok.style.display = 'block';
+      if (data.status === 'pending' || data.status === 'submitted') {
+        ok.textContent = data.status === 'pending'
+          ? '✓ Your request is already pending — we'll be in touch.'
+          : '✓ Request submitted. We'll email you when access is granted.';
+      } else if (data.status === 'accepted' || data.status === 'exists') {
+        ok.textContent = '✓ Access already granted — sign in to continue.';
+      } else {
+        ok.textContent = res.ok
+          ? '✓ Request received. We'll be in touch shortly.'
+          : '✗ Something went wrong. Email access@costadvisor.org directly.';
+      }
+    }
+  } catch {
+    if (btn) { btn.disabled = false; btn.textContent = 'Request access →'; }
+  }
 }
 
 // ─── Count-up for stat numbers ───

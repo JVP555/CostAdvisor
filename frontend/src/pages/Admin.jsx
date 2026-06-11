@@ -11,6 +11,7 @@ export default function Admin() {
   const [users, setUsers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
+  const [accessRequests, setAccessRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('users');
   const [impersonating, setImpersonating] = useState(false);
@@ -26,10 +27,12 @@ export default function Admin() {
     Promise.all([
       api.get('/api/admin/users', { params: { include_deleted: showDeleted } }),
       api.get('/api/admin/teams'),
+      api.get('/api/admin/access-requests'),
     ])
-      .then(([uRes, tRes]) => {
+      .then(([uRes, tRes, rRes]) => {
         setUsers(uRes.data);
         setTeams(tRes.data);
+        setAccessRequests(rRes.data);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -45,8 +48,17 @@ export default function Admin() {
       .finally(() => setLoading(false));
   };
 
+  const fetchAccessRequests = () => {
+    setLoading(true);
+    api.get('/api/admin/access-requests')
+      .then(r => setAccessRequests(r.data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
     if (tab === 'audit') fetchAuditLogs();
+    else if (tab === 'requests') fetchAccessRequests();
     else fetchData();
   }, [tab, showDeleted]);
 
@@ -145,6 +157,13 @@ export default function Admin() {
           { key: 'users', label: `Users (${users.length})` },
           { key: 'teams', label: `Teams (${teams.length})` },
           { key: 'audit', label: 'Audit Log' },
+          {
+            key: 'requests',
+            label: (() => {
+              const pending = accessRequests.filter(r => r.status === 'pending').length;
+              return pending > 0 ? `Requests (${pending})` : 'Requests';
+            })(),
+          },
         ].map(t => (
           <button
             key={t.key}
@@ -184,6 +203,11 @@ export default function Admin() {
           onRefresh={fetchData}
           targetTeamId={targetTeamId}
           onTeamExpanded={() => setTargetTeamId(null)}
+        />
+      ) : tab === 'requests' ? (
+        <RequestsTab
+          requests={accessRequests}
+          onRefresh={fetchAccessRequests}
         />
       ) : (
         <AuditTab
@@ -912,6 +936,157 @@ function UserDetailPanel({ user, onClose, onNavigateToTeam, onToggleSuperAdmin,
         </div>
       )}
     </div>
+  );
+}
+
+
+function RequestsTab({ requests, onRefresh }) {
+  const confirm = useConfirm();
+  const showAlert = useAlert();
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+
+  const filtered = requests.filter(r => {
+    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return r.email.toLowerCase().includes(q) ||
+           r.name?.toLowerCase().includes(q) ||
+           r.company?.toLowerCase().includes(q);
+  });
+
+  const handleAccept = async (req) => {
+    const ok = await confirm({
+      title: `Grant access to ${req.email}?`,
+      message: "They'll receive an email confirming access and a welcome email.",
+      confirmLabel: 'Grant Access',
+    });
+    if (!ok) return;
+    try {
+      await api.post(`/api/admin/access-requests/${req.id}/accept`);
+      onRefresh();
+    } catch (err) {
+      showAlert({ title: 'Error', message: formatApiError(err) });
+    }
+  };
+
+  const handleReject = async (req) => {
+    const ok = await confirm({
+      title: `Reject request from ${req.email}?`,
+      message: 'No email will be sent. They can request access again later.',
+      confirmLabel: 'Reject',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.post(`/api/admin/access-requests/${req.id}/reject`);
+      onRefresh();
+    } catch (err) {
+      showAlert({ title: 'Error', message: formatApiError(err) });
+    }
+  };
+
+  const statusBadge = (status) => {
+    const styles = {
+      pending:  { background: 'var(--accent3-dim, #fef3c7)', color: 'var(--accent3, #f59e0b)' },
+      accepted: { background: 'var(--success-bg)',           color: 'var(--accent)'             },
+      rejected: { background: 'var(--accent2-dim)',          color: 'var(--accent2)'            },
+    };
+    const s = styles[status] || {};
+    return (
+      <span style={{
+        display: 'inline-block', padding: '2px 8px', borderRadius: 4,
+        fontSize: 10, fontWeight: 600, ...s,
+      }}>
+        {status.toUpperCase()}
+      </span>
+    );
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          className="ca-input"
+          placeholder="Search by email, name or company…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ maxWidth: 260 }}
+        />
+        <select
+          className="ca-input"
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          style={{ width: 'auto' }}
+        >
+          <option value="all">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="accepted">Accepted</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={onRefresh}>Refresh</button>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{filtered.length} request{filtered.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      <div className="ca-card">
+        <div className="ca-scroll-x" style={{ minHeight: 300 }}>
+          <table className="ca-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Name</th>
+                <th>Company</th>
+                <th className="center">Requested</th>
+                <th className="center">Status</th>
+                <th>Reviewed by</th>
+                <th className="center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No requests found.</td></tr>
+              )}
+              {filtered.map(r => (
+                <tr key={r.id}>
+                  <td style={{ fontSize: 12, fontWeight: 600 }}>{r.email}</td>
+                  <td style={{ fontSize: 12, color: 'var(--muted)' }}>{r.name || '—'}</td>
+                  <td style={{ fontSize: 12, color: 'var(--muted)' }}>{r.company || '—'}</td>
+                  <td className="center" style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                    {new Date(r.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="center">{statusBadge(r.status)}</td>
+                  <td style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    {r.reviewed_by_email
+                      ? <>{r.reviewed_by_email}<br /><span style={{ fontSize: 10 }}>{new Date(r.reviewed_at).toLocaleDateString()}</span></>
+                      : '—'}
+                  </td>
+                  <td className="center">
+                    {r.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        <button
+                          className="ca-btn ca-btn-primary ca-btn-sm"
+                          style={{ fontSize: 11 }}
+                          onClick={() => handleAccept(r)}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="ca-btn ca-btn-ghost ca-btn-sm"
+                          style={{ fontSize: 11, color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                          onClick={() => handleReject(r)}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
 }
 

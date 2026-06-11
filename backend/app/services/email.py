@@ -70,24 +70,15 @@ def build_invite_html(team_name: str, role: str, invited_by_name: str,
 </html>"""
 
 
-def send_invite_email(
-    to_email: str,
-    team_name: str,
-    role: str,
-    invited_by_name: str,
-    invited_by_email: str,
-) -> bool:
-    """Send a team invite email via SMTP (stdlib only). Returns True on success, False if not configured or failed."""
+def _send(to_email: str, subject: str, html: str) -> bool:
+    """Low-level SMTP send. Returns True on success, False if not configured or failed."""
     settings = get_settings()
     if not settings.smtp_host or not settings.smtp_user:
-        logger.warning("SMTP not configured — invite email not sent to %s", to_email)
+        logger.warning("SMTP not configured — email not sent to %s", to_email)
         return False
 
-    requests_url = f"{settings.app_url}/team?tab=requests"
-    html = build_invite_html(team_name, role, invited_by_name, invited_by_email, requests_url)
-
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"{invited_by_name or invited_by_email} invited you to join {team_name} on CostAdvisor"
+    msg["Subject"] = subject
     msg["From"] = formataddr(("CostAdvisor", settings.email_from))
     msg["To"] = to_email
     msg.attach(MIMEText(html, "html", "utf-8"))
@@ -101,11 +92,101 @@ def send_invite_email(
                 smtp.login(settings.smtp_user, settings.smtp_password)
                 smtp.sendmail(settings.email_from, [to_email], msg.as_string())
         else:
-            # Implicit SSL (port 465)
             with smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=15) as smtp:
                 smtp.login(settings.smtp_user, settings.smtp_password)
                 smtp.sendmail(settings.email_from, [to_email], msg.as_string())
         return True
     except Exception as e:
-        logger.warning("Failed to send invite email to %s: %s", to_email, e)
+        logger.warning("Failed to send email to %s: %s", to_email, e)
         return False
+
+
+def build_welcome_html(display_name: str, app_url: str, heading: str, body_lines: list[str], cta_label: str) -> str:
+    body_html = "".join(
+        f'<p style="margin:0 0 12px;color:#52525b;font-size:13px;line-height:1.6">{line}</p>'
+        for line in body_lines
+    )
+    return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr><td align="center" style="padding:40px 20px">
+      <table width="560" cellpadding="0" cellspacing="0"
+             style="background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7">
+        <tr><td style="background:#18181b;padding:24px 32px">
+          <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px">CostAdvisor</span>
+        </td></tr>
+        <tr><td style="padding:32px">
+          <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#18181b">{heading}</p>
+          {body_html}
+          <a href="{app_url}"
+             style="display:inline-block;background:#18181b;color:#fff;
+                    text-decoration:none;padding:12px 28px;border-radius:6px;
+                    font-size:14px;font-weight:600;margin-top:8px">
+            {cta_label}
+          </a>
+        </td></tr>
+        <tr><td style="padding:20px 32px;border-top:1px solid #f4f4f5;background:#fafafa">
+          <p style="margin:0;font-size:11px;color:#a1a1aa">
+            &copy; CostAdvisor &middot;
+            <a href="https://costadvisor.org" style="color:#a1a1aa">costadvisor.org</a>
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+
+def send_access_granted_email(to_email: str, app_url: str) -> bool:
+    """Notify a user that their platform access request was approved."""
+    html = build_welcome_html(
+        display_name="",
+        app_url=app_url,
+        heading="You've been granted access to CostAdvisor",
+        body_lines=[
+            "Your access request has been approved.",
+            "Sign in with your Google account to get started. "
+            "Once signed in, a team administrator will add you to your team — "
+            "or a team owner can invite you directly from their Team page.",
+            "If you have any questions, reply to this email.",
+        ],
+        cta_label="Sign in to CostAdvisor →",
+    )
+    return _send(to_email, "You've been granted access to CostAdvisor", html)
+
+
+def send_welcome_email(to_email: str, display_name: str, app_url: str) -> bool:
+    """Welcome email sent when a new user account is created (via team-invite bypass)."""
+    name = display_name or to_email.split("@")[0]
+    html = build_welcome_html(
+        display_name=name,
+        app_url=app_url,
+        heading=f"Welcome to CostAdvisor, {name}!",
+        body_lines=[
+            "Your account is ready.",
+            "You've been invited to join a team — open the <strong>Requests</strong> tab "
+            "inside the Team page to accept your invitation.",
+            "From there you can start building should-cost models and running gap analysis "
+            "against your supplier prices.",
+        ],
+        cta_label="Go to CostAdvisor →",
+    )
+    return _send(to_email, "Welcome to CostAdvisor", html)
+
+
+def send_invite_email(
+    to_email: str,
+    team_name: str,
+    role: str,
+    invited_by_name: str,
+    invited_by_email: str,
+) -> bool:
+    """Send a team invite email via SMTP. Returns True on success, False if not configured or failed."""
+    settings = get_settings()
+    requests_url = f"{settings.app_url}/team?tab=requests"
+    html = build_invite_html(team_name, role, invited_by_name, invited_by_email, requests_url)
+    subject = f"{invited_by_name or invited_by_email} invited you to join {team_name} on CostAdvisor"
+    return _send(to_email, subject, html)

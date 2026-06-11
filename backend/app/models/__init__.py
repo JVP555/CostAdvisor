@@ -11,6 +11,7 @@ from app.models.fx_rate import FxRate
 from app.models.scenario import CostScenario
 from app.models.audit_log import AuditLog
 from app.models.invite import TeamInvite
+from app.models.access_request import PlatformAccessRequest
 
 __all__ = [
     "User",
@@ -32,4 +33,5 @@ __all__ = [
     "CostScenario",
     "AuditLog",
     "TeamInvite",
+    "PlatformAccessRequest",
 ]
