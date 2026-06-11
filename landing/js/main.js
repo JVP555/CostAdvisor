@@ -214,44 +214,61 @@ function toggleLpFaq(btn) {
 }
 
 // ─── CTA form ───
-async function handleCtaSubmit(e) {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function handleCtaSubmit(e) {
   e.preventDefault();
   const emailEl = document.getElementById('ctaEmail');
   if (!emailEl) return;
   const email = emailEl.value.trim();
-  if (!email) return;
+  if (!email || !EMAIL_RE.test(email)) {
+    emailEl.focus();
+    return;
+  }
+  // Show confirm panel
+  const form    = document.getElementById('ctaForm');
+  const confirm = document.getElementById('ctaConfirm');
+  const label   = document.getElementById('ctaConfirmEmail');
+  if (form)    form.style.display = 'none';
+  if (label)   label.textContent  = email;
+  if (confirm) confirm.style.display = 'block';
+}
 
-  const btn = e.target.querySelector('button[type="submit"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+function cancelAccessRequest() {
+  const form    = document.getElementById('ctaForm');
+  const confirm = document.getElementById('ctaConfirm');
+  if (confirm) confirm.style.display = 'none';
+  if (form)    form.style.display = '';
+}
 
-  const form = document.getElementById('ctaForm');
-  const ok   = document.getElementById('ctaFormOk');
+async function confirmAccessRequest() {
+  const emailEl = document.getElementById('ctaEmail');
+  const confirm = document.getElementById('ctaConfirm');
+  const ok      = document.getElementById('ctaFormOk');
+  const email   = emailEl ? emailEl.value.trim() : '';
+
+  const yesBtn = confirm ? confirm.querySelector('button') : null;
+  if (yesBtn) { yesBtn.disabled = true; yesBtn.textContent = 'Sending…'; }
 
   try {
-    const res = await fetch(`${API_URL}/api/access-requests`, {
+    const res  = await fetch(`${API_URL}/api/access-requests`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     });
     const data = await res.json().catch(() => ({}));
 
-    if (form) form.style.display = 'none';
+    if (confirm) confirm.style.display = 'none';
     if (ok) {
       ok.style.display = 'block';
-      if (data.status === 'pending' || data.status === 'submitted') {
-        ok.textContent = data.status === 'pending'
-          ? "✓ Your request is already pending — we'll be in touch."
-          : "✓ Request submitted. We'll email you when access is granted.";
-      } else if (data.status === 'accepted' || data.status === 'exists') {
+      if (data.status === 'accepted' || data.status === 'exists') {
         ok.textContent = '✓ Access already granted — sign in to continue.';
       } else {
-        ok.textContent = res.ok
-          ? "✓ Request received. We'll be in touch shortly."
-          : '✗ Something went wrong. Email access@costadvisor.org directly.';
+        ok.textContent = 'Request sent! The admin will contact you soon.';
       }
     }
   } catch {
-    if (btn) { btn.disabled = false; btn.textContent = 'Request access →'; }
+    if (yesBtn) { yesBtn.disabled = false; yesBtn.textContent = 'Yes, request access'; }
   }
 }
 

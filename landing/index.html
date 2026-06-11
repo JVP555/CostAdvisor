@@ -1308,6 +1308,13 @@
                      placeholder="your@company.com" required autocomplete="email" />
               <button type="submit" class="lp-btn lp-btn-primary">Request access →</button>
             </form>
+            <div id="ctaConfirm" style="display:none" class="lp-cta-confirm">
+              <p class="lp-cta-confirm-msg">Send access request for <strong id="ctaConfirmEmail"></strong>?</p>
+              <div class="lp-cta-confirm-btns">
+                <button class="lp-btn lp-btn-primary" onclick="confirmAccessRequest()">Yes, request access</button>
+                <button class="lp-btn lp-btn-ghost" onclick="cancelAccessRequest()">Cancel</button>
+              </div>
+            </div>
             <p class="lp-cta-ok" id="ctaFormOk" style="display:none"></p>
             <a href="http://localhost:8000/auth/login" class="lp-cta-signin">Already have an account →</a>
           </div>
