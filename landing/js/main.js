@@ -240,13 +240,13 @@ async function handleCtaSubmit(e) {
       ok.style.display = 'block';
       if (data.status === 'pending' || data.status === 'submitted') {
         ok.textContent = data.status === 'pending'
-          ? '✓ Your request is already pending — we'll be in touch.'
-          : '✓ Request submitted. We'll email you when access is granted.';
+          ? "✓ Your request is already pending — we'll be in touch."
+          : "✓ Request submitted. We'll email you when access is granted.";
       } else if (data.status === 'accepted' || data.status === 'exists') {
         ok.textContent = '✓ Access already granted — sign in to continue.';
       } else {
         ok.textContent = res.ok
-          ? '✓ Request received. We'll be in touch shortly.'
+          ? "✓ Request received. We'll be in touch shortly."
           : '✗ Something went wrong. Email access@costadvisor.org directly.';
       }
     }
