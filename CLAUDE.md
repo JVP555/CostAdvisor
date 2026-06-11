@@ -248,12 +248,26 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 CORS updated for `www.costadvisor.org`; router registered in `main.py`
   - 🟢 Landing page CTA form submits email to API via `fetch POST` (replaced mailto fallback)
 
-- 🟡 **Scrum 14** — End-to-end win-a-negotiation flow (product → components → indices → should-cost → actuals → gap → export brief)
-  - 🔴 A new user can complete the full flow (steps 1–8) without external help
-  - 🟡 Every empty or missing-data state has a clear message and a next action (Dashboard + Pricing have empty states; others not fully covered)
-  - 🔴 The brief shows gap, top drivers, and narrative with real data
-  - 🔴 Total impact shows correctly when volumes are present; prompts to upload when absent
+- 🟢 **Scrum 14** — End-to-end win-a-negotiation flow (product → components → indices → should-cost → actuals → gap → export brief)
+  - 🟢 A new user can complete the full flow (steps 1–8) without external help
+  - 🟢 Every empty or missing-data state has a clear message and a next action
+  - 🟢 The brief shows gap, top drivers, and narrative with real data
+  - 🟢 Total impact shows correctly when volumes are present; prompts to upload when absent
   - 🟢 No raw API errors surface in the UI (`formatApiError()` in `api.js` + consistent error display)
+  - 🟢 Evolution chart does not show flat zero line when actuals are absent
+  - 🟢 Malformed CSV upload shows readable per-row errors
+  - 🟢 User warned when commodities have no index data (`data_gaps` flag)
+  - 🟢 Unknown routes render a 404 page
+  - 🟢 `db.commit() → db.refresh()` 500 fixed across 6 RLS-protected routers (flush+expunge pattern)
+
+- 🟢 **Scrum 14b** — Two-speed formula system (simple parts+weights AND advanced expression mode)
+  - 🟢 Simple mode unchanged: parts + weights + base price + base quarter (current model)
+  - 🟢 Advanced formula mode: user can type a free-form expression (e.g. `0.92*[(0.75*ACN+1500)*(1-h)+h*AA/0.8]+FC`)
+  - 🟢 Variables in advanced mode are defined by the user and mapped to a commodity index, a fixed value, or a per-period upload
+  - 🟢 UI toggle between Simple and Advanced mode; existing formulas open in the mode they were saved with
+  - 🟢 Expression validated client-side (balanced brackets, recognised operators) and server-side before saving
+  - 🟢 Costing engine evaluates advanced expressions deterministically with the same index/FX/incoterm pipeline as simple mode
+  - 🔴 Should-cost drill-down (Scrum 17) works for advanced formulas — shows resolved variable values (deferred to Scrum 17)
 
 - 🔴 **Scrum 15** — Polished exportable deliverable (clean PDF negotiation brief with verdict, gap, ranked drivers)
   - 🔴 "Export PDF" button on the Brief page

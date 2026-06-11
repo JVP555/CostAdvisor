@@ -8,7 +8,21 @@
       "Bash(Head -30)",
       "PowerShell(head *)",
       "Bash(npx tsc *)",
-      "PowerShell(Get-Process *)"
+      "PowerShell(Get-Process *)",
+      "Bash(.venv\\\\Scripts\\\\python -m alembic upgrade head)",
+      "Bash(venv\\\\Scripts\\\\python -m alembic upgrade head)",
+      "Bash(python -m alembic upgrade head)",
+      "Bash(/c/Users/lenovo/Desktop/CostAdvisor/backend/venv/bin/alembic upgrade *)",
+      "Bash(/c/Users/lenovo/Desktop/CostAdvisor/backend/venv/bin/python3 *)",
+      "PowerShell(Get-ChildItem C:\\\\Users\\\\lenovo\\\\Desktop\\\\CostAdvisor\\\\backend\\\\venv\\\\Scripts\\\\ | Where-Object { $_.Name -match 'alembic' })",
+      "PowerShell(Get-ChildItem C:\\\\Users\\\\lenovo\\\\Desktop\\\\CostAdvisor\\\\backend\\\\venv\\\\ -Recurse | Where-Object { $_.Name -match 'alembic' })",
+      "Read(//mnt/c/Users/lenovo/Desktop/CostAdvisor/**)",
+      "Bash(/mnt/c/Users/lenovo/Desktop/CostAdvisor/backend/venv/bin/python -m alembic upgrade head)",
+      "Bash(/c/Users/lenovo/Desktop/CostAdvisor/backend/venv/bin/python -m alembic --help)",
+      "Bash(/c/Users/lenovo/AppData/Local/Programs/Python/Python312/python.exe --version)",
+      "Bash(/c/Users/lenovo/AppData/Local/Programs/Python/Python312/python.exe -c 'import sys; sys.path.insert\\(0, '\\\\''venv/lib/python3.12/site-packages'\\\\''\\); import alembic; print\\('\\\\''alembic ok'\\\\''\\)')",
+      "Bash(PYTHONPATH=\"venv/lib/python3.12/site-packages\" $PYTHON *)",
+      "Bash(wsl.exe *)"
     ]
   }
 }

@@ -40,10 +40,18 @@ def require_team_access(db: Session, user: User, team_id: uuid.UUID, perm: str =
 
 @router.get("/", response_model=list[CommodityIndexOut])
 def list_commodities(
+    has_data: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return db.query(CommodityIndex).order_by(CommodityIndex.name).all()
+    q = db.query(CommodityIndex)
+    if has_data:
+        q = q.filter(
+            db.query(IndexValue.commodity_id)
+            .filter(IndexValue.commodity_id == CommodityIndex.id)
+            .exists()
+        )
+    return q.order_by(CommodityIndex.name).all()
 
 
 @router.get("/values", response_model=list[IndexValueOut])

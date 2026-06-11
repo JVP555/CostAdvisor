@@ -22,6 +22,51 @@ from app.schemas.costing import (
     DataGap,
 )
 
+# ── Advanced formula evaluator ─────────────────────────────────
+import ast as _ast
+import operator as _op
+
+_SAFE_OPS: dict = {
+    _ast.Add: _op.add,
+    _ast.Sub: _op.sub,
+    _ast.Mult: _op.mul,
+    _ast.Div: _op.truediv,
+    _ast.Pow: _op.pow,
+    _ast.USub: _op.neg,
+    _ast.UAdd: _op.pos,
+}
+
+
+def _eval_node(node, ctx: dict) -> float:
+    if isinstance(node, _ast.Constant):
+        return float(node.value)
+    if isinstance(node, _ast.Name):
+        if node.id not in ctx:
+            raise ValueError(f"Undefined variable '{node.id}'")
+        return float(ctx[node.id])
+    if isinstance(node, _ast.BinOp):
+        fn = _SAFE_OPS.get(type(node.op))
+        if fn is None:
+            raise ValueError(f"Unsupported operator: {type(node.op).__name__}")
+        return fn(_eval_node(node.left, ctx), _eval_node(node.right, ctx))
+    if isinstance(node, _ast.UnaryOp):
+        fn = _SAFE_OPS.get(type(node.op))
+        if fn is None:
+            raise ValueError(f"Unsupported unary operator: {type(node.op).__name__}")
+        return fn(_eval_node(node.operand, ctx))
+    raise ValueError(f"Unsupported expression node: {type(node).__name__}")
+
+
+def safe_eval_expr(expression: str, context: dict) -> float:
+    """Safely evaluate a mathematical expression.
+    Square brackets are accepted as grouping (common in contract formulas).
+    Only arithmetic operators and variable lookups are allowed — no builtins,
+    no attribute access, no function calls."""
+    expr = expression.replace('[', '(').replace(']', ')')
+    tree = _ast.parse(expr, mode='eval')
+    return _eval_node(tree.body, context)
+
+
 # ── Period helpers ─────────────────────────────────────────────
 
 MONTH_NAMES = [
@@ -69,12 +114,18 @@ def _available_index_range(db: Session, cost_model: CostModel):
 
     min_yq, max_yq = None, None
 
-    # Check index data for this model's commodity components
+    # Check index data for this model's commodity components (simple + advanced)
     commodity_ids = set()
     for fv in cost_model.formula_versions:
         for c in fv.components:
             if c.commodity_id:
                 commodity_ids.add(c.commodity_id)
+        # Advanced mode: collect commodity ids from variable definitions
+        fv_type = getattr(fv, 'formula_type', 'simple') or 'simple'
+        if fv_type == 'advanced' and fv.variables:
+            for var_def in fv.variables.values():
+                if var_def.get('type') == 'index' and var_def.get('commodity_id'):
+                    commodity_ids.add(var_def['commodity_id'])
 
     if commodity_ids:
         row = db.query(
@@ -268,9 +319,15 @@ def calculate_should_cost(
         db, fv, cost_model, region, ref_year, ref_quarter, t_year, t_quarter, base_price
     )
 
-    should_cost, margin_amount = _apply_margin(
-        indexed_cost, fv.margin_type, fv.margin_value, base_price
-    )
+    # Advanced formulas embed margin in the expression — skip the margin step.
+    formula_type = getattr(fv, 'formula_type', 'simple') or 'simple'
+    if formula_type == 'advanced':
+        should_cost = indexed_cost
+        margin_amount = 0.0
+    else:
+        should_cost, margin_amount = _apply_margin(
+            indexed_cost, fv.margin_type, fv.margin_value, base_price
+        )
 
     target_inc = _norm_incoterm(normalize_to_incoterm)
     if target_inc:
@@ -886,6 +943,10 @@ def _compute_indexed_cost(
     base_price: float,
 ) -> float:
     """Compute the indexed cost for a given period using the formula components."""
+    formula_type = getattr(fv, 'formula_type', 'simple') or 'simple'
+    if formula_type == 'advanced':
+        return _compute_advanced_cost(db, fv, cost_model, region, target_year, target_quarter)
+
     comp_base = _component_base(base_price, fv.margin_type, fv.margin_value)
     indexed_cost = 0.0
     for comp in fv.components:
@@ -902,3 +963,38 @@ def _compute_indexed_cost(
             ratio = 1.0
         indexed_cost += comp_base * weight * ratio
     return indexed_cost
+
+
+def _compute_advanced_cost(
+    db: Session,
+    fv,
+    cost_model: CostModel,
+    region: str,
+    target_year: int,
+    target_quarter: int,
+) -> float:
+    """Evaluate an advanced free-form expression for the given period.
+
+    Each variable in fv.variables maps to either an absolute index value for the
+    target period or a user-supplied fixed constant. The expression result IS the
+    should-cost — no margin step is applied on top.
+    """
+    if not fv.expression:
+        return float(fv.base_price)
+
+    context: dict[str, float] = {}
+    for var_name, var_def in (fv.variables or {}).items():
+        if var_def.get('type') == 'index' and var_def.get('commodity_id'):
+            val = get_single_index_value(
+                db, cost_model.team_id, var_def['commodity_id'],
+                region, target_year, target_quarter,
+            )
+            context[var_name] = float(val) if val is not None else 0.0
+        else:
+            context[var_name] = float(var_def.get('value', 0))
+
+    try:
+        return safe_eval_expr(fv.expression, context)
+    except Exception:
+        # Fall back to base_price so callers always get a numeric result.
+        return float(fv.base_price)
