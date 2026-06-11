@@ -92,7 +92,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setTeams([]);
     setActiveTeamId(null);
-    window.location.href = `${import.meta.env.VITE_APP_URL || 'http://localhost:5173'}/login`;
+    window.location.href = '/login';
   };
 
   return (
