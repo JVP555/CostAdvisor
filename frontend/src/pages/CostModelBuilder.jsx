@@ -13,7 +13,7 @@ import { useAuth } from '../AuthContext';
 export default function CostModelBuilder() {
   const { costModelId } = useParams();
   const navigate = useNavigate();
-  const { activeTeamId } = useAuth();
+  const { activeTeamId, user } = useAuth();
   const confirm = useConfirm();
   const showAlert = useAlert();
   const { addToast } = useToast();
@@ -66,6 +66,9 @@ export default function CostModelBuilder() {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [canEditPlatform, setCanEditPlatform] = useState(false);
   const templateDropdownRef = useRef(null);
+
+  const membership = user?.memberships?.find(m => m.team_id === activeTeamId);
+  const canEditTeam = membership?.role === 'owner' || membership?.role === 'admin';
 
   // Snapshot for cancel
   const [snapshot, setSnapshot] = useState(null);
@@ -1031,6 +1034,7 @@ export default function CostModelBuilder() {
         variables={advancedVars}
         activeTeamId={activeTeamId}
         canEditPlatform={canEditPlatform}
+        canEditTeam={canEditTeam}
         addToast={addToast}
         onClose={() => setShowSaveTemplate(false)}
         onSaved={(t) => {
@@ -1043,10 +1047,12 @@ export default function CostModelBuilder() {
   );
 }
 
-function SaveTemplateModal({ expression, variables, activeTeamId, canEditPlatform, addToast, onClose, onSaved }) {
+function SaveTemplateModal({ expression, variables, activeTeamId, canEditPlatform, canEditTeam, addToast, onClose, onSaved }) {
+  const showScopeToggle = canEditPlatform && canEditTeam;
+  const defaultScope = !canEditTeam && canEditPlatform ? 'platform' : 'team';
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [scope, setScope] = useState('team');
+  const [scope, setScope] = useState(defaultScope);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -1092,7 +1098,7 @@ function SaveTemplateModal({ expression, variables, activeTeamId, canEditPlatfor
             <label className="ca-label">Description</label>
             <input className="ca-input" value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" />
           </div>
-          {canEditPlatform && (
+          {showScopeToggle && (
             <div>
               <label className="ca-label">Scope</label>
               <div style={{ display: 'flex', gap: 8 }}>
