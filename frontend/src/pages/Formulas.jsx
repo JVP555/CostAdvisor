@@ -100,18 +100,11 @@ export default function Formulas() {
             Reusable advanced formula templates for cost models
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {canEditTeam && (
-            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => openCreate(false)}>
-              + Team Formula
-            </button>
-          )}
-          {canEditPlatform && (
-            <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => openCreate(true)}>
-              + Default Formula
-            </button>
-          )}
-        </div>
+        {(canEditTeam || canEditPlatform) && (
+          <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => openCreate(false)}>
+            + Add Formula
+          </button>
+        )}
       </div>
 
       {loading ? (
