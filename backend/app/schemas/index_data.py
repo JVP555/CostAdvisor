@@ -93,6 +93,7 @@ class TeamIndexSourceOut(BaseModel):
     commodity_name: str | None = None
     last_scrape_status: str | None = None  # "ok" | "error" | null
     last_scrape_at: str | None = None
+    scrape_warning: str | None = None  # set when auto-scrape on save fails
 
     model_config = {"from_attributes": True}
 

@@ -522,8 +522,8 @@ async def create_or_update_team_source(
     if body.source_type == "scrape_url" and body.scrape_url:
         try:
             await _scrape_and_replace_overrides(db, source, current_user)
-        except Exception:
-            pass  # scrape failure shouldn't block saving the source config
+        except Exception as e:
+            response.scrape_warning = str(e)
 
     return response
 
