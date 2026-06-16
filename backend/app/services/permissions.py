@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.team import Team, TeamMembership
-from app.models.rbac import Permission, RolePermission, PlanPermission, TeamMemberRole
+from app.models.rbac import Permission, RolePermission, PlanPermission, TeamMemberRole, UserPlatformRole
 from app.models.user import User
 
 
@@ -69,3 +69,24 @@ def has_permission(db: Session, user: User, team_id: uuid.UUID, key: str) -> boo
 def require_permission(db: Session, user: User, team_id: uuid.UUID, key: str) -> None:
     if not has_permission(db, user, team_id, key):
         raise HTTPException(status_code=403, detail=f"Permission required: {key}")
+
+
+def has_platform_permission(db: Session, user: User, key: str) -> bool:
+    """Check if user has a platform-level permission (not team-scoped). Super admins bypass."""
+    if user.is_super_admin:
+        return True
+    rows = db.query(UserPlatformRole).filter(UserPlatformRole.user_id == user.id).all()
+    if not rows:
+        return False
+    role_ids = [r.role_id for r in rows]
+    return bool(
+        db.query(RolePermission)
+        .join(Permission, Permission.id == RolePermission.permission_id)
+        .filter(RolePermission.role_id.in_(role_ids), Permission.key == key)
+        .first()
+    )
+
+
+def require_platform_permission(db: Session, user: User, key: str) -> None:
+    if not has_platform_permission(db, user, key):
+        raise HTTPException(status_code=403, detail=f"Platform permission required: {key}")

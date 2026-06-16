@@ -249,6 +249,7 @@ export default function Admin() {
             onRestore={(u) => { restoreUser(u); setSelectedUser(null); }}
             currentUser={user}
             isImpersonating={impersonating}
+            onRefresh={fetchData}
           />
         </>
       )}
@@ -260,6 +261,9 @@ export default function Admin() {
 function PlatformRoleChips({ user }) {
   const chips = [{ name: 'User', color: 'var(--muted)', bg: 'var(--neutral-bg)' }];
   if (user.is_super_admin) chips.push({ name: 'SuperAdmin', color: 'var(--accent)', bg: 'var(--success-bg)' });
+  (user.platform_role_names || []).forEach(name => {
+    if (name !== 'SuperAdmin') chips.push({ name, color: 'var(--accent3)', bg: 'var(--surface2)' });
+  });
   return (
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
       {chips.map(c => (
@@ -272,7 +276,40 @@ function PlatformRoleChips({ user }) {
   );
 }
 
-function EditRolePanel({ user, platformRoles, onSetRole, onClose }) {
+function EditRolePanel({ user, platformRoles, onSetRole, onClose, onRefresh }) {
+  const [assignedRoleIds, setAssignedRoleIds] = useState(new Set());
+  const [loadingRoles, setLoadingRoles] = useState(true);
+
+  useEffect(() => {
+    api.get(`/api/admin/users/${user.id}/platform-roles`)
+      .then(r => setAssignedRoleIds(new Set(r.data.map(x => x.id))))
+      .catch(() => {})
+      .finally(() => setLoadingRoles(false));
+  }, [user.id]);
+
+  const handleToggle = async (role, grant) => {
+    if (role.name === 'SuperAdmin') {
+      await onSetRole(user.id, 'SuperAdmin', grant);
+      onRefresh?.();
+      return;
+    }
+    try {
+      if (grant) {
+        await api.post(`/api/admin/users/${user.id}/platform-roles`, { role_id: role.id });
+      } else {
+        await api.delete(`/api/admin/users/${user.id}/platform-roles/${role.id}`);
+      }
+      setAssignedRoleIds(prev => {
+        const next = new Set(prev);
+        grant ? next.add(role.id) : next.delete(role.id);
+        return next;
+      });
+      onRefresh?.();
+    } catch (e) {
+      console.error('Role toggle failed', e);
+    }
+  };
+
   return (
     <div style={{
       position: 'absolute', zIndex: 20, right: 0, top: '100%', marginTop: 4,
@@ -282,22 +319,29 @@ function EditRolePanel({ user, platformRoles, onSetRole, onClose }) {
       onClick={e => e.stopPropagation()}
     >
       <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 10, color: 'var(--text)' }}>Platform Roles</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'not-allowed', opacity: 0.6 }}>
-          <input type="checkbox" checked disabled />
-          User <span style={{ fontSize: 10, color: 'var(--muted)' }}>(default)</span>
-        </label>
-        {(platformRoles || []).filter(r => r.name !== 'User').map(r => (
-          <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={r.name === 'SuperAdmin' ? !!user.is_super_admin : false}
-              onChange={e => onSetRole(user.id, r.name, e.target.checked)}
-            />
-            {r.name}
+      {loadingRoles ? (
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Loading…</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'not-allowed', opacity: 0.6 }}>
+            <input type="checkbox" checked disabled />
+            User <span style={{ fontSize: 10, color: 'var(--muted)' }}>(default)</span>
           </label>
-        ))}
-      </div>
+          {(platformRoles || []).filter(r => r.name !== 'User').map(r => (
+            <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={r.name === 'SuperAdmin' ? !!user.is_super_admin : assignedRoleIds.has(r.id)}
+                onChange={e => handleToggle(r, e.target.checked)}
+              />
+              {r.name}
+              {r.description && (
+                <span style={{ fontSize: 10, color: 'var(--muted)' }}>— {r.description}</span>
+              )}
+            </label>
+          ))}
+        </div>
+      )}
       <button
         className="ca-btn ca-btn-ghost ca-btn-sm"
         style={{ marginTop: 12, width: '100%', fontSize: 11 }}
@@ -398,6 +442,7 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
                                 platformRoles={platformRoles}
                                 onSetRole={onSetPlatformRole}
                                 onClose={() => setEditRoleUserId(null)}
+                                onRefresh={onChanged}
                               />
                             )}
                           </div>
@@ -924,7 +969,7 @@ function AuditTab({ logs, eventType, setEventType, onRefresh, users }) {
 
 
 function UserDetailPanel({ user, onClose, onNavigateToTeam, platformRoles,
-  onSetPlatformRole, onImpersonate, onDelete, onRestore, currentUser, isImpersonating }) {
+  onSetPlatformRole, onImpersonate, onDelete, onRestore, currentUser, isImpersonating, onRefresh }) {
   const [showEditRole, setShowEditRole] = useState(false);
   if (!user) return null;
   return (
@@ -1017,6 +1062,7 @@ function UserDetailPanel({ user, onClose, onNavigateToTeam, platformRoles,
                   platformRoles={platformRoles}
                   onSetRole={onSetPlatformRole}
                   onClose={() => setShowEditRole(false)}
+                  onRefresh={onRefresh}
                 />
               </>
             )}

@@ -269,6 +269,18 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Costing engine evaluates advanced expressions deterministically with the same index/FX/incoterm pipeline as simple mode
   - 🔴 Should-cost drill-down (Scrum 17) works for advanced formulas — shows resolved variable values (deferred to Scrum 17)
 
+- 🟢 **Scrum 14c** — Formula library + Chemist platform role
+  - 🟢 `FormulaTemplate` entity (nullable `team_id`): `team_id IS NULL` = platform Default, `team_id = X` = team-scoped
+  - 🟢 `UserPlatformRole` junction table: real assignment of platform roles (Chemist, etc.) to users
+  - 🟢 `has_platform_permission` / `require_platform_permission` in permissions service
+  - 🟢 Chemist platform role seeded with `formulas.view/edit/delete`; SuperAdmin role updated; Dream Plan updated
+  - 🟢 `/api/formulas` CRUD router: GET/POST/PUT/DELETE gated per tier (platform vs team)
+  - 🟢 RLS policy on `formula_templates`: allows `team_id IS NULL` rows to all authenticated teams
+  - 🟢 Admin → Users → Edit Role: Chemist checkbox stores in `user_platform_roles` (not `is_super_admin`); `PlatformRoleChips` shows all assigned roles
+  - 🟢 `/formulas` page: Default Formulas + Team Formulas sections; full CRUD gated by permission
+  - 🟢 CostModelBuilder advanced mode: "Load Template" dropdown pre-fills expression + variables
+  - 🟢 CostModelBuilder advanced mode: "Save as Template" saves current expression to the library
+
 - 🔴 **Scrum 15** — Polished exportable deliverable (clean PDF negotiation brief with verdict, gap, ranked drivers)
   - 🔴 "Export PDF" button on the Brief page
   - 🔴 PDF contains: verdict, gap, top drivers table, evolution chart, narrative

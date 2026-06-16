@@ -12,7 +12,7 @@ from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.models.audit_log import AuditLog
 from app.models.access_request import PlatformAccessRequest
-from app.models.rbac import Plan, Role, TeamMemberRole
+from app.models.rbac import Plan, Role, TeamMemberRole, UserPlatformRole
 from app.config import get_settings
 from app.routers.auth import get_current_user, create_jwt
 from app.schemas.user import UserOut
@@ -47,6 +47,7 @@ class UserAdminOut(BaseModel):
     last_login_at: str | None
     deleted_at: str | None
     teams: list[dict]
+    platform_role_names: list[str] = []
 
     model_config = {"from_attributes": True}
 
@@ -78,6 +79,23 @@ def list_all_users(
         )
     users = query.order_by(User.created_at).all()
 
+    # Batch-load platform role assignments to avoid N+1
+    user_ids = [u.id for u in users]
+    platform_role_rows = (
+        db.query(UserPlatformRole).filter(UserPlatformRole.user_id.in_(user_ids)).all()
+        if user_ids else []
+    )
+    platform_role_ids = {r.role_id for r in platform_role_rows}
+    roles_by_id = (
+        {r.id: r.name for r in db.query(Role).filter(Role.id.in_(platform_role_ids)).all()}
+        if platform_role_ids else {}
+    )
+    platform_roles_by_user: dict = {}
+    for row in platform_role_rows:
+        platform_roles_by_user.setdefault(row.user_id, []).append(
+            roles_by_id.get(row.role_id, "?")
+        )
+
     result = []
     for u in users:
         teams = []
@@ -98,6 +116,7 @@ def list_all_users(
             last_login_at=u.last_login_at.isoformat() if u.last_login_at else None,
             deleted_at=u.deleted_at.isoformat() if u.deleted_at else None,
             teams=teams,
+            platform_role_names=platform_roles_by_user.get(u.id, []),
         ))
     return result
 
@@ -609,6 +628,85 @@ def reject_access_request(
                   new_value={"email": req.email, "by": current_user.email})
     db.commit()
     return {"status": "rejected"}
+
+
+# ── Platform role assignments ─────────────────────────────────────────────────
+
+class PlatformRoleAssignRequest(BaseModel):
+    role_id: uuid.UUID
+
+
+@router.get("/users/{user_id}/platform-roles")
+def get_user_platform_roles(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    rows = db.query(UserPlatformRole).filter(UserPlatformRole.user_id == user_id).all()
+    role_ids = [r.role_id for r in rows]
+    roles = db.query(Role).filter(Role.id.in_(role_ids), Role.team_id == None).all()  # noqa: E711
+    return [{"id": str(r.id), "name": r.name} for r in roles]
+
+
+@router.post("/users/{user_id}/platform-roles")
+def assign_platform_role(
+    user_id: uuid.UUID,
+    data: PlatformRoleAssignRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    role = db.query(Role).filter(Role.id == data.role_id, Role.team_id == None).first()  # noqa: E711
+    if not role:
+        raise HTTPException(status_code=404, detail="Platform role not found")
+    if role.name == "SuperAdmin":
+        raise HTTPException(status_code=400, detail="Use is_super_admin flag to assign SuperAdmin")
+
+    existing = db.query(UserPlatformRole).filter(
+        UserPlatformRole.user_id == user_id,
+        UserPlatformRole.role_id == data.role_id,
+    ).first()
+    if existing:
+        return {"status": "already_assigned"}
+
+    db.add(UserPlatformRole(user_id=user_id, role_id=data.role_id))
+
+    team_id = _first_team_id(db, user_id) or _first_team_id(db, current_user.id)
+    if team_id:
+        log_event(db, team_id, current_user.id, "admin_assign_platform_role", "user",
+                  str(user_id),
+                  new_value={"role": role.name, "by": current_user.email})
+    db.commit()
+    return {"status": "assigned"}
+
+
+@router.delete("/users/{user_id}/platform-roles/{role_id}")
+def remove_platform_role(
+    user_id: uuid.UUID,
+    role_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    row = db.query(UserPlatformRole).filter(
+        UserPlatformRole.user_id == user_id,
+        UserPlatformRole.role_id == role_id,
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Role assignment not found")
+
+    role = db.query(Role).filter(Role.id == role_id).first()
+    team_id = _first_team_id(db, user_id) or _first_team_id(db, current_user.id)
+    if team_id:
+        log_event(db, team_id, current_user.id, "admin_remove_platform_role", "user",
+                  str(user_id),
+                  previous_value={"role": role.name if role else str(role_id)},
+                  new_value={"by": current_user.email})
+    db.delete(row)
+    db.commit()
+    return {"status": "removed"}
 
 
 # ── Audit logs (cross-team admin view) ────────────────────────────────────────

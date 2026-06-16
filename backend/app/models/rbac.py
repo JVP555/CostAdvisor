@@ -85,3 +85,15 @@ class TeamMemberRole(Base):
     role_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
     )
+
+
+class UserPlatformRole(Base):
+    """Links a user to a platform-level role (team_id IS NULL in roles table)."""
+    __tablename__ = "user_platform_roles"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    role_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    )

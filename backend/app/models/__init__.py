@@ -12,7 +12,8 @@ from app.models.scenario import CostScenario
 from app.models.audit_log import AuditLog
 from app.models.invite import TeamInvite
 from app.models.access_request import PlatformAccessRequest
-from app.models.rbac import Permission, Role, RolePermission, Plan, PlanPermission, TeamMemberRole
+from app.models.rbac import Permission, Role, RolePermission, Plan, PlanPermission, TeamMemberRole, UserPlatformRole
+from app.models.formula_template import FormulaTemplate
 
 __all__ = [
     "User",
@@ -41,4 +42,6 @@ __all__ = [
     "Plan",
     "PlanPermission",
     "TeamMemberRole",
+    "UserPlatformRole",
+    "FormulaTemplate",
 ]

@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { OVC_ITEMS, RM_ITEMS, PIE_COLORS, INCOTERMS } from '../utils/constants';
 import DonutChart from '../components/DonutChart';
 import IncotermAdjustments from '../components/IncotermAdjustments';
 import api, { formatApiError } from '../api';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
+import { useToast } from '../components/Toast';
 
 const REGIONS = ['Europe', 'NA', 'Asia', 'Latam'];
 import { useAuth } from '../AuthContext';
@@ -15,6 +16,7 @@ export default function CostModelBuilder() {
   const { activeTeamId } = useAuth();
   const confirm = useConfirm();
   const showAlert = useAlert();
+  const { addToast } = useToast();
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(!costModelId);
   const [editing, setEditing] = useState(!costModelId);
@@ -58,6 +60,13 @@ export default function CostModelBuilder() {
   const [advancedVars, setAdvancedVars] = useState({});
   const [showLandedCost, setShowLandedCost] = useState(true);
 
+  // Formula template picker / saver
+  const [formulaTemplates, setFormulaTemplates] = useState([]);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [canEditPlatform, setCanEditPlatform] = useState(false);
+  const templateDropdownRef = useRef(null);
+
   // Snapshot for cancel
   const [snapshot, setSnapshot] = useState(null);
 
@@ -75,12 +84,28 @@ export default function CostModelBuilder() {
       api.get('/api/products', { params: { team_id: activeTeamId } }),
       api.get('/api/suppliers', { params: { team_id: activeTeamId } }),
       api.get('/api/indexes', { params: { has_data: true } }),
-    ]).then(([pRes, sRes, iRes]) => {
+      api.get('/api/formulas/', { params: { team_id: activeTeamId } }).catch(() => ({ data: [] })),
+      api.get('/api/formulas/can-edit-platform').catch(() => ({ data: { can_edit: false } })),
+    ]).then(([pRes, sRes, iRes, tmplRes, permRes]) => {
       setProducts(pRes.data);
       setSuppliers(sRes.data);
       setCommodities(iRes.data);
+      setFormulaTemplates(tmplRes.data);
+      setCanEditPlatform(permRes.data.can_edit);
     }).catch(() => setLoadError('Could not load reference data. Try reloading the page.'));
   }, [activeTeamId]);
+
+  // Close template dropdown on outside click
+  useEffect(() => {
+    if (!showTemplateDropdown) return;
+    const handler = (e) => {
+      if (templateDropdownRef.current && !templateDropdownRef.current.contains(e.target)) {
+        setShowTemplateDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showTemplateDropdown]);
 
   // Load existing cost model
   useEffect(() => {
@@ -324,6 +349,7 @@ export default function CostModelBuilder() {
   const sym = currency === 'EUR' ? '\u20AC' : '$';
 
   return (
+    <>
     <div className="ca-page ca-fade-in">
       {loadError && (
         <div style={{ background: 'var(--accent2-bg, #fff1f0)', border: '1px solid var(--accent2)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: 'var(--accent2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -581,7 +607,67 @@ export default function CostModelBuilder() {
                   </>
                 ) : (
                   <div style={{ marginBottom: 12 }}>
-                    <label className="ca-label">Expression</label>
+                    {/* Expression label row with Load Template dropdown */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <label className="ca-label" style={{ marginBottom: 0 }}>Expression</label>
+                      <div style={{ position: 'relative' }} ref={templateDropdownRef}>
+                        <button
+                          className="ca-btn ca-btn-ghost ca-btn-sm"
+                          style={{ fontSize: 10 }}
+                          onClick={() => setShowTemplateDropdown(v => !v)}
+                        >
+                          Load Template ▾
+                        </button>
+                        {showTemplateDropdown && (
+                          <div style={{
+                            position: 'absolute', right: 0, top: 'calc(100% + 4px)',
+                            background: 'var(--surface)', border: '1px solid var(--border)',
+                            borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                            zIndex: 50, minWidth: 260, maxHeight: 300, overflowY: 'auto', padding: 6,
+                          }}>
+                            {formulaTemplates.length === 0 ? (
+                              <div style={{ padding: '8px 10px', fontSize: 11, color: 'var(--muted)' }}>
+                                No templates available
+                              </div>
+                            ) : (
+                              [
+                                { label: 'Default', items: formulaTemplates.filter(t => !t.team_id) },
+                                { label: 'Team', items: formulaTemplates.filter(t => t.team_id) },
+                              ].map(group => group.items.length > 0 && (
+                                <div key={group.label}>
+                                  <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', padding: '6px 8px 2px' }}>
+                                    {group.label}
+                                  </div>
+                                  {group.items.map(t => (
+                                    <button
+                                      key={t.id}
+                                      style={{
+                                        display: 'block', width: '100%', textAlign: 'left',
+                                        padding: '6px 10px', borderRadius: 4, fontSize: 12,
+                                        border: 'none', cursor: 'pointer', background: 'transparent',
+                                        color: 'var(--text)',
+                                      }}
+                                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface2)'; }}
+                                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                                      onClick={() => {
+                                        setAdvancedExpression(t.expression);
+                                        setAdvancedVars(t.variables || {});
+                                        setShowTemplateDropdown(false);
+                                      }}
+                                    >
+                                      <span style={{ fontWeight: 600 }}>{t.name}</span>
+                                      {t.description && (
+                                        <span style={{ fontSize: 10, color: 'var(--muted)', display: 'block' }}>{t.description}</span>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
                       The result is the should-cost directly — embed any margin in the expression. Use square or round brackets.
                     </div>
@@ -593,9 +679,20 @@ export default function CostModelBuilder() {
                       value={advancedExpression}
                       onChange={e => setAdvancedExpression(e.target.value)}
                     />
-                    <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ marginTop: 8, marginBottom: 14 }} onClick={detectVars}>
-                      Detect Variables
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8, marginBottom: 14, alignItems: 'center' }}>
+                      <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={detectVars}>
+                        Detect Variables
+                      </button>
+                      {advancedExpression.trim() && (
+                        <button
+                          className="ca-btn ca-btn-ghost ca-btn-sm"
+                          style={{ fontSize: 10, color: 'var(--accent)' }}
+                          onClick={() => setShowSaveTemplate(true)}
+                        >
+                          Save as Template
+                        </button>
+                      )}
+                    </div>
                     {Object.keys(advancedVars).length > 0 && (
                       <div>
                         <div style={{ display: 'grid', gridTemplateColumns: '90px 90px 1fr 28px', gap: 8, marginBottom: 6 }}>
@@ -924,6 +1021,101 @@ export default function CostModelBuilder() {
               setShowLandedCost(vtype === 'simple');
             }} />
           )}
+        </div>
+      </div>
+    </div>
+
+    {showSaveTemplate && (
+      <SaveTemplateModal
+        expression={advancedExpression}
+        variables={advancedVars}
+        activeTeamId={activeTeamId}
+        canEditPlatform={canEditPlatform}
+        addToast={addToast}
+        onClose={() => setShowSaveTemplate(false)}
+        onSaved={(t) => {
+          setFormulaTemplates(prev => [...prev, t]);
+          setShowSaveTemplate(false);
+        }}
+      />
+    )}
+    </>
+  );
+}
+
+function SaveTemplateModal({ expression, variables, activeTeamId, canEditPlatform, addToast, onClose, onSaved }) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [scope, setScope] = useState('team');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!name.trim()) { addToast('Name is required', 'error'); return; }
+    setSaving(true);
+    try {
+      const res = await api.post('/api/formulas/', {
+        team_id: scope === 'platform' ? null : activeTeamId,
+        name: name.trim(),
+        description: description.trim() || null,
+        expression,
+        variables: Object.keys(variables).length > 0 ? variables : null,
+      });
+      addToast('Saved to Formula Library', 'success');
+      onSaved(res.data);
+    } catch (e) {
+      addToast(e?.response?.data?.detail || 'Save failed', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200,
+    }}>
+      <div style={{
+        background: 'var(--surface)', borderRadius: 12, padding: 28,
+        width: '100%', maxWidth: 440, boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+        margin: '0 16px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>Save as Template</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--muted)' }}>✕</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <label className="ca-label">Name *</label>
+            <input className="ca-input" value={name} onChange={e => setName(e.target.value)} placeholder="Template name" autoFocus />
+          </div>
+          <div>
+            <label className="ca-label">Description</label>
+            <input className="ca-input" value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" />
+          </div>
+          {canEditPlatform && (
+            <div>
+              <label className="ca-label">Scope</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {['team', 'platform'].map(s => (
+                  <button key={s} onClick={() => setScope(s)} style={{
+                    padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                    border: `1px solid ${scope === s ? 'var(--accent)' : 'var(--border)'}`,
+                    background: scope === s ? 'var(--accent)' : 'transparent',
+                    color: scope === s ? '#fff' : 'var(--text)',
+                    fontWeight: scope === s ? 600 : 400,
+                  }}>
+                    {s === 'platform' ? 'Default (all teams)' : 'Team only'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
         </div>
       </div>
     </div>
