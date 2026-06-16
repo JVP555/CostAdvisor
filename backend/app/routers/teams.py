@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.models.invite import TeamInvite
-from app.models.rbac import Role, RolePermission, Permission, TeamMemberRole, Plan, PlanPermission
+from app.models.rbac import Role, RolePermission, Permission, TeamMemberRole, Plan, PlanPermission, UserPlatformRole
 from app.routers.auth import get_current_user
 from app.schemas.team import TeamCreate, TeamOut, TeamMemberOut, InviteRequest, RoleUpdate
 from app.schemas.invite import TeamInviteOut
@@ -91,6 +91,20 @@ def list_members(
     roles_by_user: dict = {}
     for row in role_rows:
         roles_by_user.setdefault(row.user_id, []).append({"id": row.role_id, "name": roles_by_id.get(row.role_id, "?")})
+    # Batch-load platform roles for these members
+    platform_role_rows = db.query(UserPlatformRole).filter(
+        UserPlatformRole.user_id.in_(member_ids)
+    ).all()
+    plat_role_ids = {r.role_id for r in platform_role_rows}
+    plat_roles_by_id = {r.id: r.name for r in db.query(Role).filter(
+        Role.id.in_(plat_role_ids), Role.team_id == None  # noqa: E711
+    ).all()} if plat_role_ids else {}
+    plat_roles_by_user: dict = {}
+    for row in platform_role_rows:
+        plat_roles_by_user.setdefault(row.user_id, []).append(
+            plat_roles_by_id.get(row.role_id, "?")
+        )
+
     result = []
     for m in memberships:
         u = db.query(User).filter(User.id == m.user_id).first()
@@ -101,6 +115,7 @@ def list_members(
             email=u.email if u else None,
             display_name=u.display_name if u else None,
             custom_roles=[{"id": r["id"], "name": r["name"]} for r in roles_by_user.get(m.user_id, [])],
+            platform_role_names=plat_roles_by_user.get(m.user_id, []),
         ))
     return result
 

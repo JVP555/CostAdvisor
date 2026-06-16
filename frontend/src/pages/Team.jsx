@@ -551,6 +551,11 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
                         )}
                       </span>
                     ))}
+                    {(m.platform_role_names || []).map(name => (
+                      <span key={name} style={{ display: 'inline-block', padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'var(--surface2)', border: '1px solid var(--accent3)', color: 'var(--accent3)' }}>
+                        {name}
+                      </span>
+                    ))}
                     {canManage && !isSelf && availRoles.length > 0 && (
                       <select
                         className="ca-input"
@@ -562,7 +567,7 @@ function TeamManagePanel({ teamId, teamName, userRole, currentUserId, onRefresh,
                         {availRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                       </select>
                     )}
-                    {(m.custom_roles || []).length === 0 && !isOwnerRow && (
+                    {(m.custom_roles || []).length === 0 && (m.platform_role_names || []).length === 0 && !isOwnerRow && (
                       <span style={{ fontSize: 10, color: 'var(--muted)' }}>No roles</span>
                     )}
                   </div>

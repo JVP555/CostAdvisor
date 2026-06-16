@@ -1444,7 +1444,7 @@ function AdminSettingsTab() {
                       <tr>
                         <td style={{ fontWeight: 600, fontSize: 13 }}>
                           {r.name}
-                          {['User', 'SuperAdmin'].includes(r.name) && (
+                          {['User', 'SuperAdmin', 'Chemist', 'FX Manager'].includes(r.name) && (
                             <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, background: 'var(--accent-dim)', color: 'var(--accent)' }}>default</span>
                           )}
                         </td>
@@ -1455,7 +1455,7 @@ function AdminSettingsTab() {
                             <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setEditingRole(editingRole?.id === r.id ? null : r)}>
                               {editingRole?.id === r.id ? 'Close' : 'Edit'}
                             </button>
-                            {!['User', 'SuperAdmin'].includes(r.name) && (
+                            {!['User', 'SuperAdmin', 'Chemist', 'FX Manager'].includes(r.name) && (
                               <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }} onClick={() => deleteRole(r)}>Delete</button>
                             )}
                           </div>

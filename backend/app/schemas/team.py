@@ -37,6 +37,7 @@ class TeamMemberOut(BaseModel):
     email: str | None = None
     display_name: str | None = None
     custom_roles: list[RoleChip] = []
+    platform_role_names: list[str] = []
 
     model_config = {"from_attributes": True}
 

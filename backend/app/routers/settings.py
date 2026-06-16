@@ -170,7 +170,7 @@ def delete_plan(
 
 # ── Platform Roles (team_id IS NULL) ──────────────────────────────────────────
 
-PROTECTED_PLATFORM_ROLES = {"User", "SuperAdmin"}
+PROTECTED_PLATFORM_ROLES = {"User", "SuperAdmin", "Chemist", "FX Manager"}
 
 
 def _role_out(role: Role) -> RoleOut:
