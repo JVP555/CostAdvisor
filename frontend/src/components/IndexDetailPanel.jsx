@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api, { formatApiError } from '../api';
 import { useConfirm } from './ConfirmDialog';
 
@@ -11,8 +11,10 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
   );
   const [saving, setSaving] = useState(false);
   const [scraping, setScraping] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState(null);
   const [detectedSource, setDetectedSource] = useState(null);
+  const fileRef = useRef(null);
   const confirm = useConfirm();
 
   // Detect source type when URL changes
@@ -73,6 +75,28 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
       setMessage({ type: 'error', text: 'Scrape request failed.' });
     } finally {
       setScraping(false);
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    setMessage(null);
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await api.post(`/api/indexes/overrides?team_id=${teamId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const count = res.data?.rows_processed ?? res.data?.count ?? '?';
+      setMessage({ type: 'success', text: `${count} row(s) uploaded.` });
+      onSourceChanged(source);
+    } catch (err) {
+      setMessage({ type: 'error', text: formatApiError(err) });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
@@ -198,24 +222,39 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setEditing(true)}>
-            {source ? 'Change Source' : 'Configure Source'}
-          </button>
-          {source?.source_type === 'scrape_url' && (
-            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={handleScrapeNow} disabled={scraping}>
-              {scraping ? 'Scraping...' : 'Re-scrape Now'}
+        <>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setEditing(true)}>
+              {source ? 'Change Source' : 'Configure Source'}
             </button>
-          )}
-          <button className="ca-btn ca-btn-danger" onClick={handleResetAll}>
-            Reset All Overrides
-          </button>
-          {source && (
-            <button className="ca-btn ca-btn-danger" onClick={handleRemove}>
-              Remove Index
+            {source?.source_type === 'scrape_url' && (
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={handleScrapeNow} disabled={scraping}>
+                {scraping ? 'Scraping...' : 'Re-scrape Now'}
+              </button>
+            )}
+            {source?.source_type === 'upload' && (
+              <>
+                <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} style={{ display: 'none' }} />
+                <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+                  {uploading ? 'Uploading...' : 'Upload CSV / Excel'}
+                </button>
+              </>
+            )}
+            <button className="ca-btn ca-btn-danger" onClick={handleResetAll}>
+              Reset All Overrides
             </button>
+            {source && (
+              <button className="ca-btn ca-btn-danger" onClick={handleRemove}>
+                Remove Index
+              </button>
+            )}
+          </div>
+          {source?.source_type === 'upload' && (
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 14 }}>
+              CSV columns: <code>material</code>, <code>region</code>, <code>period</code> (Q1-2024), <code>value</code>
+            </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Feedback */}

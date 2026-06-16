@@ -178,6 +178,59 @@ def resolve_index_values(
             global_scrape_at=None,
         ))
 
+    # Generate placeholder rows for team sources that have no data yet.
+    # Fixed sources always show their constant value. Manual/upload sources show
+    # empty clickable cells so the user can enter values without a chicken-and-egg
+    # problem (you can't click a cell that doesn't exist).
+    covered_pairs = {(r.commodity_id, r.region) for r in results}
+
+    from datetime import datetime as _dt
+    _now = _dt.now()
+    _fy = from_year if from_year is not None else _now.year - 1
+    _fq = from_quarter if from_quarter is not None else 1
+    _ty = to_year if to_year is not None else _now.year + 1
+    _tq = to_quarter if to_quarter is not None else 4
+    # Clamp to single-period when a specific year/quarter was requested
+    if year is not None:
+        _fy, _ty = year, year
+        _fq = quarter if quarter is not None else 1
+        _tq = quarter if quarter is not None else 4
+
+    src_q = (
+        db.query(TeamIndexSource, CommodityIndex.name.label("src_cname"))
+        .join(CommodityIndex, CommodityIndex.id == TeamIndexSource.commodity_id)
+        .filter(TeamIndexSource.team_id == team_id)
+    )
+    if region:
+        src_q = src_q.filter(TeamIndexSource.region == region)
+    if commodity_name_filter:
+        src_q = src_q.filter(CommodityIndex.name == commodity_name_filter)
+    if commodity_ids is not None and commodity_ids:
+        src_q = src_q.filter(TeamIndexSource.commodity_id.in_(commodity_ids))
+
+    for src, src_cname in src_q.all():
+        pair = (src.commodity_id, src.region)
+        if pair in covered_pairs:
+            continue
+        covered_pairs.add(pair)
+        is_fixed = src.source_type == "fixed" and src.fixed_value is not None
+        y, q = _fy, _fq
+        while (y < _ty) or (y == _ty and q <= _tq):
+            results.append(IndexValueOut(
+                commodity_id=src.commodity_id,
+                commodity_name=src_cname,
+                region=src.region,
+                year=y,
+                quarter=q,
+                value=float(src.fixed_value) if is_fixed else None,
+                source="fixed" if is_fixed else "team_override",
+                scraped_value=None,
+            ))
+            q += 1
+            if q > 4:
+                q = 1
+                y += 1
+
     return results
 
 

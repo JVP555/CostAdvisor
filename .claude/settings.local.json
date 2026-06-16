@@ -22,7 +22,15 @@
       "Bash(/c/Users/lenovo/AppData/Local/Programs/Python/Python312/python.exe --version)",
       "Bash(/c/Users/lenovo/AppData/Local/Programs/Python/Python312/python.exe -c 'import sys; sys.path.insert\\(0, '\\\\''venv/lib/python3.12/site-packages'\\\\''\\); import alembic; print\\('\\\\''alembic ok'\\\\''\\)')",
       "Bash(PYTHONPATH=\"venv/lib/python3.12/site-packages\" $PYTHON *)",
-      "Bash(wsl.exe *)"
+      "Bash(wsl.exe *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\CostAdvisor\" -Recurse -Directory)",
+      "Bash(grep -n \"pass\\\\s*$\\\\|raise NotImplementedError\" backend/app/services/scraper.py)",
+      "Bash(python *)",
+      "PowerShell(& \"C:\\\\Users\\\\lenovo\\\\Desktop\\\\CostAdvisor\\\\backend\\\\venv\\\\bin\\\\python\" --version 2>&1)",
+      "Bash(python3 *)",
+      "PowerShell(python --version 2>&1; python3 --version 2>&1; where.exe python 2>&1)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/api/indexes/\" -UseBasicParsing -TimeoutSec 3; \"Backend is UP - status $\\($r.StatusCode\\)\" } catch { \"Backend is DOWN or unreachable: $_\" })",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5173\" -UseBasicParsing -TimeoutSec 3; \"Frontend UP - $\\($r.StatusCode\\)\" } catch { \"Frontend DOWN: $_\" })"
     ]
   }
 }

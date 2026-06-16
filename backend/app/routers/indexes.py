@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, current_user_id_var, bypass_rls_var
 from app.models.user import User
 from app.models.index_data import (
     CommodityIndex, IndexValue, IndexOverride, TeamIndexSource,
@@ -54,6 +54,32 @@ def list_commodities(
     return q.order_by(CommodityIndex.name).all()
 
 
+@router.post("/commodities", response_model=CommodityIndexOut)
+def create_commodity(
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a custom commodity index (user-defined, not a built-in scraper source)."""
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    existing = db.query(CommodityIndex).filter(CommodityIndex.name == name).first()
+    if existing:
+        return existing  # idempotent — return existing if same name
+    commodity = CommodityIndex(
+        name=name,
+        unit=body.get("unit"),
+        currency=body.get("currency"),
+        category=body.get("category") or "Custom",
+        scrape_enabled=False,
+    )
+    db.add(commodity)
+    db.commit()
+    db.refresh(commodity)
+    return commodity
+
+
 @router.get("/values", response_model=list[IndexValueOut])
 def get_index_values(
     team_id: uuid.UUID,
@@ -98,6 +124,8 @@ async def upload_global_indexes(
     current_user: User = Depends(get_current_user),
 ):
     """Upload global index data (super admin only). Writes to index_values table."""
+    current_user_id_var.set(str(current_user.id))
+    bypass_rls_var.set(True)  # super admin only — verified by require_super_admin below
     require_super_admin(current_user)
 
     content = await file.read()
@@ -148,6 +176,9 @@ async def upload_index_overrides(
     current_user: User = Depends(get_current_user),
 ):
     """Upload team-specific index overrides."""
+    current_user_id_var.set(str(current_user.id))
+    if current_user.is_super_admin:
+        bypass_rls_var.set(True)
     require_team_access(db, current_user, team_id, "indexes.import")
     content = await file.read()
     filename = file.filename or "upload"
@@ -454,6 +485,13 @@ async def create_or_update_team_source(
     clears old overrides, populates all returned periods, interpolates gaps,
     and blanks periods outside the new source's range.
     """
+    # Sync dependencies (get_current_user) run in a threadpool for async routes;
+    # ContextVar.set() there does not propagate to the event loop. Re-set here
+    # so every db.query() in this route sees the correct RLS context.
+    current_user_id_var.set(str(current_user.id))
+    if current_user.is_super_admin:
+        bypass_rls_var.set(True)
+
     require_team_access(db, current_user, body.team_id, "indexes.edit")
     if body.source_type == "scrape_url" and not body.scrape_url:
         raise HTTPException(
@@ -500,8 +538,8 @@ async def create_or_update_team_source(
     # Flush to assign serial id (for new sources) before building the response.
     db.flush()
 
-    # Build response while still in transaction so post-commit expiry doesn't
-    # open a second transaction where the RLS context may not be set.
+    # Build response while source is still in the current transaction (all
+    # attributes accessible without lazy-load, no post-commit expiry issues).
     response = TeamIndexSourceOut(
         id=source.id,
         team_id=source.team_id,
@@ -516,13 +554,24 @@ async def create_or_update_team_source(
         updated_at=source.updated_at,
         commodity_name=commodity.name,
     )
+
     db.commit()
 
-    # Auto-scrape on save for scrape_url sources
-    if body.source_type == "scrape_url" and body.scrape_url:
+    # Auto-scrape after commit. RLS context is now set via current_user_id_var
+    # (re-set at the top of this handler), so the after_begin listener will see
+    # the correct user ID for every subsequent transaction.
+    if body.source_type == "scrape_url" and source.scrape_url:
         try:
-            await _scrape_and_replace_overrides(db, source, current_user)
+            fresh_source = db.query(TeamIndexSource).filter(
+                TeamIndexSource.team_id == body.team_id,
+                TeamIndexSource.commodity_id == body.commodity_id,
+                TeamIndexSource.region == body.region,
+            ).first()
+            if fresh_source:
+                await _scrape_and_replace_overrides(db, fresh_source, current_user)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             response.scrape_warning = str(e)
 
     return response
@@ -566,6 +615,9 @@ async def scrape_now(
     current_user: User = Depends(get_current_user),
 ):
     """Trigger an immediate scrape for a team source. Uses smart dispatch for known URL patterns."""
+    current_user_id_var.set(str(current_user.id))
+    if current_user.is_super_admin:
+        bypass_rls_var.set(True)
     source = db.query(TeamIndexSource).filter(TeamIndexSource.id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
