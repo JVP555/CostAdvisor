@@ -127,10 +127,10 @@ def upsert_custom_fx_rate(
         )
         db.add(existing)
     db.flush()
+    rate_id = existing.id
     db.expunge(existing)
     db.commit()
-    db.refresh(existing)
-    return existing
+    return db.query(CustomFxRate).filter(CustomFxRate.id == rate_id).first()
 
 
 @router.delete("/custom/{rate_id}", status_code=204)
