@@ -180,6 +180,9 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Team roles limited to plan-allowed permissions — validated at API level; UI shows only plan-scoped permissions
   - 🟢 Team owner gets all plan-allowed permissions (plan ceiling enforced before owner fallback)
   - 🟢 `require_team_role` has super_admin bypass; `GET /api/teams/{id}/members` includes custom_roles batch-loaded
+  - 🟢 Chemist and FX Manager are default/protected platform roles — show "default" badge in Admin → Settings → Roles, cannot be deleted
+  - 🟢 FX Manager platform role seeded with `fx_rates.view/edit/delete` permissions; added to Dream Plan and SuperAdmin role
+  - 🟢 Platform role chips (accent3) visible on Team page member rows alongside team-scoped role chips; `GET /api/teams/{id}/members` includes `platform_role_names`
 
 - 🔴 **Scrum 9** — Hardened authentication on OAuth 2.0
   - 🔴 PKCE `code_verifier`/`code_challenge` used on every OAuth flow
@@ -279,7 +282,17 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Admin → Users → Edit Role: Chemist checkbox stores in `user_platform_roles` (not `is_super_admin`); `PlatformRoleChips` shows all assigned roles
   - 🟢 `/formulas` page: Default Formulas + Team Formulas sections; full CRUD gated by permission
   - 🟢 CostModelBuilder advanced mode: "Load Template" dropdown pre-fills expression + variables
-  - 🟢 CostModelBuilder advanced mode: "Save as Template" saves current expression to the library
+  - 🟢 CostModelBuilder advanced mode: "Save as Template" scope toggle respects `canEditPlatform && canEditTeam`; Chemist-only users default to platform scope with no toggle
+
+- 🟢 **Scrum 14d** — FX Rates page + team custom overrides
+  - 🟢 `/fx-rates` nav page with two tabs: Default (platform rates, read-only) and Custom (team overrides, editable)
+  - 🟢 `custom_fx_rates` table with RLS (`team_id` scoped); Alembic migration (`r9s0t1u2v3w4`)
+  - 🟢 `GET/PUT/DELETE /api/fx-rates/custom` endpoints; `POST /api/fx-rates/custom/copy-from-default` bulk-seeds team overrides from platform rates
+  - 🟢 Custom tab: inline-editable rate cells, "Sync from Default" modal, "+ Add Rate" modal, delete per row
+  - 🟢 `fx_converter.py` checks `custom_fx_rates` first (team priority), falls back to platform `fx_rates`
+  - 🟢 Costing engine threads `team_id` through all 14 `_apply_fx` call sites
+  - 🟢 FX Rates section removed from Team → Settings; `FxRates.jsx` registered in App.jsx and Navbar after Formulas
+  - 🟢 Write endpoints gated on `fx_rates.edit` permission (via FX Manager role or plan ceiling)
 
 - 🔴 **Scrum 15** — Polished exportable deliverable (clean PDF negotiation brief with verdict, gap, ranked drivers)
   - 🔴 "Export PDF" button on the Brief page

@@ -191,10 +191,10 @@ def _default_period_range(db: Session, cost_model: CostModel):
 
 # ── Conversion helpers ────────────────────────────────────────
 
-def _apply_fx(db: Session, value: float, from_ccy: str, to_ccy: str | None, year: int, quarter: int) -> float:
+def _apply_fx(db: Session, value: float, from_ccy: str, to_ccy: str | None, year: int, quarter: int, team_id=None) -> float:
     if not to_ccy or to_ccy == from_ccy:
         return value
-    return convert_price(db, value, from_ccy, to_ccy, year, quarter)
+    return convert_price(db, value, from_ccy, to_ccy, year, quarter, team_id=team_id)
 
 
 def _apply_unit(value: float, from_unit: str, to_unit: str | None) -> float:
@@ -398,7 +398,7 @@ def calculate_evolution(
 
     # Convert reference cost for display (use current/latest formula)
     ref_cost_display = _apply_unit(
-        _apply_fx(db, base_price, model_ccy, out_ccy, ref_year, ref_quarter),
+        _apply_fx(db, base_price, model_ccy, out_ccy, ref_year, ref_quarter, team_id=cost_model.team_id),
         model_unit, out_unit
     )
 
@@ -458,7 +458,7 @@ def calculate_evolution(
             else:
                 ratio = 1.0
             comp_cost = comp_base * weight * ratio
-            comp_cost = _apply_unit(_apply_fx(db, comp_cost, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
+            comp_cost = _apply_unit(_apply_fx(db, comp_cost, model_ccy, out_ccy, year, quarter, team_id=cost_model.team_id), model_unit, out_unit)
             comp_costs[comp.label] = round(comp_cost, 4)
 
         theoretical, _ = _apply_margin(indexed_cost, period_fv.margin_type, period_fv.margin_value, period_base_price)
@@ -478,12 +478,12 @@ def calculate_evolution(
                 actual = normalize_with_lane(actual, a_inc, target_inc, a_adj, lane_adj)
 
         # Apply FX and unit conversions
-        theoretical = _apply_unit(_apply_fx(db, theoretical, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
+        theoretical = _apply_unit(_apply_fx(db, theoretical, model_ccy, out_ccy, year, quarter, team_id=cost_model.team_id), model_unit, out_unit)
         if actual is not None:
-            actual = _apply_unit(_apply_fx(db, actual, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
+            actual = _apply_unit(_apply_fx(db, actual, model_ccy, out_ccy, year, quarter, team_id=cost_model.team_id), model_unit, out_unit)
 
         gap = (actual - theoretical) if actual is not None else None
-        bp_display = _apply_unit(_apply_fx(db, period_base_price, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
+        bp_display = _apply_unit(_apply_fx(db, period_base_price, model_ccy, out_ccy, year, quarter, team_id=cost_model.team_id), model_unit, out_unit)
         gap_pct = (gap / bp_display * 100) if (gap is not None and bp_display) else None
 
         periods_out.append(EvolutionPeriod(
@@ -567,7 +567,7 @@ def calculate_squeeze(
     volume_data = project_volumes(raw_volumes, request.volume_projection, period_keys)
 
     ref_cost_display = _apply_unit(
-        _apply_fx(db, base_price, model_ccy, out_ccy, ref_year, ref_quarter),
+        _apply_fx(db, base_price, model_ccy, out_ccy, ref_year, ref_quarter, team_id=cost_model.team_id),
         model_unit, out_unit
     )
 
@@ -594,12 +594,12 @@ def calculate_squeeze(
 
         actual = actuals.get((year, quarter))
 
-        theoretical = _apply_unit(_apply_fx(db, theoretical, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
+        theoretical = _apply_unit(_apply_fx(db, theoretical, model_ccy, out_ccy, year, quarter, team_id=cost_model.team_id), model_unit, out_unit)
         if actual is not None:
-            actual = _apply_unit(_apply_fx(db, actual, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
+            actual = _apply_unit(_apply_fx(db, actual, model_ccy, out_ccy, year, quarter, team_id=cost_model.team_id), model_unit, out_unit)
 
         gap = (actual - theoretical) if actual is not None else None
-        bp_display = _apply_unit(_apply_fx(db, period_base_price, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
+        bp_display = _apply_unit(_apply_fx(db, period_base_price, model_ccy, out_ccy, year, quarter, team_id=cost_model.team_id), model_unit, out_unit)
         gap_pct = (gap / bp_display * 100) if (gap is not None and bp_display) else None
 
         vol, vol_projected = volume_data.get((year, quarter), (0.0, True))
@@ -704,12 +704,12 @@ def calculate_brief(
         theoretical, _ = _apply_margin(indexed_cost, period_fv.margin_type, period_fv.margin_value, period_base_price)
         actual = actuals.get((year, quarter))
 
-        theoretical = _apply_unit(_apply_fx(db, theoretical, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
+        theoretical = _apply_unit(_apply_fx(db, theoretical, model_ccy, out_ccy, year, quarter, team_id=cost_model.team_id), model_unit, out_unit)
         if actual is not None:
-            actual = _apply_unit(_apply_fx(db, actual, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
+            actual = _apply_unit(_apply_fx(db, actual, model_ccy, out_ccy, year, quarter, team_id=cost_model.team_id), model_unit, out_unit)
 
         gap = (actual - theoretical) if actual is not None else None
-        bp_display = _apply_unit(_apply_fx(db, period_base_price, model_ccy, out_ccy, year, quarter), model_unit, out_unit)
+        bp_display = _apply_unit(_apply_fx(db, period_base_price, model_ccy, out_ccy, year, quarter, team_id=cost_model.team_id), model_unit, out_unit)
         gap_pct = (gap / bp_display * 100) if (gap is not None and bp_display) else None
 
         evo_periods.append(EvolutionPeriod(
@@ -767,11 +767,11 @@ def calculate_brief(
                 idx_name = comp.commodity.name
 
         contribution = _apply_unit(
-            _apply_fx(db, comp_base * weight * (idx_change_pct / 100), model_ccy, out_ccy, last_y, last_q),
+            _apply_fx(db, comp_base * weight * (idx_change_pct / 100), model_ccy, out_ccy, last_y, last_q, team_id=cost_model.team_id),
             model_unit, out_unit
         )
         comp_cost = _apply_unit(
-            _apply_fx(db, comp_base * weight * ratio, model_ccy, out_ccy, last_y, last_q),
+            _apply_fx(db, comp_base * weight * ratio, model_ccy, out_ccy, last_y, last_q, team_id=cost_model.team_id),
             model_unit, out_unit
         )
         direction = "up" if idx_change_pct > 1 else "down" if idx_change_pct < -1 else "flat"

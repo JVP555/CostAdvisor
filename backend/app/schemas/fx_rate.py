@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -12,3 +13,25 @@ class FxRateOut(BaseModel):
     uploaded_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CustomFxRateOut(BaseModel):
+    id: uuid.UUID
+    team_id: uuid.UUID
+    from_currency: str
+    to_currency: str
+    year: int
+    quarter: int
+    rate: float
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CustomFxRateUpsert(BaseModel):
+    team_id: uuid.UUID
+    from_currency: str
+    to_currency: str
+    year: int
+    quarter: int
+    rate: float

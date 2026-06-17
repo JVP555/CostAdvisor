@@ -8,6 +8,7 @@ from app.models.index_data import CommodityIndex, IndexValue, IndexOverride, Tea
 from app.models.price_data import ActualPrice
 from app.models.actual_volume import ActualVolume
 from app.models.fx_rate import FxRate
+from app.models.custom_fx_rate import CustomFxRate
 from app.models.scenario import CostScenario
 from app.models.audit_log import AuditLog
 from app.models.invite import TeamInvite
@@ -32,6 +33,7 @@ __all__ = [
     "ActualPrice",
     "ActualVolume",
     "FxRate",
+    "CustomFxRate",
     "CostScenario",
     "AuditLog",
     "TeamInvite",

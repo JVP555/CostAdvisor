@@ -1,12 +1,15 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
 from app.models.fx_rate import FxRate
+from app.models.custom_fx_rate import CustomFxRate
 from app.routers.auth import get_current_user
-from app.schemas.fx_rate import FxRateOut
+from app.schemas.fx_rate import FxRateOut, CustomFxRateOut, CustomFxRateUpsert
 from app.services.file_parser import parse_fx_upload
+from app.services.permissions import require_permission
 
 router = APIRouter()
 
@@ -69,3 +72,121 @@ async def upload_fx_rates(
 
     db.commit()
     return {"status": "uploaded", "rows_processed": count, "filename": filename}
+
+
+# ── Custom team FX rates ──────────────────────────────────────────────────────
+
+@router.get("/can-edit-custom")
+def can_edit_custom(
+    team_id: uuid.UUID = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.permissions import has_permission
+    return {"can_edit": has_permission(db, current_user, team_id, "fx_rates.edit")}
+
+
+@router.get("/custom", response_model=list[CustomFxRateOut])
+def list_custom_fx_rates(
+    team_id: uuid.UUID = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_permission(db, current_user, team_id, "fx_rates.view")
+    return db.query(CustomFxRate).filter(
+        CustomFxRate.team_id == team_id
+    ).order_by(CustomFxRate.year, CustomFxRate.quarter).all()
+
+
+@router.put("/custom", response_model=CustomFxRateOut)
+def upsert_custom_fx_rate(
+    payload: CustomFxRateUpsert,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_permission(db, current_user, payload.team_id, "fx_rates.edit")
+    existing = db.query(CustomFxRate).filter(
+        CustomFxRate.team_id == payload.team_id,
+        CustomFxRate.from_currency == payload.from_currency,
+        CustomFxRate.to_currency == payload.to_currency,
+        CustomFxRate.year == payload.year,
+        CustomFxRate.quarter == payload.quarter,
+    ).first()
+    if existing:
+        existing.rate = payload.rate
+        existing.updated_by = current_user.id
+    else:
+        existing = CustomFxRate(
+            team_id=payload.team_id,
+            from_currency=payload.from_currency,
+            to_currency=payload.to_currency,
+            year=payload.year,
+            quarter=payload.quarter,
+            rate=payload.rate,
+            updated_by=current_user.id,
+        )
+        db.add(existing)
+    db.flush()
+    db.expunge(existing)
+    db.commit()
+    db.refresh(existing)
+    return existing
+
+
+@router.delete("/custom/{rate_id}", status_code=204)
+def delete_custom_fx_rate(
+    rate_id: uuid.UUID,
+    team_id: uuid.UUID = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_permission(db, current_user, team_id, "fx_rates.edit")
+    rate = db.query(CustomFxRate).filter(
+        CustomFxRate.id == rate_id,
+        CustomFxRate.team_id == team_id,
+    ).first()
+    if not rate:
+        raise HTTPException(status_code=404, detail="Custom FX rate not found")
+    db.delete(rate)
+    db.commit()
+
+
+@router.post("/custom/copy-from-default", response_model=dict)
+def copy_default_fx_rates(
+    team_id: uuid.UUID = Query(...),
+    year: int = Query(...),
+    quarter: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Copy all platform default rates for a given year/quarter into team custom overrides."""
+    require_permission(db, current_user, team_id, "fx_rates.edit")
+    defaults = db.query(FxRate).filter(
+        FxRate.year == year,
+        FxRate.quarter == quarter,
+    ).all()
+    count = 0
+    for d in defaults:
+        existing = db.query(CustomFxRate).filter(
+            CustomFxRate.team_id == team_id,
+            CustomFxRate.from_currency == d.from_currency,
+            CustomFxRate.to_currency == d.to_currency,
+            CustomFxRate.year == d.year,
+            CustomFxRate.quarter == d.quarter,
+        ).first()
+        if existing:
+            existing.rate = d.rate
+            existing.updated_by = current_user.id
+        else:
+            db.add(CustomFxRate(
+                team_id=team_id,
+                from_currency=d.from_currency,
+                to_currency=d.to_currency,
+                year=d.year,
+                quarter=d.quarter,
+                rate=d.rate,
+                updated_by=current_user.id,
+            ))
+        count += 1
+    db.commit()
+    return {"copied": count, "year": year, "quarter": quarter}
