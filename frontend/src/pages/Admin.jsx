@@ -276,7 +276,7 @@ function PlatformRoleChips({ user }) {
   );
 }
 
-function EditRolePanel({ user, platformRoles, onSetRole, onClose, onRefresh }) {
+function EditRoleModal({ user, platformRoles, onSetRole, onClose, onRefresh }) {
   const [assignedRoleIds, setAssignedRoleIds] = useState(new Set());
   const [loadingRoles, setLoadingRoles] = useState(true);
 
@@ -311,42 +311,53 @@ function EditRolePanel({ user, platformRoles, onSetRole, onClose, onRefresh }) {
   };
 
   return (
-    <div style={{
-      position: 'absolute', zIndex: 20, right: 0, top: '100%', marginTop: 4,
-      background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
-      boxShadow: '0 4px 20px rgba(0,0,0,0.15)', padding: '12px 16px', minWidth: 200,
-    }}
-      onClick={e => e.stopPropagation()}
-    >
-      <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 10, color: 'var(--text)' }}>Platform Roles</div>
-      {loadingRoles ? (
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Loading…</div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'not-allowed', opacity: 0.6 }}>
-            <input type="checkbox" checked disabled />
-            User <span style={{ fontSize: 10, color: 'var(--muted)' }}>(default)</span>
-          </label>
-          {(platformRoles || []).filter(r => r.name !== 'User').map(r => (
-            <label key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={r.name === 'SuperAdmin' ? !!user.is_super_admin : assignedRoleIds.has(r.id)}
-                onChange={e => handleToggle(r, e.target.checked)}
-              />
-              {r.name}
-              {r.description && (
-                <span style={{ fontSize: 10, color: 'var(--muted)' }}>— {r.description}</span>
-              )}
-            </label>
-          ))}
+    <div className="ca-modal-overlay" onClick={onClose}>
+      <div className="ca-modal" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
+        <div className="ca-modal-header">
+          <div className="ca-modal-title">Edit Platform Roles</div>
+          <button className="ca-modal-close" onClick={onClose}>×</button>
         </div>
-      )}
-      <button
-        className="ca-btn ca-btn-ghost ca-btn-sm"
-        style={{ marginTop: 12, width: '100%', fontSize: 11 }}
-        onClick={onClose}
-      >Done</button>
+        <div className="ca-modal-body">
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>User</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{user.display_name || user.email}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{user.email}</div>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10 }}>Platform Roles</div>
+            {loadingRoles ? (
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Loading…</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'not-allowed', opacity: 0.6 }}>
+                  <input type="checkbox" checked disabled />
+                  <span>User</span>
+                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>(default — all users)</span>
+                </label>
+                {(platformRoles || []).filter(r => r.name !== 'User').map(r => (
+                  <label key={r.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      style={{ marginTop: 2 }}
+                      checked={r.name === 'SuperAdmin' ? !!user.is_super_admin : assignedRoleIds.has(r.id)}
+                      onChange={e => handleToggle(r, e.target.checked)}
+                    />
+                    <span>
+                      {r.name}
+                      {r.description && (
+                        <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{r.description}</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="ca-modal-footer">
+          <button className="ca-btn ca-btn-primary" onClick={onClose}>Done</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -428,24 +439,22 @@ function UsersTab({ users, allTeams, search, setSearch, showDeleted, setShowDele
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
                       {!u.deleted_at && u.id !== currentUser?.id && (
                         <>
-                          <div style={{ position: 'relative' }}>
-                            <Tooltip text="Edit platform roles">
-                              <button
-                                className="ca-btn ca-btn-ghost ca-btn-sm"
-                                style={{ padding: '4px 8px', fontSize: 11 }}
-                                onClick={e => { e.stopPropagation(); setEditRoleUserId(prev => prev === u.id ? null : u.id); }}
-                              >Edit Role</button>
-                            </Tooltip>
-                            {editRoleUserId === u.id && (
-                              <EditRolePanel
-                                user={u}
-                                platformRoles={platformRoles}
-                                onSetRole={onSetPlatformRole}
-                                onClose={() => setEditRoleUserId(null)}
-                                onRefresh={onChanged}
-                              />
-                            )}
-                          </div>
+                          <Tooltip text="Edit platform roles">
+                            <button
+                              className="ca-btn ca-btn-ghost ca-btn-sm"
+                              style={{ padding: '4px 8px', fontSize: 11 }}
+                              onClick={e => { e.stopPropagation(); setEditRoleUserId(u.id); }}
+                            >Edit Role</button>
+                          </Tooltip>
+                          {editRoleUserId === u.id && (
+                            <EditRoleModal
+                              user={u}
+                              platformRoles={platformRoles}
+                              onSetRole={onSetPlatformRole}
+                              onClose={() => setEditRoleUserId(null)}
+                              onRefresh={onChanged}
+                            />
+                          )}
                           <Tooltip text={u.is_super_admin ? 'Cannot impersonate a super admin' : isImpersonating ? 'Stop current impersonation first' : 'Impersonate'}>
                             <button
                               className="ca-btn ca-btn-ghost ca-btn-sm"
@@ -739,6 +748,11 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
                                             )}
                                           </span>
                                         ))}
+                                        {(m.platform_role_names || []).map(name => (
+                                          <span key={name} style={{ display: 'inline-block', padding: '1px 7px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: 'var(--surface2)', border: '1px solid var(--accent3)', color: 'var(--accent3)' }}>
+                                            {name}
+                                          </span>
+                                        ))}
                                         {!pendingRemoval && availRoles.length > 0 && (
                                           <select
                                             className="ca-input"
@@ -750,7 +764,7 @@ function TeamsTab({ teams, allUsers, plans, onRefresh, targetTeamId, onTeamExpan
                                             {availRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                           </select>
                                         )}
-                                        {(m.custom_roles || []).length === 0 && m.role !== 'owner' && (
+                                        {(m.custom_roles || []).length === 0 && (m.platform_role_names || []).length === 0 && m.role !== 'owner' && (
                                           <span style={{ fontSize: 10, color: 'var(--muted)' }}>No roles</span>
                                         )}
                                       </div>
@@ -1046,27 +1060,22 @@ function UserDetailPanel({ user, onClose, onNavigateToTeam, platformRoles,
 
       {!user.deleted_at && user.id !== currentUser?.id && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <div style={{ position: 'relative' }}>
-            <button
-              className="ca-btn ca-btn-ghost ca-btn-sm"
-              style={{ width: '100%' }}
-              onClick={() => setShowEditRole(p => !p)}
-            >
-              ⚙ Edit Role
-            </button>
-            {showEditRole && (
-              <>
-                <div style={{ position: 'fixed', inset: 0, zIndex: 19 }} onClick={() => setShowEditRole(false)} />
-                <EditRolePanel
-                  user={user}
-                  platformRoles={platformRoles}
-                  onSetRole={onSetPlatformRole}
-                  onClose={() => setShowEditRole(false)}
-                  onRefresh={onRefresh}
-                />
-              </>
-            )}
-          </div>
+          <button
+            className="ca-btn ca-btn-ghost ca-btn-sm"
+            style={{ width: '100%' }}
+            onClick={() => setShowEditRole(true)}
+          >
+            ⚙ Edit Role
+          </button>
+          {showEditRole && (
+            <EditRoleModal
+              user={user}
+              platformRoles={platformRoles}
+              onSetRole={onSetPlatformRole}
+              onClose={() => setShowEditRole(false)}
+              onRefresh={onRefresh}
+            />
+          )}
           <button
             className="ca-btn ca-btn-ghost ca-btn-sm"
             style={{ color: 'var(--accent3)', borderColor: 'var(--accent3)', opacity: (isImpersonating || user.is_super_admin) ? 0.4 : 1 }}
