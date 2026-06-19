@@ -59,8 +59,20 @@ class ECBScraper(BaseScraper):
             # Match Obs elements in any namespace
             if not (tag.endswith("}Obs") or tag == "Obs"):
                 continue
-            period = elem.get("TIME_PERIOD", "")
-            value = elem.get("OBS_VALUE")
+            # ECB SDMX-ML uses child elements ObsDimension/ObsValue
+            period = ""
+            value = None
+            for child in elem:
+                local = child.tag.split("}")[-1]
+                if local == "ObsDimension":
+                    period = child.get("value", "")
+                elif local == "ObsValue":
+                    value = child.get("value")
+            # Fallback: some SDMX flavours put period/value as attributes
+            if not period:
+                period = elem.get("TIME_PERIOD", "")
+            if value is None:
+                value = elem.get("OBS_VALUE")
             if not period or value is None:
                 continue
             try:

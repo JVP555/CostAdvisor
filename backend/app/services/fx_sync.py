@@ -61,7 +61,7 @@ def sync_fx_rates(db: Session) -> int:
             if existing:
                 existing.rate = iv.value
                 existing.uploaded_at = datetime.now(timezone.utc)
-                existing.uploaded_by = "00000000-0000-0000-0000-000000000000"
+                existing.uploaded_by = None
             else:
                 db.add(FxRate(
                     from_currency=from_ccy,
@@ -69,8 +69,7 @@ def sync_fx_rates(db: Session) -> int:
                     year=iv.year,
                     quarter=iv.quarter,
                     rate=iv.value,
-                    # Use a system UUID for automated syncs
-                    uploaded_by="00000000-0000-0000-0000-000000000000",
+                    uploaded_by=None,
                 ))
             count += 1
 

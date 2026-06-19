@@ -93,7 +93,7 @@ async def scrape_fx_rates(
             scraper_cls = SCRAPER_REGISTRY.get(commodity.name)
             if not scraper_cls:
                 continue
-            count = await scraper_cls(commodity.name).run(db)
+            count = await scraper_cls().run(db)
             scraped += count
             pairs.append(commodity.name)
         synced = sync_fx_rates(db)
