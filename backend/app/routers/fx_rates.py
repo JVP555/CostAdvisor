@@ -151,6 +151,31 @@ def delete_custom_fx_rate(
     db.commit()
 
 
+@router.delete("/custom-by-key", status_code=204)
+def delete_custom_fx_rate_by_key(
+    team_id: uuid.UUID = Query(...),
+    from_currency: str = Query(...),
+    to_currency: str = Query(...),
+    year: int = Query(...),
+    quarter: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a custom FX rate by natural key (pair + period) instead of UUID."""
+    require_permission(db, current_user, team_id, "fx_rates.edit")
+    rate = db.query(CustomFxRate).filter(
+        CustomFxRate.team_id == team_id,
+        CustomFxRate.from_currency == from_currency,
+        CustomFxRate.to_currency == to_currency,
+        CustomFxRate.year == year,
+        CustomFxRate.quarter == quarter,
+    ).first()
+    if not rate:
+        raise HTTPException(status_code=404, detail="Custom FX rate not found")
+    db.delete(rate)
+    db.commit()
+
+
 @router.post("/custom/copy-from-default", response_model=dict)
 def copy_default_fx_rates(
     team_id: uuid.UUID = Query(...),
