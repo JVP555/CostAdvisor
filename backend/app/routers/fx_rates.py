@@ -70,6 +70,38 @@ def upsert_fx_rate(
     return db.query(FxRate).filter(FxRate.id == rate_id).first()
 
 
+@router.post("/scrape")
+async def scrape_fx_rates(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger an on-demand ECB scrape for all FX-category commodities. Super admin only."""
+    require_super_admin(current_user)
+    from app.services.scraper import SCRAPER_REGISTRY
+    from app.services.fx_sync import sync_fx_rates
+    from app.models.index_data import CommodityIndex
+    from app.database import bypass_rls_var
+
+    bypass_rls_var.set(True)
+    try:
+        fx_commodities = db.query(CommodityIndex).filter(
+            CommodityIndex.category == "FX",
+            CommodityIndex.scrape_enabled == True,
+        ).all()
+        scraped, pairs = 0, []
+        for commodity in fx_commodities:
+            scraper_cls = SCRAPER_REGISTRY.get(commodity.name)
+            if not scraper_cls:
+                continue
+            count = await scraper_cls(commodity.name).run(db)
+            scraped += count
+            pairs.append(commodity.name)
+        synced = sync_fx_rates(db)
+        return {"scraped": scraped, "synced": synced, "pairs": pairs}
+    finally:
+        bypass_rls_var.set(False)
+
+
 @router.post("/upload")
 async def upload_fx_rates(
     file: UploadFile = File(...),

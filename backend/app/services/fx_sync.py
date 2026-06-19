@@ -5,6 +5,8 @@ After FX exchange rate indexes (EUR/USD, GBP/EUR, etc.) are scraped,
 this module copies their values into the fx_rates table so the cost
 engine and portfolio calculations can use them for currency conversion.
 """
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from app.models.index_data import CommodityIndex, IndexValue
@@ -58,6 +60,8 @@ def sync_fx_rates(db: Session) -> int:
 
             if existing:
                 existing.rate = iv.value
+                existing.uploaded_at = datetime.now(timezone.utc)
+                existing.uploaded_by = "00000000-0000-0000-0000-000000000000"
             else:
                 db.add(FxRate(
                     from_currency=from_ccy,

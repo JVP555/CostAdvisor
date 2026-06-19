@@ -298,8 +298,23 @@ function SyncModal({ teamId, onSynced, onClose }) {
 // ── Default tab ───────────────────────────────────────────────────────────────
 
 function DefaultTab({ user, defaultRates, loading, onRefresh, periods }) {
+  const { addToast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
+  const [scraping, setScraping] = useState(false);
   const scrollRef = useRef(null);
+
+  const handleScrape = async () => {
+    setScraping(true);
+    try {
+      const { data } = await api.post('/api/fx-rates/scrape');
+      addToast(`Synced ${data.synced} rates from ECB`, 'success');
+      onRefresh();
+    } catch {
+      addToast('ECB scrape failed', 'error');
+    } finally {
+      setScraping(false);
+    }
+  };
 
   useEffect(() => {
     if (!loading && scrollRef.current) {
@@ -328,24 +343,37 @@ function DefaultTab({ user, defaultRates, loading, onRefresh, periods }) {
         />
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <p className="ca-subtitle" style={{ margin: 0 }}>
-          Platform default exchange rates.{user?.is_super_admin ? '' : ' Managed by super admins.'}
-        </p>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {user?.is_super_admin && (
-            <>
-              <FileUpload endpoint="/api/fx-rates/upload" onSuccess={onRefresh} />
-              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowAdd(true)}>+ Add Rate</button>
-            </>
-          )}
-          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => defaultRates.length > 0 && exportCsv(
-            'fx_rates_default.csv',
-            ['From', 'To', 'Year', 'Quarter', 'Rate'],
-            defaultRates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate])
-          )}>Export CSV</button>
-        </div>
-      </div>
+      {(() => {
+        const lastSync = defaultRates.length > 0
+          ? new Date(Math.max(...defaultRates.map(r => new Date(r.uploaded_at)))).toLocaleString()
+          : null;
+        return (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <p className="ca-subtitle" style={{ margin: 0 }}>
+                Platform default exchange rates.{user?.is_super_admin ? '' : ' Managed by super admins.'}
+              </p>
+              {lastSync && <span style={{ fontSize: 11, color: 'var(--muted)' }}>Last sync: {lastSync}</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {user?.is_super_admin && (
+                <>
+                  <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={handleScrape} disabled={scraping}>
+                    {scraping ? 'Scraping…' : 'Scrape from ECB'}
+                  </button>
+                  <FileUpload endpoint="/api/fx-rates/upload" onSuccess={onRefresh} />
+                  <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowAdd(true)}>+ Add Rate</button>
+                </>
+              )}
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => defaultRates.length > 0 && exportCsv(
+                'fx_rates_default.csv',
+                ['From', 'To', 'Year', 'Quarter', 'Rate'],
+                defaultRates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate])
+              )}>Export CSV</button>
+            </div>
+          </div>
+        );
+      })()}
 
       {loading ? (
         <div className="ca-card" style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
