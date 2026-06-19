@@ -293,6 +293,15 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Costing engine threads `team_id` through all 14 `_apply_fx` call sites
   - 🟢 FX Rates section removed from Team → Settings; `FxRates.jsx` registered in App.jsx and Navbar after Formulas
   - 🟢 Write endpoints gated on `fx_rates.edit` permission (via FX Manager role or plan ceiling)
+  - 🟢 `fx_pairs` table: configurable currency pairs with scrape URLs + live rate column; seeded with 6 ECB pairs; replaces hardcoded `_FX_PAIR_MAP`
+  - 🟢 FX Pairs management section in Default tab (FX Manager / super admin): add/edit/delete pairs, per-row "Scrape Live Now", "Scrape All Live"
+  - 🟢 `custom_fx_rates` extended: `value_type` (fixed/live/quarter_ref), `ref_year`, `ref_quarter`; rate nullable
+  - 🟢 3-mode custom edit modal: fixed value / use live rate (dynamic) / point to a platform quarter
+  - 🟢 LIVE column in Custom tab showing each pair's daily scraped rate (read-only reference)
+  - 🟢 Multi-period Sync modal: per-pair accordion, per-quarter checkboxes, syncs N periods in one call
+  - 🟢 ECBUrlScraper + ECBLiveScraper (Q→D URL swap for daily rate); scrape_fx_live Celery task (daily 08:00 UTC)
+  - 🟢 fx_converter 3-branch: custom fixed → custom live → custom quarter_ref → platform quarterly → platform live fallback
+  - 🟢 Download Template CSV button in both Default and Custom upload areas
 
 - 🔴 **Scrum 15** — Polished exportable deliverable (clean PDF negotiation brief with verdict, gap, ranked drivers)
   - 🔴 "Export PDF" button on the Brief page
