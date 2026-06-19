@@ -9,6 +9,7 @@ from app.models.custom_fx_rate import CustomFxRate
 from app.routers.auth import get_current_user
 from app.schemas.fx_rate import FxRateOut, CustomFxRateOut, CustomFxRateUpsert
 from app.services.file_parser import parse_fx_upload
+from datetime import datetime, timezone
 from app.services.permissions import require_permission
 
 router = APIRouter()
@@ -149,6 +150,46 @@ def delete_custom_fx_rate(
         raise HTTPException(status_code=404, detail="Custom FX rate not found")
     db.delete(rate)
     db.commit()
+
+
+@router.post("/custom/upload")
+async def upload_custom_fx_rates(
+    team_id: uuid.UUID = Query(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bulk-upload custom FX rates from CSV/Excel for a team."""
+    require_permission(db, current_user, team_id, "fx_rates.edit")
+    content = await file.read()
+    filename = file.filename or "upload"
+    rows = parse_fx_upload(content, filename)
+    count = 0
+    for row in rows:
+        existing = db.query(CustomFxRate).filter(
+            CustomFxRate.team_id == team_id,
+            CustomFxRate.from_currency == row["from_currency"],
+            CustomFxRate.to_currency == row["to_currency"],
+            CustomFxRate.year == row["year"],
+            CustomFxRate.quarter == row["quarter"],
+        ).first()
+        if existing:
+            existing.rate = row["rate"]
+            existing.updated_by = current_user.id
+            existing.updated_at = datetime.now(timezone.utc)
+        else:
+            db.add(CustomFxRate(
+                team_id=team_id,
+                from_currency=row["from_currency"],
+                to_currency=row["to_currency"],
+                year=row["year"],
+                quarter=row["quarter"],
+                rate=row["rate"],
+                updated_by=current_user.id,
+            ))
+        count += 1
+    db.commit()
+    return {"status": "uploaded", "rows_processed": count, "filename": filename}
 
 
 @router.delete("/custom-by-key", status_code=204)

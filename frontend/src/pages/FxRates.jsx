@@ -346,6 +346,79 @@ function DefaultTab({ user, defaultRates, loading, onRefresh, periods }) {
   );
 }
 
+// ── Add Rate Modal (new pair not yet in grid) ────────────────────────────────
+
+function AddRateModal({ teamId, onSaved, onClose }) {
+  const { addToast } = useToast();
+  const [form, setForm] = useState({ from_currency: '', to_currency: '', year: new Date().getFullYear(), quarter: 1, rate: '' });
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    const rate = parseFloat(form.rate);
+    if (!form.from_currency || !form.to_currency || isNaN(rate) || rate <= 0) {
+      addToast('Fill in all fields with valid values', 'error'); return;
+    }
+    setSaving(true);
+    try {
+      await api.put('/api/fx-rates/custom', { ...form, team_id: teamId, rate });
+      addToast('Rate added', 'success');
+      onSaved();
+      onClose();
+    } catch {
+      addToast('Failed to save rate', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="ca-modal-overlay" onClick={onClose}>
+      <div className="ca-modal" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
+        <div className="ca-modal-header">
+          <div className="ca-modal-title">Add Custom Rate</div>
+          <button className="ca-modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="ca-modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label className="ca-label">From Currency</label>
+            <input className="ca-input" maxLength={3} placeholder="USD" value={form.from_currency}
+              onChange={e => setForm(f => ({ ...f, from_currency: e.target.value.toUpperCase() }))} />
+          </div>
+          <div>
+            <label className="ca-label">To Currency</label>
+            <input className="ca-input" maxLength={3} placeholder="EUR" value={form.to_currency}
+              onChange={e => setForm(f => ({ ...f, to_currency: e.target.value.toUpperCase() }))} />
+          </div>
+          <div>
+            <label className="ca-label">Year</label>
+            <input className="ca-input" type="number" value={form.year}
+              onChange={e => setForm(f => ({ ...f, year: parseInt(e.target.value) }))} />
+          </div>
+          <div>
+            <label className="ca-label">Quarter</label>
+            <select className="ca-select" value={form.quarter}
+              onChange={e => setForm(f => ({ ...f, quarter: parseInt(e.target.value) }))}>
+              {[1, 2, 3, 4].map(q => <option key={q} value={q}>Q{q}</option>)}
+            </select>
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label className="ca-label">Rate</label>
+            <input className="ca-input" type="number" step="0.000001" placeholder="1.000000" value={form.rate}
+              onChange={e => setForm(f => ({ ...f, rate: e.target.value }))}
+              onKeyDown={e => { if (e.key === 'Enter') save(); }} />
+          </div>
+        </div>
+        <div className="ca-modal-footer">
+          <button className="ca-btn ca-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="ca-btn ca-btn-primary" disabled={saving} onClick={save}>
+            {saving ? 'Saving…' : 'Add Rate'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Custom tab ────────────────────────────────────────────────────────────────
 
 function CustomTab({ teamId, canEdit, defaultRates }) {
@@ -353,6 +426,7 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
   const [customRates, setCustomRates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showSync, setShowSync] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [editCell, setEditCell] = useState(null); // { row, period, cell }
   const scrollRef = useRef(null);
 
@@ -415,6 +489,7 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
   return (
     <>
       {showSync && <SyncModal teamId={teamId} onSynced={fetchCustom} onClose={() => setShowSync(false)} />}
+      {showAdd && <AddRateModal teamId={teamId} onSaved={fetchCustom} onClose={() => setShowAdd(false)} />}
       {editCell && (
         <EditRateModal
           pair={{ from: editCell.row.from, to: editCell.row.to }}
@@ -434,8 +509,13 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
           {canEdit && ' Click any cell to set or edit a rate.'}
         </p>
         {canEdit && (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <FileUpload
+              endpoint={`/api/fx-rates/custom/upload?team_id=${teamId}`}
+              onSuccess={fetchCustom}
+            />
             <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setShowSync(true)}>Sync from Default</button>
+            <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowAdd(true)}>+ Add Rate</button>
           </div>
         )}
       </div>
