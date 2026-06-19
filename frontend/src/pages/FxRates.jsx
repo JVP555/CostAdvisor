@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../components/Toast';
 import FileUpload from '../components/FileUpload';
@@ -95,7 +96,7 @@ function EditRateModal({ pair, period, currentRate, defaultRate, periods, teamId
 
   const opts = periodOptions();
 
-  return (
+  return createPortal(
     <div className="ca-modal-overlay" onClick={onClose}>
       <div className="ca-modal" style={{ width: 420 }} onClick={e => e.stopPropagation()}>
         <div className="ca-modal-header">
@@ -179,7 +180,8 @@ function EditRateModal({ pair, period, currentRate, defaultRate, periods, teamId
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -257,7 +259,7 @@ function SyncModal({ teamId, onSynced, onClose }) {
     }
   };
 
-  return (
+  return createPortal(
     <div className="ca-modal-overlay" onClick={onClose}>
       <div className="ca-modal" style={{ width: 360 }} onClick={e => e.stopPropagation()}>
         <div className="ca-modal-header">
@@ -288,7 +290,8 @@ function SyncModal({ teamId, onSynced, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -383,7 +386,7 @@ function AddRateModal({ title, onSave, onClose }) {
     }
   };
 
-  return (
+  return createPortal(
     <div className="ca-modal-overlay" onClick={onClose}>
       <div className="ca-modal" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
         <div className="ca-modal-header">
@@ -427,7 +430,8 @@ function AddRateModal({ title, onSave, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
