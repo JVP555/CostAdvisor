@@ -28,10 +28,13 @@ class CustomFxRateOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class CustomFxRateUpsert(BaseModel):
-    team_id: uuid.UUID
+class FxRateUpsert(BaseModel):
     from_currency: str
     to_currency: str
     year: int
     quarter: int
     rate: float
+
+
+class CustomFxRateUpsert(FxRateUpsert):
+    team_id: uuid.UUID

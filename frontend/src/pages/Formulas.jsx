@@ -178,6 +178,7 @@ export default function Formulas() {
           template={editingTemplate}
           activeTeamId={activeTeamId}
           canEditPlatform={canEditPlatform}
+          canEditTeam={canEditTeam}
           commodities={commodities}
           onSaved={handleSaved}
           onClose={() => { setShowModal(false); setEditingTemplate(null); }}
@@ -251,15 +252,17 @@ function FormulaSection({ title, subtitle, rows, canEdit, onEdit, onDelete }) {
   );
 }
 
-function FormulaModal({ template, activeTeamId, canEditPlatform, commodities, onSaved, onClose, addToast }) {
+function FormulaModal({ template, activeTeamId, canEditPlatform, canEditTeam, commodities, onSaved, onClose, addToast }) {
   const isNew = !!template?._new;
+  // Default scope: platform-only users → platform; everyone else → team
+  const defaultScope = !canEditTeam && canEditPlatform ? 'platform' : 'team';
   const [name, setName] = useState(isNew ? '' : (template?.name || ''));
   const [description, setDescription] = useState(isNew ? '' : (template?.description || ''));
   const [scope, setScope] = useState(
-    isNew
-      ? (template?._platform ? 'platform' : 'team')
-      : (template?.team_id ? 'team' : 'platform')
+    isNew ? defaultScope : (template?.team_id ? 'team' : 'platform')
   );
+  // Toggle shown only when user has both permissions
+  const showScopeToggle = canEditPlatform && canEditTeam;
   const [expression, setExpression] = useState(isNew ? '' : (template?.expression || ''));
   const [vars, setVars] = useState(isNew ? {} : (template?.variables || {}));
   const [saving, setSaving] = useState(false);
@@ -342,7 +345,7 @@ function FormulaModal({ template, activeTeamId, canEditPlatform, commodities, on
             <input className="ca-input" value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" />
           </div>
 
-          {canEditPlatform && (
+          {showScopeToggle && (
             <div>
               <label className="ca-label">Scope</label>
               <div style={{ display: 'flex', gap: 8 }}>

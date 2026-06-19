@@ -295,6 +295,7 @@ function SyncModal({ teamId, onSynced, onClose }) {
 // ── Default tab ───────────────────────────────────────────────────────────────
 
 function DefaultTab({ user, defaultRates, loading, onRefresh, periods }) {
+  const [showAdd, setShowAdd] = useState(false);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -316,26 +317,38 @@ function DefaultTab({ user, defaultRates, loading, onRefresh, periods }) {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <p className="ca-subtitle" style={{ margin: 0 }}>Platform default exchange rates. Read-only — managed by super admins.</p>
-        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => defaultRates.length > 0 && exportCsv(
-          'fx_rates_default.csv',
-          ['From', 'To', 'Year', 'Quarter', 'Rate'],
-          defaultRates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate])
-        )}>Export CSV</button>
-      </div>
-
-      {user?.is_super_admin && (
-        <div style={{ marginBottom: 16 }}>
-          <FileUpload endpoint="/api/fx-rates/upload" onSuccess={onRefresh} />
-        </div>
+      {showAdd && (
+        <AddRateModal
+          title="Add Platform Rate"
+          onSave={form => api.put('/api/fx-rates/', form)}
+          onClose={() => { setShowAdd(false); onRefresh(); }}
+        />
       )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <p className="ca-subtitle" style={{ margin: 0 }}>
+          Platform default exchange rates.{user?.is_super_admin ? '' : ' Managed by super admins.'}
+        </p>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {user?.is_super_admin && (
+            <>
+              <FileUpload endpoint="/api/fx-rates/upload" onSuccess={onRefresh} />
+              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowAdd(true)}>+ Add Rate</button>
+            </>
+          )}
+          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => defaultRates.length > 0 && exportCsv(
+            'fx_rates_default.csv',
+            ['From', 'To', 'Year', 'Quarter', 'Rate'],
+            defaultRates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate])
+          )}>Export CSV</button>
+        </div>
+      </div>
 
       {loading ? (
         <div className="ca-card" style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
       ) : rows.length === 0 ? (
         <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
-          No FX rates found.{user?.is_super_admin ? ' Upload a CSV to get started.' : ' Ask a super admin to upload rates.'}
+          No FX rates found.{user?.is_super_admin ? ' Upload a CSV or add a rate to get started.' : ' Ask a super admin to upload rates.'}
         </div>
       ) : (
         <div className="ca-card">
@@ -346,9 +359,9 @@ function DefaultTab({ user, defaultRates, loading, onRefresh, periods }) {
   );
 }
 
-// ── Add Rate Modal (new pair not yet in grid) ────────────────────────────────
+// ── Add Rate Modal (shared by Default and Custom tabs) ───────────────────────
 
-function AddRateModal({ teamId, onSaved, onClose }) {
+function AddRateModal({ title, onSave, onClose }) {
   const { addToast } = useToast();
   const [form, setForm] = useState({ from_currency: '', to_currency: '', year: new Date().getFullYear(), quarter: 1, rate: '' });
   const [saving, setSaving] = useState(false);
@@ -360,9 +373,8 @@ function AddRateModal({ teamId, onSaved, onClose }) {
     }
     setSaving(true);
     try {
-      await api.put('/api/fx-rates/custom', { ...form, team_id: teamId, rate });
+      await onSave({ ...form, rate });
       addToast('Rate added', 'success');
-      onSaved();
       onClose();
     } catch {
       addToast('Failed to save rate', 'error');
@@ -375,7 +387,7 @@ function AddRateModal({ teamId, onSaved, onClose }) {
     <div className="ca-modal-overlay" onClick={onClose}>
       <div className="ca-modal" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
         <div className="ca-modal-header">
-          <div className="ca-modal-title">Add Custom Rate</div>
+          <div className="ca-modal-title">{title || 'Add Rate'}</div>
           <button className="ca-modal-close" onClick={onClose}>×</button>
         </div>
         <div className="ca-modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -489,7 +501,11 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
   return (
     <>
       {showSync && <SyncModal teamId={teamId} onSynced={fetchCustom} onClose={() => setShowSync(false)} />}
-      {showAdd && <AddRateModal teamId={teamId} onSaved={fetchCustom} onClose={() => setShowAdd(false)} />}
+      {showAdd && <AddRateModal
+        title="Add Custom Rate"
+        onSave={form => api.put('/api/fx-rates/custom', { ...form, team_id: teamId })}
+        onClose={() => { setShowAdd(false); fetchCustom(); }}
+      />}
       {editCell && (
         <EditRateModal
           pair={{ from: editCell.row.from, to: editCell.row.to }}
@@ -508,16 +524,22 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
           Team overrides (<span style={{ color: 'var(--accent4)' }}>highlighted</span>) take priority over platform defaults in all costing calculations.
           {canEdit && ' Click any cell to set or edit a rate.'}
         </p>
-        {canEdit && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <FileUpload
-              endpoint={`/api/fx-rates/custom/upload?team_id=${teamId}`}
-              onSuccess={fetchCustom}
-            />
-            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setShowSync(true)}>Sync from Default</button>
-            <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowAdd(true)}>+ Add Rate</button>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {canEdit && (
+            <>
+              <FileUpload
+                endpoint={`/api/fx-rates/custom/upload?team_id=${teamId}`}
+                onSuccess={fetchCustom}
+              />
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setShowSync(true)}>Sync from Default</button>
+              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowAdd(true)}>+ Add Rate</button>
+            </>
+          )}
+          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => {
+            const flat = customRates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate]);
+            exportCsv('fx_rates_custom.csv', ['From', 'To', 'Year', 'Quarter', 'Rate'], flat);
+          }}>Export CSV</button>
+        </div>
       </div>
 
       {loading ? (
@@ -530,12 +552,6 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
         </div>
       ) : (
         <div className="ca-card">
-          <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => {
-              const flat = customRates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate]);
-              exportCsv('fx_rates_custom.csv', ['From', 'To', 'Year', 'Quarter', 'Rate'], flat);
-            }}>Export CSV</button>
-          </div>
           <RateGrid
             periods={periods}
             rows={rows}

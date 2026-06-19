@@ -28,8 +28,8 @@ export default function Navbar() {
   const tabs = [
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/indexes', label: 'Indexes' },
-    { path: '/formulas', label: 'Formulas' },
     { path: '/fx-rates', label: 'FX Rates' },
+    { path: '/formulas', label: 'Formulas' },
     { path: '/suppliers', label: 'Suppliers' },
     { path: '/team', label: 'Team', badge: pendingInviteCount || 0 },
     ...(user?.is_super_admin ? [{ path: '/admin', label: 'Admin' }] : []),

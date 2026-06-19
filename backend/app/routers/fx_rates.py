@@ -7,7 +7,7 @@ from app.models.user import User
 from app.models.fx_rate import FxRate
 from app.models.custom_fx_rate import CustomFxRate
 from app.routers.auth import get_current_user
-from app.schemas.fx_rate import FxRateOut, CustomFxRateOut, CustomFxRateUpsert
+from app.schemas.fx_rate import FxRateOut, FxRateUpsert, CustomFxRateOut, CustomFxRateUpsert
 from app.services.file_parser import parse_fx_upload
 from datetime import datetime, timezone
 from app.services.permissions import require_permission
@@ -33,6 +33,41 @@ def list_fx_rates(
     if to_currency:
         query = query.filter(FxRate.to_currency == to_currency)
     return query.order_by(FxRate.year, FxRate.quarter).all()
+
+
+@router.put("/", response_model=FxRateOut)
+def upsert_fx_rate(
+    payload: FxRateUpsert,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upsert a single platform default FX rate. Super admin only."""
+    require_super_admin(current_user)
+    existing = db.query(FxRate).filter(
+        FxRate.from_currency == payload.from_currency,
+        FxRate.to_currency == payload.to_currency,
+        FxRate.year == payload.year,
+        FxRate.quarter == payload.quarter,
+    ).first()
+    if existing:
+        existing.rate = payload.rate
+        existing.uploaded_by = current_user.id
+        existing.uploaded_at = datetime.now(timezone.utc)
+    else:
+        existing = FxRate(
+            from_currency=payload.from_currency,
+            to_currency=payload.to_currency,
+            year=payload.year,
+            quarter=payload.quarter,
+            rate=payload.rate,
+            uploaded_by=current_user.id,
+        )
+        db.add(existing)
+    db.flush()
+    rate_id = existing.id
+    db.expunge(existing)
+    db.commit()
+    return db.query(FxRate).filter(FxRate.id == rate_id).first()
 
 
 @router.post("/upload")
