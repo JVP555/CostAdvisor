@@ -1,16 +1,22 @@
+import io
+import csv
 import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, bypass_rls_var
 from app.models.user import User
 from app.models.fx_rate import FxRate
 from app.models.custom_fx_rate import CustomFxRate
+from app.models.fx_pair import FxPair
 from app.routers.auth import get_current_user
 from app.schemas.fx_rate import FxRateOut, FxRateUpsert, CustomFxRateOut, CustomFxRateUpsert
+from app.schemas.fx_pair import FxPairOut, FxPairCreate, FxPairUpdate
 from app.services.file_parser import parse_fx_upload
-from datetime import datetime, timezone
-from app.services.permissions import require_permission
+from app.services.permissions import require_permission, has_platform_permission, require_platform_permission
 
 router = APIRouter()
 
@@ -19,6 +25,162 @@ def require_super_admin(user: User):
     if not user.is_super_admin:
         raise HTTPException(status_code=403, detail="Super admin required")
 
+
+def require_fx_manager(db: Session, user: User):
+    """FX Manager platform permission OR super admin."""
+    if user.is_super_admin:
+        return
+    require_platform_permission(db, user, "fx_rates.edit")
+
+
+# ── FX Pairs (platform-level) ─────────────────────────────────────────────────
+
+@router.get("/pairs", response_model=list[FxPairOut])
+def list_fx_pairs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return db.query(FxPair).order_by(FxPair.name).all()
+
+
+@router.post("/pairs", response_model=FxPairOut)
+def create_fx_pair(
+    payload: FxPairCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_fx_manager(db, current_user)
+    existing = db.query(FxPair).filter(
+        FxPair.from_currency == payload.from_currency,
+        FxPair.to_currency == payload.to_currency,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Pair already exists")
+    pair = FxPair(
+        from_currency=payload.from_currency.upper(),
+        to_currency=payload.to_currency.upper(),
+        name=payload.name,
+        source_type=payload.source_type,
+        scrape_url=payload.scrape_url,
+        scrape_enabled=payload.scrape_enabled,
+        created_by=current_user.id,
+    )
+    db.add(pair)
+    db.flush()
+    pair_id = pair.id
+    db.expunge(pair)
+    db.commit()
+    return db.query(FxPair).filter(FxPair.id == pair_id).first()
+
+
+@router.put("/pairs/{pair_id}", response_model=FxPairOut)
+def update_fx_pair(
+    pair_id: int,
+    payload: FxPairUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_fx_manager(db, current_user)
+    pair = db.query(FxPair).filter(FxPair.id == pair_id).first()
+    if not pair:
+        raise HTTPException(status_code=404, detail="FX pair not found")
+    if payload.name is not None:
+        pair.name = payload.name
+    if payload.source_type is not None:
+        pair.source_type = payload.source_type
+    if payload.scrape_url is not None:
+        pair.scrape_url = payload.scrape_url
+    if payload.scrape_enabled is not None:
+        pair.scrape_enabled = payload.scrape_enabled
+    db.flush()
+    db.expunge(pair)
+    db.commit()
+    return db.query(FxPair).filter(FxPair.id == pair_id).first()
+
+
+@router.delete("/pairs/{pair_id}", status_code=204)
+def delete_fx_pair(
+    pair_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_fx_manager(db, current_user)
+    pair = db.query(FxPair).filter(FxPair.id == pair_id).first()
+    if not pair:
+        raise HTTPException(status_code=404, detail="FX pair not found")
+    db.delete(pair)
+    db.commit()
+
+
+@router.post("/pairs/{pair_id}/scrape-live")
+async def scrape_pair_live(
+    pair_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger an on-demand live rate scrape for a single FX pair."""
+    require_fx_manager(db, current_user)
+    pair = db.query(FxPair).filter(FxPair.id == pair_id).first()
+    if not pair:
+        raise HTTPException(status_code=404, detail="FX pair not found")
+    if not pair.scrape_url:
+        raise HTTPException(status_code=400, detail="Pair has no scrape URL configured")
+
+    bypass_rls_var.set(True)
+    try:
+        if pair.source_type == "ecb":
+            from app.services.scrapers.ecb import ECBLiveScraper
+            live = await ECBLiveScraper(pair.name, pair.scrape_url).fetch_live()
+        else:
+            live = None
+
+        if live is None:
+            raise HTTPException(status_code=502, detail="No live rate returned from source")
+
+        pair.live_rate = live
+        pair.live_scraped_at = datetime.now(timezone.utc)
+        db.flush()
+        db.expunge(pair)
+        db.commit()
+        refreshed = db.query(FxPair).filter(FxPair.id == pair_id).first()
+        return {"pair": pair.name, "live_rate": live, "scraped_at": refreshed.live_scraped_at}
+    finally:
+        bypass_rls_var.set(False)
+
+
+@router.post("/scrape-live")
+async def scrape_all_pairs_live(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger live rate scrape for all enabled FX pairs."""
+    require_fx_manager(db, current_user)
+    bypass_rls_var.set(True)
+    try:
+        from app.services.scrapers.ecb import ECBLiveScraper
+        pairs = db.query(FxPair).filter(
+            FxPair.scrape_enabled == True,  # noqa: E712
+            FxPair.scrape_url != None,  # noqa: E711
+        ).all()
+        results = {}
+        for pair in pairs:
+            if pair.source_type == "ecb":
+                live = await ECBLiveScraper(pair.name, pair.scrape_url).fetch_live()
+            else:
+                live = None
+            if live is not None:
+                pair.live_rate = live
+                pair.live_scraped_at = datetime.now(timezone.utc)
+                results[pair.name] = live
+            else:
+                results[pair.name] = None
+        db.commit()
+        return {"results": results}
+    finally:
+        bypass_rls_var.set(False)
+
+
+# ── Platform default quarterly rates ─────────────────────────────────────────
 
 @router.get("/", response_model=list[FxRateOut])
 def list_fx_rates(
@@ -41,8 +203,7 @@ def upsert_fx_rate(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Upsert a single platform default FX rate. Super admin only."""
-    require_super_admin(current_user)
+    require_fx_manager(db, current_user)
     existing = db.query(FxRate).filter(
         FxRate.from_currency == payload.from_currency,
         FxRate.to_currency == payload.to_currency,
@@ -76,8 +237,7 @@ def delete_fx_rate(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete a platform default FX rate. Super admin only."""
-    require_super_admin(current_user)
+    require_fx_manager(db, current_user)
     rate = db.query(FxRate).filter(FxRate.id == rate_id).first()
     if not rate:
         raise HTTPException(status_code=404, detail="FX rate not found")
@@ -90,18 +250,19 @@ async def scrape_fx_rates(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Trigger an on-demand ECB scrape for all FX-category commodities. Super admin only."""
-    require_super_admin(current_user)
+    """Trigger an on-demand quarterly scrape for all ECB FX pairs."""
+    require_fx_manager(db, current_user)
     from app.services.scraper import SCRAPER_REGISTRY
     from app.services.fx_sync import sync_fx_rates
     from app.models.index_data import CommodityIndex
-    from app.database import bypass_rls_var
+    from app.services.scrapers.ecb import ECBUrlScraper
 
     bypass_rls_var.set(True)
     try:
+        # Scrape via registered commodity scrapers (legacy path)
         fx_commodities = db.query(CommodityIndex).filter(
             CommodityIndex.category == "FX",
-            CommodityIndex.scrape_enabled == True,
+            CommodityIndex.scrape_enabled == True,  # noqa: E712
         ).all()
         scraped, pairs = 0, []
         for commodity in fx_commodities:
@@ -111,6 +272,25 @@ async def scrape_fx_rates(
             count = await scraper_cls().run(db)
             scraped += count
             pairs.append(commodity.name)
+
+        # Also scrape any fx_pairs rows with source_type=ecb that aren't in SCRAPER_REGISTRY
+        db_pairs = db.query(FxPair).filter(
+            FxPair.scrape_enabled == True,  # noqa: E712
+            FxPair.source_type == "ecb",
+            FxPair.scrape_url != None,  # noqa: E711
+        ).all()
+        for fp in db_pairs:
+            if fp.name in SCRAPER_REGISTRY:
+                continue  # already scraped above
+            try:
+                from app.services.scraper import BaseScraper
+                url_scraper = ECBUrlScraper(fp.name, fp.scrape_url)
+                count = await url_scraper.run(db)
+                scraped += count
+                pairs.append(fp.name)
+            except Exception:
+                pass
+
         synced = sync_fx_rates(db)
         return {"scraped": scraped, "synced": synced, "pairs": pairs}
     finally:
@@ -123,12 +303,10 @@ async def upload_fx_rates(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_super_admin(current_user)
-
+    require_fx_manager(db, current_user)
     content = await file.read()
     filename = file.filename or "upload"
     rows = parse_fx_upload(content, filename)
-
     count = 0
     for row in rows:
         existing = db.query(FxRate).filter(
@@ -137,27 +315,74 @@ async def upload_fx_rates(
             FxRate.year == row["year"],
             FxRate.quarter == row["quarter"],
         ).first()
-
         if existing:
             existing.rate = row["rate"]
             existing.uploaded_by = current_user.id
         else:
-            fx = FxRate(
+            db.add(FxRate(
                 from_currency=row["from_currency"],
                 to_currency=row["to_currency"],
                 year=row["year"],
                 quarter=row["quarter"],
                 rate=row["rate"],
                 uploaded_by=current_user.id,
-            )
-            db.add(fx)
+            ))
         count += 1
-
     db.commit()
     return {"status": "uploaded", "rows_processed": count, "filename": filename}
 
 
+@router.get("/template")
+def download_template(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return a CSV template pre-populated with known pairs and recent quarters."""
+    pairs = db.query(FxPair).order_by(FxPair.name).all()
+
+    # Build 5 recent quarters relative to now
+    now = datetime.now(timezone.utc)
+    current_year = now.year
+    current_q = (now.month - 1) // 3 + 1
+    quarters = []
+    y, q = current_year, current_q
+    for _ in range(5):
+        quarters.append((y, q))
+        q -= 1
+        if q == 0:
+            q = 4
+            y -= 1
+    quarters.reverse()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["from_currency", "to_currency", "period", "rate"])
+    for pair in pairs[:10]:  # cap at 10 pairs to keep template readable
+        for yr, qt in quarters:
+            writer.writerow([pair.from_currency, pair.to_currency, f"Q{qt}-{yr}", ""])
+    if not pairs:
+        writer.writerow(["EUR", "USD", "Q1-2026", "1.0800"])
+        writer.writerow(["GBP", "EUR", "Q1-2026", "1.1700"])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=fx_rates_template.csv"},
+    )
+
+
 # ── Custom team FX rates ──────────────────────────────────────────────────────
+
+@router.get("/can-manage-pairs")
+def can_manage_pairs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Check whether the current user can create/edit/delete FX pairs (FX Manager or super admin)."""
+    ok = current_user.is_super_admin or has_platform_permission(db, current_user, "fx_rates.edit")
+    return {"can_manage": ok}
+
 
 @router.get("/can-edit-custom")
 def can_edit_custom(
@@ -196,8 +421,12 @@ def upsert_custom_fx_rate(
         CustomFxRate.quarter == payload.quarter,
     ).first()
     if existing:
-        existing.rate = payload.rate
+        existing.value_type = payload.value_type
+        existing.rate = payload.rate if payload.value_type == "fixed" else None
+        existing.ref_year = payload.ref_year
+        existing.ref_quarter = payload.ref_quarter
         existing.updated_by = current_user.id
+        existing.updated_at = datetime.now(timezone.utc)
     else:
         existing = CustomFxRate(
             team_id=payload.team_id,
@@ -205,7 +434,10 @@ def upsert_custom_fx_rate(
             to_currency=payload.to_currency,
             year=payload.year,
             quarter=payload.quarter,
-            rate=payload.rate,
+            value_type=payload.value_type,
+            rate=payload.rate if payload.value_type == "fixed" else None,
+            ref_year=payload.ref_year,
+            ref_quarter=payload.ref_quarter,
             updated_by=current_user.id,
         )
         db.add(existing)
@@ -241,7 +473,6 @@ async def upload_custom_fx_rates(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Bulk-upload custom FX rates from CSV/Excel for a team."""
     require_permission(db, current_user, team_id, "fx_rates.edit")
     content = await file.read()
     filename = file.filename or "upload"
@@ -256,7 +487,10 @@ async def upload_custom_fx_rates(
             CustomFxRate.quarter == row["quarter"],
         ).first()
         if existing:
+            existing.value_type = "fixed"
             existing.rate = row["rate"]
+            existing.ref_year = None
+            existing.ref_quarter = None
             existing.updated_by = current_user.id
             existing.updated_at = datetime.now(timezone.utc)
         else:
@@ -266,6 +500,7 @@ async def upload_custom_fx_rates(
                 to_currency=row["to_currency"],
                 year=row["year"],
                 quarter=row["quarter"],
+                value_type="fixed",
                 rate=row["rate"],
                 updated_by=current_user.id,
             ))
@@ -284,7 +519,6 @@ def delete_custom_fx_rate_by_key(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete a custom FX rate by natural key (pair + period) instead of UUID."""
     require_permission(db, current_user, team_id, "fx_rates.edit")
     rate = db.query(CustomFxRate).filter(
         CustomFxRate.team_id == team_id,
@@ -299,6 +533,69 @@ def delete_custom_fx_rate_by_key(
     db.commit()
 
 
+@router.post("/custom/sync-periods")
+def sync_custom_periods(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Multi-currency, multi-period sync from platform defaults into custom overrides.
+
+    Body: {
+      "team_id": "...",
+      "selections": [
+        {"from_currency": "EUR", "to_currency": "USD", "periods": [{"year": 2026, "quarter": 1}]}
+      ]
+    }
+    """
+    team_id = uuid.UUID(str(payload["team_id"]))
+    require_permission(db, current_user, team_id, "fx_rates.edit")
+    selections = payload.get("selections", [])
+    count = 0
+    for sel in selections:
+        from_c = sel["from_currency"]
+        to_c = sel["to_currency"]
+        for period in sel.get("periods", []):
+            y, q = period["year"], period["quarter"]
+            default = db.query(FxRate).filter(
+                FxRate.from_currency == from_c,
+                FxRate.to_currency == to_c,
+                FxRate.year == y,
+                FxRate.quarter == q,
+            ).first()
+            if not default:
+                continue
+            existing = db.query(CustomFxRate).filter(
+                CustomFxRate.team_id == team_id,
+                CustomFxRate.from_currency == from_c,
+                CustomFxRate.to_currency == to_c,
+                CustomFxRate.year == y,
+                CustomFxRate.quarter == q,
+            ).first()
+            if existing:
+                existing.value_type = "fixed"
+                existing.rate = default.rate
+                existing.ref_year = None
+                existing.ref_quarter = None
+                existing.updated_by = current_user.id
+                existing.updated_at = datetime.now(timezone.utc)
+            else:
+                db.add(CustomFxRate(
+                    team_id=team_id,
+                    from_currency=from_c,
+                    to_currency=to_c,
+                    year=y,
+                    quarter=q,
+                    value_type="fixed",
+                    rate=default.rate,
+                    updated_by=current_user.id,
+                ))
+            count += 1
+    db.commit()
+    return {"synced": count}
+
+
 @router.post("/custom/copy-from-default", response_model=dict)
 def copy_default_fx_rates(
     team_id: uuid.UUID = Query(...),
@@ -307,7 +604,7 @@ def copy_default_fx_rates(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Copy all platform default rates for a given year/quarter into team custom overrides."""
+    """Copy all platform default rates for one period into team custom overrides (legacy)."""
     require_permission(db, current_user, team_id, "fx_rates.edit")
     defaults = db.query(FxRate).filter(
         FxRate.year == year,
@@ -323,6 +620,7 @@ def copy_default_fx_rates(
             CustomFxRate.quarter == d.quarter,
         ).first()
         if existing:
+            existing.value_type = "fixed"
             existing.rate = d.rate
             existing.updated_by = current_user.id
         else:
@@ -332,6 +630,7 @@ def copy_default_fx_rates(
                 to_currency=d.to_currency,
                 year=d.year,
                 quarter=d.quarter,
+                value_type="fixed",
                 rate=d.rate,
                 updated_by=current_user.id,
             ))

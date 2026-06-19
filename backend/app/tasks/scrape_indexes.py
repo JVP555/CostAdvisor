@@ -85,6 +85,43 @@ def scrape_team_sources():
         db.close()
 
 
+@celery_app.task(name="app.tasks.scrape_indexes.scrape_fx_live")
+def scrape_fx_live():
+    """Fetch today's live rate for all enabled FX pairs and store in fx_pairs.live_rate."""
+    from app.models.fx_pair import FxPair
+    from app.services.scrapers.ecb import ECBLiveScraper
+
+    bypass_rls_var.set(True)
+    db = SessionLocal()
+    try:
+        pairs = db.query(FxPair).filter(
+            FxPair.scrape_enabled == True,  # noqa: E712
+            FxPair.scrape_url != None,  # noqa: E711
+        ).all()
+
+        results = {}
+        for pair in pairs:
+            try:
+                if pair.source_type == "ecb":
+                    live = asyncio.run(ECBLiveScraper(pair.name, pair.scrape_url).fetch_live())
+                else:
+                    live = None
+
+                if live is not None:
+                    pair.live_rate = live
+                    pair.live_scraped_at = datetime.now(timezone.utc)
+                    results[pair.name] = f"ok:{live}"
+                else:
+                    results[pair.name] = "no_data"
+            except Exception as exc:
+                results[pair.name] = f"error:{exc}"
+
+        db.commit()
+        return results
+    finally:
+        db.close()
+
+
 def _upsert_override(db, source: TeamIndexSource, value: float):
     """Write a scraped value into IndexOverride for the current quarter."""
     now = datetime.now(timezone.utc)
