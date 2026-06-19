@@ -300,13 +300,25 @@ async def scrape_fx_rates(
 @router.post("/upload")
 async def upload_fx_rates(
     file: UploadFile = File(...),
+    dry_run: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     require_fx_manager(db, current_user)
     content = await file.read()
     filename = file.filename or "upload"
-    rows = parse_fx_upload(content, filename)
+
+    try:
+        result = parse_fx_upload(content, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    rows = result["rows"]
+    parse_errors = result["errors"]
+
+    if dry_run:
+        return {"rows_processed": len(rows), "errors": parse_errors, "dry_run": True, "filename": filename}
+
     count = 0
     for row in rows:
         existing = db.query(FxRate).filter(
@@ -329,7 +341,7 @@ async def upload_fx_rates(
             ))
         count += 1
     db.commit()
-    return {"status": "uploaded", "rows_processed": count, "filename": filename}
+    return {"status": "uploaded", "rows_processed": count, "errors": parse_errors, "filename": filename}
 
 
 @router.get("/template")
@@ -470,13 +482,25 @@ def delete_custom_fx_rate(
 async def upload_custom_fx_rates(
     team_id: uuid.UUID = Query(...),
     file: UploadFile = File(...),
+    dry_run: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     require_permission(db, current_user, team_id, "fx_rates.edit")
     content = await file.read()
     filename = file.filename or "upload"
-    rows = parse_fx_upload(content, filename)
+
+    try:
+        result = parse_fx_upload(content, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    rows = result["rows"]
+    parse_errors = result["errors"]
+
+    if dry_run:
+        return {"rows_processed": len(rows), "errors": parse_errors, "dry_run": True, "filename": filename}
+
     count = 0
     for row in rows:
         existing = db.query(CustomFxRate).filter(
@@ -506,7 +530,7 @@ async def upload_custom_fx_rates(
             ))
         count += 1
     db.commit()
-    return {"status": "uploaded", "rows_processed": count, "filename": filename}
+    return {"status": "uploaded", "rows_processed": count, "errors": parse_errors, "filename": filename}
 
 
 @router.delete("/custom-by-key", status_code=204)

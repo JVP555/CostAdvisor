@@ -12,6 +12,8 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
   const [saving, setSaving] = useState(false);
   const [scraping, setScraping] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadPreview, setUploadPreview] = useState(null);
+  const [pendingFile, setPendingFile] = useState(null);
   const [message, setMessage] = useState(null);
   const [detectedSource, setDetectedSource] = useState(null);
   const fileRef = useRef(null);
@@ -81,22 +83,41 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setUploading(true);
     setMessage(null);
+    setUploadPreview(null);
     const formData = new FormData();
     formData.append('file', file);
+    try {
+      const res = await api.post(`/api/indexes/overrides?team_id=${teamId}&dry_run=true`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setPendingFile(file);
+      setUploadPreview({ filename: res.data.filename || file.name, rows_processed: res.data.rows_processed, errors: res.data.errors || [] });
+    } catch (err) {
+      setMessage({ type: 'error', text: formatApiError(err) });
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!pendingFile) return;
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', pendingFile);
     try {
       const res = await api.post(`/api/indexes/overrides?team_id=${teamId}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      const count = res.data?.rows_processed ?? res.data?.count ?? '?';
-      setMessage({ type: 'success', text: `${count} row(s) uploaded.` });
+      const count = res.data?.rows_processed ?? '?';
+      setMessage({ type: 'success', text: `${count} row(s) imported.` });
+      setUploadPreview(null);
+      setPendingFile(null);
       onSourceChanged(source);
     } catch (err) {
       setMessage({ type: 'error', text: formatApiError(err) });
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
@@ -234,6 +255,14 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
             )}
             {source?.source_type === 'upload' && (
               <>
+                <a
+                  href={`/api/indexes/template?team_id=${teamId}`}
+                  download="index_overrides_template.csv"
+                  className="ca-btn ca-btn-ghost ca-btn-sm"
+                  style={{ fontSize: 11 }}
+                >
+                  Template
+                </a>
                 <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} style={{ display: 'none' }} />
                 <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
                   {uploading ? 'Uploading...' : 'Upload CSV / Excel'}
@@ -249,7 +278,37 @@ export default function IndexDetailPanel({ commodity_id, commodity_name, region,
               </button>
             )}
           </div>
-          {source?.source_type === 'upload' && (
+          {uploadPreview && (
+            <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                    {uploadPreview.filename} &middot; {uploadPreview.rows_processed} row{uploadPreview.rows_processed !== 1 ? 's' : ''} ready
+                  </div>
+                  {uploadPreview.errors.length > 0 && (
+                    <div style={{ color: 'var(--warning, #92400e)' }}>
+                      <span style={{ fontWeight: 600 }}>{uploadPreview.errors.length} row{uploadPreview.errors.length !== 1 ? 's' : ''} skipped:</span>
+                      <ul style={{ margin: '3px 0 0 14px', padding: 0 }}>
+                        {uploadPreview.errors.slice(0, 4).map((e, i) => <li key={i}>{e.row ? `Row ${e.row}: ` : ''}{e.message}</li>)}
+                        {uploadPreview.errors.length > 4 && <li>…and {uploadPreview.errors.length - 4} more</li>}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => { setUploadPreview(null); setPendingFile(null); }}>Cancel</button>
+                  <button
+                    className="ca-btn ca-btn-primary ca-btn-sm"
+                    onClick={handleConfirmUpload}
+                    disabled={uploading || uploadPreview.rows_processed === 0}
+                  >
+                    {uploading ? 'Importing…' : `Import ${uploadPreview.rows_processed}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {source?.source_type === 'upload' && !uploadPreview && (
             <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 14 }}>
               CSV columns: <code>material</code>, <code>region</code>, <code>period</code> (Q1-2024), <code>value</code>
             </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../components/Toast';
 import api from '../api';
+import exportCsv from '../utils/exportCsv';
 
 export default function Formulas() {
   const { activeTeamId, user } = useAuth();
@@ -192,11 +193,32 @@ export default function Formulas() {
 function FormulaSection({ title, subtitle, rows, canEdit, onEdit, onDelete }) {
   if (rows.length === 0 && !canEdit) return null;
 
+  const handleExport = () => {
+    exportCsv(
+      `formulas_${title.toLowerCase().replace(/\s+/g, '_')}.csv`,
+      ['Name', 'Description', 'Expression', 'Variables', 'Created By'],
+      rows.map(t => [
+        t.name,
+        t.description || '',
+        t.expression || '',
+        t.variables ? Object.keys(t.variables).join(', ') : '',
+        t.creator_email || '',
+      ])
+    );
+  };
+
   return (
     <div style={{ marginBottom: 32 }}>
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>{title}</div>
-        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{subtitle}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>{title}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>{subtitle}</div>
+        </div>
+        {rows.length > 0 && (
+          <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }} onClick={handleExport}>
+            Export CSV
+          </button>
+        )}
       </div>
       {rows.length === 0 ? (
         <div style={{

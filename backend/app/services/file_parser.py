@@ -43,28 +43,56 @@ def _read_file(content: bytes, filename: str) -> pd.DataFrame:
     return df
 
 
-def parse_index_upload(content: bytes, filename: str) -> list[dict]:
+def parse_index_upload(content: bytes, filename: str) -> dict:
     """
     Parse index override upload.
     Expected columns: material, region, period, value
+
+    Returns {"rows": [...], "errors": [{"row": N, "message": "..."}]}.
+    Raises ValueError only for structural issues (missing required columns).
     """
     df = _read_file(content, filename)
 
     required = {"material", "region", "period", "value"}
-    if not required.issubset(set(df.columns)):
-        raise ValueError(f"Missing columns. Required: {required}. Found: {set(df.columns)}")
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"Missing required column(s): {', '.join(sorted(missing))}. "
+            f"Expected: material, region, period, value."
+        )
 
     rows = []
-    for _, row in df.iterrows():
-        year, quarter = _parse_period(str(row["period"]))
+    errors = []
+    for idx, row in df.iterrows():
+        row_num = int(idx) + 2
+        try:
+            year, quarter = _parse_period(str(row["period"]))
+        except ValueError:
+            errors.append({
+                "row": row_num,
+                "message": f"Invalid period '{row['period']}'. Use format Q1-2023 or 2023-Q1.",
+            })
+            continue
+        try:
+            value = float(row["value"])
+        except (ValueError, TypeError):
+            errors.append({
+                "row": row_num,
+                "message": f"Invalid value '{row['value']}'. Must be a number.",
+            })
+            continue
+        material = str(row["material"]).strip()
+        if not material:
+            errors.append({"row": row_num, "message": "Material cannot be empty."})
+            continue
         rows.append({
-            "material": str(row["material"]).strip(),
+            "material": material,
             "region": str(row["region"]).strip(),
             "year": year,
             "quarter": quarter,
-            "value": float(row["value"]),
+            "value": value,
         })
-    return rows
+    return {"rows": rows, "errors": errors}
 
 
 def parse_price_upload(content: bytes, filename: str) -> dict:
@@ -123,52 +151,97 @@ def parse_price_upload(content: bytes, filename: str) -> dict:
     return {"rows": rows, "errors": errors}
 
 
-def parse_volume_upload(content: bytes, filename: str) -> list[dict]:
+def parse_volume_upload(content: bytes, filename: str) -> dict:
     """
     Parse actual volume upload.
     Expected columns: period, volume
     Optional column: unit
+
+    Returns {"rows": [...], "errors": [{"row": N, "message": "..."}]}.
+    Raises ValueError only for structural issues (missing required columns).
     """
     df = _read_file(content, filename)
 
     required = {"period", "volume"}
-    if not required.issubset(set(df.columns)):
-        raise ValueError(f"Missing columns. Required: {required}. Found: {set(df.columns)}")
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"Missing required column(s): {', '.join(sorted(missing))}. "
+            f"Expected: period, volume. Optional: unit."
+        )
 
     has_unit = "unit" in df.columns
     rows = []
-    for _, row in df.iterrows():
-        year, quarter = _parse_period(str(row["period"]))
-        entry = {
-            "year": year,
-            "quarter": quarter,
-            "volume": float(row["volume"]),
-        }
+    errors = []
+    for idx, row in df.iterrows():
+        row_num = int(idx) + 2
+        try:
+            year, quarter = _parse_period(str(row["period"]))
+        except ValueError:
+            errors.append({
+                "row": row_num,
+                "message": f"Invalid period '{row['period']}'. Use format Q1-2023 or 2023-Q1.",
+            })
+            continue
+        try:
+            volume = float(row["volume"])
+        except (ValueError, TypeError):
+            errors.append({
+                "row": row_num,
+                "message": f"Invalid volume '{row['volume']}'. Must be a number.",
+            })
+            continue
+        entry = {"year": year, "quarter": quarter, "volume": volume}
         if has_unit:
-            entry["unit"] = str(row["unit"]).strip()
+            v = row["unit"]
+            entry["unit"] = str(v).strip() if pd.notna(v) and str(v).strip() else "kg"
         rows.append(entry)
-    return rows
+    return {"rows": rows, "errors": errors}
 
 
-def parse_fx_upload(content: bytes, filename: str) -> list[dict]:
+def parse_fx_upload(content: bytes, filename: str) -> dict:
     """
     Parse FX rate upload.
     Expected columns: from_currency, to_currency, period, rate
+
+    Returns {"rows": [...], "errors": [{"row": N, "message": "..."}]}.
+    Raises ValueError only for structural issues (missing required columns).
     """
     df = _read_file(content, filename)
 
     required = {"from_currency", "to_currency", "period", "rate"}
-    if not required.issubset(set(df.columns)):
-        raise ValueError(f"Missing columns. Required: {required}. Found: {set(df.columns)}")
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"Missing required column(s): {', '.join(sorted(missing))}. "
+            f"Expected: from_currency, to_currency, period, rate."
+        )
 
     rows = []
-    for _, row in df.iterrows():
-        year, quarter = _parse_period(str(row["period"]))
+    errors = []
+    for idx, row in df.iterrows():
+        row_num = int(idx) + 2
+        try:
+            year, quarter = _parse_period(str(row["period"]))
+        except ValueError:
+            errors.append({
+                "row": row_num,
+                "message": f"Invalid period '{row['period']}'. Use format Q1-2023 or 2023-Q1.",
+            })
+            continue
+        try:
+            rate = float(row["rate"])
+        except (ValueError, TypeError):
+            errors.append({
+                "row": row_num,
+                "message": f"Invalid rate '{row['rate']}'. Must be a number.",
+            })
+            continue
         rows.append({
             "from_currency": str(row["from_currency"]).strip().upper(),
             "to_currency": str(row["to_currency"]).strip().upper(),
             "year": year,
             "quarter": quarter,
-            "rate": float(row["rate"]),
+            "rate": rate,
         })
-    return rows
+    return {"rows": rows, "errors": errors}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
+import exportCsv from '../utils/exportCsv';
 
 export default function Products() {
   const { activeTeamId } = useAuth();
@@ -105,9 +106,28 @@ export default function Products() {
     <div className="ca-page ca-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <div className="ca-h1">Products</div>
-        <button className="ca-btn ca-btn-primary" onClick={() => { resetForm(); setShowForm(!showForm); }}>
-          {showForm && !editing ? 'Cancel' : '+ Add Product'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {products.length > 0 && (
+            <button
+              className="ca-btn ca-btn-ghost"
+              onClick={() => exportCsv('products.csv',
+                ['Name', 'Chemical Formula', 'Family', 'Unit', 'Active Content'],
+                products.map(p => [
+                  p.name,
+                  p.formula || '',
+                  getFamilyName(p.chemical_family_id) || '',
+                  p.unit,
+                  p.active_content != null ? (p.active_content * 100).toFixed(0) + '%' : '',
+                ])
+              )}
+            >
+              Export CSV
+            </button>
+          )}
+          <button className="ca-btn ca-btn-primary" onClick={() => { resetForm(); setShowForm(!showForm); }}>
+            {showForm && !editing ? 'Cancel' : '+ Add Product'}
+          </button>
+        </div>
       </div>
       <p className="ca-subtitle">Manage products for your team. Products are linked to cost models.</p>
 

@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -38,6 +38,7 @@ def get_actual_prices(
 async def upload_prices(
     cost_model_id: uuid.UUID,
     file: UploadFile = File(...),
+    dry_run: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -56,6 +57,9 @@ async def upload_prices(
 
     rows = result["rows"]
     parse_errors = result["errors"]
+
+    if dry_run:
+        return {"rows_processed": len(rows), "errors": parse_errors, "dry_run": True, "filename": filename}
 
     count = 0
     for row in rows:

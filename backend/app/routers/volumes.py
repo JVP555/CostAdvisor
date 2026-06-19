@@ -1,5 +1,10 @@
+import io
+import csv
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -33,10 +38,58 @@ def get_volumes(
     )
 
 
+@router.get("/{cost_model_id}/template")
+def download_volume_template(
+    cost_model_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return a CSV template pre-populated with existing volume rows (or last 4 quarters blank)."""
+    cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
+    if not cm:
+        raise HTTPException(status_code=404, detail="Cost model not found")
+    require_permission(db, current_user, cm.team_id, "volumes.view")
+
+    existing = (
+        db.query(ActualVolume)
+        .filter(ActualVolume.cost_model_id == cost_model_id)
+        .order_by(ActualVolume.year, ActualVolume.quarter)
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["period", "volume", "unit"])
+
+    if existing:
+        for v in existing:
+            writer.writerow([f"Q{v.quarter}-{v.year}", v.volume, v.unit or "kg"])
+    else:
+        now = datetime.now(timezone.utc)
+        y, q = now.year, (now.month - 1) // 3 + 1
+        quarters = []
+        for _ in range(4):
+            quarters.append((y, q))
+            q -= 1
+            if q == 0:
+                q = 4
+                y -= 1
+        for yr, qt in reversed(quarters):
+            writer.writerow([f"Q{qt}-{yr}", "", "kg"])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=volumes_template.csv"},
+    )
+
+
 @router.post("/{cost_model_id}/upload")
 async def upload_volumes(
     cost_model_id: uuid.UUID,
     file: UploadFile = File(...),
+    dry_run: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -47,7 +100,17 @@ async def upload_volumes(
 
     content = await file.read()
     filename = file.filename or "upload"
-    rows = parse_volume_upload(content, filename)
+
+    try:
+        result = parse_volume_upload(content, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    rows = result["rows"]
+    parse_errors = result["errors"]
+
+    if dry_run:
+        return {"rows_processed": len(rows), "errors": parse_errors, "dry_run": True, "filename": filename}
 
     count = 0
     for row in rows:
@@ -79,7 +142,7 @@ async def upload_volumes(
     log_event(db, cm.team_id, current_user.id, "create", "actual_volume", str(cost_model_id),
               new_value={"rows_processed": count, "filename": filename})
     db.commit()
-    return {"status": "uploaded", "rows_processed": count, "filename": filename}
+    return {"status": "uploaded", "rows_processed": count, "errors": parse_errors, "filename": filename}
 
 
 @router.put("/{cost_model_id}/{year}/{quarter}", response_model=ActualVolumeOut)

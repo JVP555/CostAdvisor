@@ -324,13 +324,13 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Index source is shown (scraped / team override / fixed)
   - 🔴 Numbers in the breakdown sum to the displayed should-cost exactly
 
-- 🟡 **Scrum 18** — Data import & export — Wave 1: forgiving import of core data, export of anything on screen; consolidate existing CSV/Excel
-  - 🟡 Every upload shows a row-count preview before committing (row count shown after upload, not before as a preview)
-  - 🟢 Per-row errors returned with row number and description (`file_parser.py` + Pricing page display)
-  - 🔴 Common column name variants accepted without failing
-  - 🔴 Both CSV and `.xlsx` accepted for all uploads
-  - 🟡 "Download template" available at every upload dialog (Pricing page + FX Rates page have it; other upload dialogs do not)
-  - 🟢 Export CSV button on every data table and result view (Dashboard, Pricing/FX, Evolution, Squeeze)
+- 🟢 **Scrum 18** — Data import & export — Wave 1: forgiving import of core data, export of anything on screen; consolidate existing CSV/Excel
+  - 🟢 Every upload shows a row-count preview before committing (FileUpload component two-step dry_run preview; Pricing page inline preview)
+  - 🟢 Per-row errors returned with row number and description (all parsers: prices, volumes, FX, indexes)
+  - 🟢 Common column name variants accepted without failing (`_read_file()` normalises: strip, lower, space→_)
+  - 🟢 Both CSV and `.xlsx` accepted for all uploads (`_read_file()` + FileUpload default accept)
+  - 🟢 "Download template" available at every upload dialog (Pricing prices + volumes, FX Rates default + custom, Indexes overrides)
+  - 🟢 Export CSV button on every data table and result view (Dashboard, Pricing/FX, Evolution, Squeeze, Products, Formulas)
   - 🟢 Exported CSV column names are human-readable (not internal field names)
 
 ---

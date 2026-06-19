@@ -1,8 +1,11 @@
 import asyncio
+import csv
+import io
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db, current_user_id_var, bypass_rls_var
@@ -117,9 +120,71 @@ def get_index_values(
     )
 
 
+@router.get("/template")
+def download_index_template(
+    team_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return a CSV template pre-populated with the team's tracked commodities and regions."""
+    require_team_access(db, current_user, team_id)
+
+    # Get distinct commodity+region combos the team has overrides or sources for
+    from sqlalchemy import distinct as sa_distinct
+    from app.models.index_data import TeamIndexSource
+    pairs = (
+        db.query(sa_distinct(IndexOverride.commodity_id), IndexOverride.region)
+        .filter(IndexOverride.team_id == team_id)
+        .all()
+    )
+    # Fall back to all commodities with data if team has no overrides yet
+    if not pairs:
+        pairs = (
+            db.query(sa_distinct(IndexValue.commodity_id), IndexValue.region)
+            .limit(20)
+            .all()
+        )
+
+    # Build 4 upcoming quarters as blank template rows
+    now = datetime.now(timezone.utc)
+    y, q = now.year, (now.month - 1) // 3 + 1
+    quarters = []
+    for _ in range(4):
+        quarters.append((y, q))
+        q -= 1
+        if q == 0:
+            q = 4
+            y -= 1
+    quarters.reverse()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["material", "region", "period", "value"])
+
+    commodity_cache = {}
+    for commodity_id, region in pairs[:20]:  # cap at 20 to keep template readable
+        if commodity_id not in commodity_cache:
+            c = db.query(CommodityIndex).filter(CommodityIndex.id == commodity_id).first()
+            commodity_cache[commodity_id] = c.name if c else str(commodity_id)
+        for yr, qt in quarters:
+            writer.writerow([commodity_cache[commodity_id], region, f"Q{qt}-{yr}", ""])
+
+    if not pairs:
+        for yr, qt in quarters:
+            writer.writerow(["Ammonia", "Europe", f"Q{qt}-{yr}", ""])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=index_overrides_template.csv"},
+    )
+
+
 @router.post("/upload")
 async def upload_global_indexes(
     file: UploadFile = File(...),
+    dry_run: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -130,7 +195,29 @@ async def upload_global_indexes(
 
     content = await file.read()
     filename = file.filename or "upload"
-    rows = parse_index_upload(content, filename)
+
+    try:
+        result = parse_index_upload(content, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    rows = result["rows"]
+    parse_errors = result["errors"]
+
+    if dry_run:
+        # Validate commodity names without writing
+        missing_commodities = []
+        for row in rows:
+            c = db.query(CommodityIndex).filter(CommodityIndex.name == row["material"]).first()
+            if not c:
+                missing_commodities.append(row["material"])
+        if missing_commodities:
+            unique_missing = list(dict.fromkeys(missing_commodities))
+            parse_errors = parse_errors + [
+                {"row": None, "message": f"Unknown material: {m}"} for m in unique_missing
+            ]
+        valid_rows = [r for r in rows if r["material"] not in missing_commodities]
+        return {"rows_processed": len(valid_rows), "errors": parse_errors, "dry_run": True, "filename": filename}
 
     count = 0
     for row in rows:
@@ -138,6 +225,7 @@ async def upload_global_indexes(
             CommodityIndex.name == row["material"]
         ).first()
         if not commodity:
+            parse_errors.append({"row": None, "message": f"Unknown material: {row['material']} (skipped)"})
             continue
 
         existing = db.query(IndexValue).filter(
@@ -165,13 +253,14 @@ async def upload_global_indexes(
     log_event(db, uuid.UUID("00000000-0000-0000-0000-000000000000"), current_user.id,
               "upload", "global_indexes", filename, new_value={"rows": count})
     db.commit()
-    return {"status": "uploaded", "rows_processed": count, "filename": filename}
+    return {"status": "uploaded", "rows_processed": count, "errors": parse_errors, "filename": filename}
 
 
 @router.post("/overrides")
 async def upload_index_overrides(
     team_id: uuid.UUID,
     file: UploadFile = File(...),
+    dry_run: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -182,7 +271,26 @@ async def upload_index_overrides(
     require_team_access(db, current_user, team_id, "indexes.import")
     content = await file.read()
     filename = file.filename or "upload"
-    rows = parse_index_upload(content, filename)
+
+    try:
+        result = parse_index_upload(content, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    rows = result["rows"]
+    parse_errors = result["errors"]
+
+    if dry_run:
+        missing = []
+        for row in rows:
+            c = db.query(CommodityIndex).filter(CommodityIndex.name == row["material"]).first()
+            if not c:
+                missing.append(row["material"])
+        if missing:
+            for m in dict.fromkeys(missing):
+                parse_errors = parse_errors + [{"row": None, "message": f"Unknown material: {m}"}]
+        valid = [r for r in rows if r["material"] not in missing]
+        return {"rows_processed": len(valid), "errors": parse_errors, "dry_run": True, "filename": filename}
 
     count = 0
     for row in rows:
@@ -190,6 +298,7 @@ async def upload_index_overrides(
             CommodityIndex.name == row["material"]
         ).first()
         if not commodity:
+            parse_errors.append({"row": None, "message": f"Unknown material: {row['material']} (skipped)"})
             continue
 
         existing = db.query(IndexOverride).filter(
@@ -221,7 +330,7 @@ async def upload_index_overrides(
     log_event(db, team_id, current_user.id, "upload", "index_overrides", filename,
               new_value={"rows": count})
     db.commit()
-    return {"status": "uploaded", "rows_processed": count, "filename": filename}
+    return {"status": "uploaded", "rows_processed": count, "errors": parse_errors, "filename": filename}
 
 
 # --- Cell-level and bulk override endpoints ---
