@@ -6,33 +6,20 @@ import FileUpload from '../components/FileUpload';
 import api from '../api';
 import exportCsv from '../utils/exportCsv';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Current quarter — used to mark the "LIVE" column
+const _now = new Date();
+const LIVE_YEAR = _now.getFullYear();
+const LIVE_QUARTER = Math.ceil((_now.getMonth() + 1) / 3);
 
-function buildPeriods(startYear, startQ, endYear, endQ) {
-  const out = [];
-  for (let y = startYear; y <= endYear; y++) {
-    for (let q = 1; q <= 4; q++) {
-      if (y === startYear && q < startQ) continue;
-      if (y === endYear && q > endQ) break;
-      out.push({ year: y, quarter: q, label: `Q${q}-${String(y).slice(2)}` });
-    }
-  }
-  return out;
-}
+// ── Edit Rate Modal ───────────────────────────────────────────────────────────
+// Callback-based: caller provides onUpsert(period, rate) and optional onReset().
 
-function periodOptions() {
-  const opts = [];
-  for (let y = 2020; y <= 2028; y++)
-    for (let q = 1; q <= 4; q++)
-      opts.push({ value: `${y}-${q}`, label: `Q${q}-${String(y).slice(2)}` });
-  return opts;
-}
-
-// ── Edit Rate Modal (mirrors EditCellModal pattern from Indexes) ──────────────
-
-function EditRateModal({ pair, period, currentRate, defaultRate, periods, teamId, onSaved, onClose }) {
+function EditRateModal({
+  pair, period, currentRate, referenceLabel, hasOverride,
+  periods, onUpsert, onReset, resetLabel, onSaved, onClose,
+}) {
   const { addToast } = useToast();
-  const [value, setValue] = useState(currentRate !== null ? String(currentRate) : (defaultRate !== null ? String(defaultRate) : ''));
+  const [value, setValue] = useState(currentRate !== null ? String(currentRate) : '');
   const [applyMode, setApplyMode] = useState('single');
   const [rangeStart, setRangeStart] = useState(0);
   const [rangeEnd, setRangeEnd] = useState(periods.length - 1);
@@ -40,22 +27,6 @@ function EditRateModal({ pair, period, currentRate, defaultRate, periods, teamId
   const inputRef = useRef(null);
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 50); }, []);
-
-  const periodIdx = periods.findIndex(p => p.year === period.year && p.quarter === period.quarter);
-  const periodLabel = period.label;
-
-  const upsertPeriods = async (ps) => {
-    await Promise.all(ps.map(p =>
-      api.put('/api/fx-rates/custom', {
-        team_id: teamId,
-        from_currency: pair.from,
-        to_currency: pair.to,
-        year: p.year,
-        quarter: p.quarter,
-        rate: parseFloat(value),
-      })
-    ));
-  };
 
   const handleSave = async () => {
     const v = parseFloat(value);
@@ -65,8 +36,12 @@ function EditRateModal({ pair, period, currentRate, defaultRate, periods, teamId
       let targets;
       if (applyMode === 'single') targets = [period];
       else if (applyMode === 'all') targets = periods;
-      else targets = periods.slice(rangeStart, rangeEnd + 1);
-      await upsertPeriods(targets);
+      else {
+        const lo = Math.min(rangeStart, rangeEnd);
+        const hi = Math.max(rangeStart, rangeEnd);
+        targets = periods.slice(lo, hi + 1);
+      }
+      await Promise.all(targets.map(p => onUpsert(p, v)));
       addToast('Rate saved', 'success');
       onSaved();
       onClose();
@@ -78,44 +53,38 @@ function EditRateModal({ pair, period, currentRate, defaultRate, periods, teamId
   };
 
   const handleReset = async () => {
-    if (currentRate === null) return;
+    if (!onReset) return;
     setSaving(true);
     try {
-      await api.delete('/api/fx-rates/custom-by-key', {
-        params: { team_id: teamId, from_currency: pair.from, to_currency: pair.to, year: period.year, quarter: period.quarter },
-      });
-      addToast('Reset to default', 'success');
+      await onReset();
+      addToast(resetLabel ? `${resetLabel} done` : 'Rate removed', 'success');
       onSaved();
       onClose();
     } catch {
-      addToast('Failed to reset rate', 'error');
+      addToast('Failed to remove rate', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const opts = periodOptions();
-
   return createPortal(
     <div className="ca-modal-backdrop" onClick={onClose}>
       <div className="ca-modal" style={{ width: 420 }} onClick={e => e.stopPropagation()}>
         <div className="ca-modal-header">
-          <div className="ca-modal-title">{pair.from}/{pair.to} · {periodLabel}</div>
+          <div className="ca-modal-title">{pair.from}/{pair.to} · {period.label}</div>
           <button className="ca-modal-close" onClick={onClose}>×</button>
         </div>
         <div className="ca-modal-body">
-          {/* Reference row — mirrors "Global value" in EditCellModal */}
-          <div style={{ marginBottom: 16, fontSize: 12, color: 'var(--text-secondary)' }}>
-            {defaultRate !== null
-              ? <span>Platform default: <strong style={{ color: 'var(--text)' }}>{Number(defaultRate).toFixed(6)}</strong></span>
-              : <span style={{ color: 'var(--muted)' }}>No platform default for this period</span>
-            }
-            {currentRate !== null && (
-              <span className="ca-badge" style={{ marginLeft: 10, background: 'var(--accent4-dim)', color: 'var(--accent4)', fontSize: 9 }}>
-                OVERRIDE
-              </span>
-            )}
-          </div>
+          {referenceLabel && (
+            <div style={{ marginBottom: 16, fontSize: 12, color: 'var(--text-secondary)' }}>
+              {referenceLabel}
+              {hasOverride && (
+                <span className="ca-badge" style={{ marginLeft: 10, background: 'var(--accent4-dim)', color: 'var(--accent4)', fontSize: 9 }}>
+                  OVERRIDE
+                </span>
+              )}
+            </div>
+          )}
 
           <div style={{ marginBottom: 16 }}>
             <label className="ca-label">Rate ({pair.from} → {pair.to})</label>
@@ -133,18 +102,12 @@ function EditRateModal({ pair, period, currentRate, defaultRate, periods, teamId
           <div style={{ marginBottom: 8 }}>
             <label className="ca-label">Apply to</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <input type="radio" checked={applyMode === 'single'} onChange={() => setApplyMode('single')} />
-                This period only
-              </label>
-              <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <input type="radio" checked={applyMode === 'all'} onChange={() => setApplyMode('all')} />
-                All periods
-              </label>
-              <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <input type="radio" checked={applyMode === 'range'} onChange={() => setApplyMode('range')} />
-                Custom range
-              </label>
+              {[['single', 'This period only'], ['all', 'All periods'], ['range', 'Custom range']].map(([m, l]) => (
+                <label key={m} style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                  <input type="radio" checked={applyMode === m} onChange={() => setApplyMode(m)} />
+                  {l}
+                </label>
+              ))}
             </div>
             {applyMode === 'range' && (
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -166,14 +129,16 @@ function EditRateModal({ pair, period, currentRate, defaultRate, periods, teamId
         </div>
 
         <div className="ca-modal-footer">
-          <button
-            className="ca-btn ca-btn-danger"
-            onClick={handleReset}
-            disabled={currentRate === null || saving}
-            style={{ marginRight: 'auto', opacity: currentRate !== null ? 1 : 0.4 }}
-          >
-            Reset to Default
-          </button>
+          {onReset && (
+            <button
+              className="ca-btn ca-btn-danger"
+              onClick={handleReset}
+              disabled={saving}
+              style={{ marginRight: 'auto' }}
+            >
+              {resetLabel || 'Reset to Default'}
+            </button>
+          )}
           <button className="ca-btn ca-btn-ghost" onClick={onClose}>Cancel</button>
           <button className="ca-btn ca-btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
@@ -186,22 +151,45 @@ function EditRateModal({ pair, period, currentRate, defaultRate, periods, teamId
 }
 
 // ── Rate Grid (shared by both tabs) ─────────────────────────────────────────
+// First column is sticky; periods are expected in descending order (newest first).
 
 function RateGrid({ periods, rows, onCellClick, canEdit, scrollRef }) {
   if (rows.length === 0) return null;
+
+  const stickyTh = {
+    position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 3,
+    boxShadow: '2px 0 5px -2px rgba(0,0,0,0.13)',
+  };
+  const stickyTd = {
+    position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 2,
+    boxShadow: '2px 0 5px -2px rgba(0,0,0,0.13)',
+  };
+
   return (
     <div className="ca-scroll-x" ref={scrollRef}>
       <table className="ca-table">
         <thead>
           <tr>
-            <th style={{ whiteSpace: 'nowrap' }}>Pair</th>
-            {periods.map(p => <th key={p.label} className="center">{p.label}</th>)}
+            <th style={{ whiteSpace: 'nowrap', ...stickyTh }}>Pair</th>
+            {periods.map(p => {
+              const isLive = p.year === LIVE_YEAR && p.quarter === LIVE_QUARTER;
+              return (
+                <th key={p.label} className="center" style={{ minWidth: 78 }}>
+                  {p.label}
+                  {isLive && (
+                    <div style={{ fontSize: 8, color: 'var(--accent2)', fontWeight: 800, letterSpacing: 1, marginTop: 1, lineHeight: 1 }}>
+                      LIVE
+                    </div>
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
           {rows.map(row => (
             <tr key={`${row.from}/${row.to}`}>
-              <td style={{ fontWeight: 600, whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+              <td style={{ fontWeight: 600, whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, ...stickyTd }}>
                 {row.from}/{row.to}
               </td>
               {periods.map((p, i) => {
@@ -209,12 +197,15 @@ function RateGrid({ periods, rows, onCellClick, canEdit, scrollRef }) {
                 const v = cell?.custom ?? cell?.default ?? null;
                 const isOverride = cell?.custom !== null && cell?.custom !== undefined;
                 const isEmpty = v === null;
+                const isLive = p.year === LIVE_YEAR && p.quarter === LIVE_QUARTER;
 
                 return (
                   <td
                     key={p.label}
                     className="center"
-                    title={canEdit ? (isEmpty ? 'Click to set rate' : isOverride ? 'Team override — click to edit' : 'Click to override') : undefined}
+                    title={canEdit
+                      ? isEmpty ? 'Click to set rate' : isOverride ? 'Team override — click to edit' : 'Click to edit'
+                      : undefined}
                     style={{
                       cursor: canEdit ? 'pointer' : 'default',
                       color: isEmpty ? 'var(--muted)' : isOverride ? 'var(--accent4)' : 'var(--text)',
@@ -223,7 +214,9 @@ function RateGrid({ periods, rows, onCellClick, canEdit, scrollRef }) {
                     }}
                     onClick={() => canEdit && onCellClick(row, p, cell)}
                   >
-                    {isEmpty ? '—' : Number(v).toFixed(4)}
+                    {isEmpty && isLive
+                      ? <span style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: 0.3 }}>No data</span>
+                      : isEmpty ? '—' : Number(v).toFixed(4)}
                   </td>
                 );
               })}
@@ -239,8 +232,8 @@ function RateGrid({ periods, rows, onCellClick, canEdit, scrollRef }) {
 
 function SyncModal({ teamId, onSynced, onClose }) {
   const { addToast } = useToast();
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [quarter, setQuarter] = useState(Math.ceil((new Date().getMonth() + 1) / 3));
+  const [year, setYear] = useState(LIVE_YEAR);
+  const [quarter, setQuarter] = useState(LIVE_QUARTER);
   const [syncing, setSyncing] = useState(false);
 
   const sync = async () => {
@@ -295,106 +288,14 @@ function SyncModal({ teamId, onSynced, onClose }) {
   );
 }
 
-// ── Default tab ───────────────────────────────────────────────────────────────
-
-function DefaultTab({ user, defaultRates, loading, onRefresh, periods }) {
-  const { addToast } = useToast();
-  const [showAdd, setShowAdd] = useState(false);
-  const [scraping, setScraping] = useState(false);
-  const scrollRef = useRef(null);
-
-  const handleScrape = async () => {
-    setScraping(true);
-    try {
-      const { data } = await api.post('/api/fx-rates/scrape');
-      addToast(`Synced ${data.synced} rates from ECB`, 'success');
-      onRefresh();
-    } catch {
-      addToast('ECB scrape failed', 'error');
-    } finally {
-      setScraping(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!loading && scrollRef.current) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-    }
-  }, [loading]);
-
-  const rows = useMemo(() => {
-    const map = {};
-    for (const r of defaultRates) {
-      const key = `${r.from_currency}/${r.to_currency}`;
-      if (!map[key]) map[key] = { from: r.from_currency, to: r.to_currency, cells: {} };
-      map[key].cells[`${r.year}-${r.quarter}`] = { default: r.rate };
-    }
-    return Object.values(map).sort((a, b) => `${a.from}/${a.to}`.localeCompare(`${b.from}/${b.to}`))
-      .map(row => ({ ...row, cells: periods.map(p => row.cells[`${p.year}-${p.quarter}`] ?? null) }));
-  }, [defaultRates, periods]);
-
-  return (
-    <>
-      {showAdd && (
-        <AddRateModal
-          title="Add Platform Rate"
-          onSave={form => api.put('/api/fx-rates/', form)}
-          onClose={() => { setShowAdd(false); onRefresh(); }}
-        />
-      )}
-
-      {(() => {
-        const lastSync = defaultRates.length > 0
-          ? new Date(Math.max(...defaultRates.map(r => new Date(r.uploaded_at)))).toLocaleString()
-          : null;
-        return (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <p className="ca-subtitle" style={{ margin: 0 }}>
-                Platform default exchange rates.{user?.is_super_admin ? '' : ' Managed by super admins.'}
-              </p>
-              {lastSync && <span style={{ fontSize: 11, color: 'var(--muted)' }}>Last sync: {lastSync}</span>}
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {user?.is_super_admin && (
-                <>
-                  <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={handleScrape} disabled={scraping}>
-                    {scraping ? 'Scraping…' : 'Scrape from ECB'}
-                  </button>
-                  <FileUpload endpoint="/api/fx-rates/upload" onSuccess={onRefresh} />
-                  <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowAdd(true)}>+ Add Rate</button>
-                </>
-              )}
-              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => defaultRates.length > 0 && exportCsv(
-                'fx_rates_default.csv',
-                ['From', 'To', 'Year', 'Quarter', 'Rate'],
-                defaultRates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate])
-              )}>Export CSV</button>
-            </div>
-          </div>
-        );
-      })()}
-
-      {loading ? (
-        <div className="ca-card" style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
-      ) : rows.length === 0 ? (
-        <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
-          No FX rates found.{user?.is_super_admin ? ' Upload a CSV or add a rate to get started.' : ' Ask a super admin to upload rates.'}
-        </div>
-      ) : (
-        <div className="ca-card">
-          <RateGrid periods={periods} rows={rows} canEdit={false} scrollRef={scrollRef} />
-        </div>
-      )}
-    </>
-  );
-}
-
-// ── Add Rate Modal (shared by Default and Custom tabs) ───────────────────────
+// ── Add Rate Modal (shared by Default and Custom tabs) ────────────────────────
 
 function AddRateModal({ title, onSave, onClose }) {
   const { addToast } = useToast();
-  const [form, setForm] = useState({ from_currency: '', to_currency: '', year: new Date().getFullYear(), quarter: 1, rate: '' });
+  const [form, setForm] = useState({
+    from_currency: '', to_currency: '',
+    year: LIVE_YEAR, quarter: LIVE_QUARTER, rate: '',
+  });
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
@@ -424,12 +325,14 @@ function AddRateModal({ title, onSave, onClose }) {
         <div className="ca-modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
             <label className="ca-label">From Currency</label>
-            <input className="ca-input" maxLength={3} placeholder="USD" value={form.from_currency}
+            <input className="ca-input" maxLength={3} placeholder="USD"
+              value={form.from_currency}
               onChange={e => setForm(f => ({ ...f, from_currency: e.target.value.toUpperCase() }))} />
           </div>
           <div>
             <label className="ca-label">To Currency</label>
-            <input className="ca-input" maxLength={3} placeholder="EUR" value={form.to_currency}
+            <input className="ca-input" maxLength={3} placeholder="EUR"
+              value={form.to_currency}
               onChange={e => setForm(f => ({ ...f, to_currency: e.target.value.toUpperCase() }))} />
           </div>
           <div>
@@ -446,7 +349,8 @@ function AddRateModal({ title, onSave, onClose }) {
           </div>
           <div style={{ gridColumn: '1 / -1' }}>
             <label className="ca-label">Rate</label>
-            <input className="ca-input" type="number" step="0.000001" placeholder="1.000000" value={form.rate}
+            <input className="ca-input" type="number" step="0.000001" placeholder="1.000000"
+              value={form.rate}
               onChange={e => setForm(f => ({ ...f, rate: e.target.value }))}
               onKeyDown={e => { if (e.key === 'Enter') save(); }} />
           </div>
@@ -463,6 +367,129 @@ function AddRateModal({ title, onSave, onClose }) {
   );
 }
 
+// ── Default tab ───────────────────────────────────────────────────────────────
+
+function DefaultTab({ user, defaultRates, loading, onRefresh, periods }) {
+  const { addToast } = useToast();
+  const [showAdd, setShowAdd] = useState(false);
+  const [scraping, setScraping] = useState(false);
+  const [editCell, setEditCell] = useState(null);
+  const scrollRef = useRef(null);
+
+  const handleScrape = async () => {
+    setScraping(true);
+    try {
+      const { data } = await api.post('/api/fx-rates/scrape');
+      addToast(`Synced ${data.synced} rates from ECB`, 'success');
+      onRefresh();
+    } catch {
+      addToast('ECB scrape failed', 'error');
+    } finally {
+      setScraping(false);
+    }
+  };
+
+  // Rows: cells include `id` so the edit modal can offer a delete action
+  const rows = useMemo(() => {
+    const map = {};
+    for (const r of defaultRates) {
+      const key = `${r.from_currency}/${r.to_currency}`;
+      if (!map[key]) map[key] = { from: r.from_currency, to: r.to_currency, cells: {} };
+      map[key].cells[`${r.year}-${r.quarter}`] = { default: r.rate, id: r.id };
+    }
+    return Object.values(map)
+      .sort((a, b) => `${a.from}/${a.to}`.localeCompare(`${b.from}/${b.to}`))
+      .map(row => ({ ...row, cells: periods.map(p => row.cells[`${p.year}-${p.quarter}`] ?? null) }));
+  }, [defaultRates, periods]);
+
+  const handleCellClick = (row, period, cell) => {
+    if (!user?.is_super_admin) return;
+    setEditCell({ row, period, cell });
+  };
+
+  const lastSync = defaultRates.length > 0
+    ? new Date(Math.max(...defaultRates.map(r => new Date(r.uploaded_at)))).toLocaleString()
+    : null;
+
+  return (
+    <>
+      {showAdd && (
+        <AddRateModal
+          title="Add Platform Rate"
+          onSave={form => api.put('/api/fx-rates/', form)}
+          onClose={() => { setShowAdd(false); onRefresh(); }}
+        />
+      )}
+      {editCell && (
+        <EditRateModal
+          pair={{ from: editCell.row.from, to: editCell.row.to }}
+          period={editCell.period}
+          currentRate={editCell.cell?.default ?? null}
+          referenceLabel={null}
+          hasOverride={false}
+          periods={periods}
+          onUpsert={(p, rate) => api.put('/api/fx-rates/', {
+            from_currency: editCell.row.from,
+            to_currency: editCell.row.to,
+            year: p.year,
+            quarter: p.quarter,
+            rate,
+          })}
+          onReset={editCell.cell?.id != null ? async () => {
+            await api.delete(`/api/fx-rates/${editCell.cell.id}`);
+          } : undefined}
+          resetLabel="Delete Rate"
+          onSaved={onRefresh}
+          onClose={() => setEditCell(null)}
+        />
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <p className="ca-subtitle" style={{ margin: 0 }}>
+            Platform default exchange rates.{user?.is_super_admin ? ' Click any cell to edit.' : ' Managed by super admins.'}
+          </p>
+          {lastSync && <span style={{ fontSize: 11, color: 'var(--muted)' }}>Last sync: {lastSync}</span>}
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {user?.is_super_admin && (
+            <>
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={handleScrape} disabled={scraping}>
+                {scraping ? 'Scraping…' : 'Scrape from ECB'}
+              </button>
+              <FileUpload endpoint="/api/fx-rates/upload" onSuccess={onRefresh} />
+              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowAdd(true)}>+ Add Rate</button>
+            </>
+          )}
+          <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => defaultRates.length > 0 && exportCsv(
+            'fx_rates_default.csv',
+            ['From', 'To', 'Year', 'Quarter', 'Rate'],
+            defaultRates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate])
+          )}>Export CSV</button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="ca-card" style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
+      ) : rows.length === 0 ? (
+        <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
+          No FX rates found.{user?.is_super_admin ? ' Upload a CSV or add a rate to get started.' : ' Ask a super admin to upload rates.'}
+        </div>
+      ) : (
+        <div className="ca-card">
+          <RateGrid
+            periods={periods}
+            rows={rows}
+            canEdit={!!user?.is_super_admin}
+            onCellClick={handleCellClick}
+            scrollRef={scrollRef}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Custom tab ────────────────────────────────────────────────────────────────
 
 function CustomTab({ teamId, canEdit, defaultRates }) {
@@ -471,7 +498,7 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
   const [loading, setLoading] = useState(true);
   const [showSync, setShowSync] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [editCell, setEditCell] = useState(null); // { row, period, cell }
+  const [editCell, setEditCell] = useState(null);
   const scrollRef = useRef(null);
 
   const fetchCustom = () => {
@@ -484,22 +511,17 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
 
   useEffect(() => { if (teamId) fetchCustom(); }, [teamId]);
 
-  useEffect(() => {
-    if (!loading && scrollRef.current)
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-  }, [loading]);
-
-  // Build periods from union of default + custom data
+  // Periods: union of default + custom, always include current quarter, descending
   const periods = useMemo(() => {
     const set = new Set();
-    [...defaultRates, ...customRates].forEach(r => set.add(`${r.year || r.year}-${r.quarter}`));
+    set.add(`${LIVE_YEAR}-${LIVE_QUARTER}`);
+    [...defaultRates, ...customRates].forEach(r => set.add(`${r.year}-${r.quarter}`));
     return [...set]
       .map(s => { const [y, q] = s.split('-'); return { year: +y, quarter: +q }; })
-      .sort((a, b) => a.year - b.year || a.quarter - b.quarter)
+      .sort((a, b) => b.year - a.year || b.quarter - a.quarter)
       .map(p => ({ ...p, label: `Q${p.quarter}-${String(p.year).slice(2)}` }));
   }, [defaultRates, customRates]);
 
-  // Build rows: union of all pairs seen in default or custom
   const rows = useMemo(() => {
     const pairs = new Map();
     for (const r of defaultRates) {
@@ -518,9 +540,7 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
         ...row,
         cells: periods.map(p => {
           const key = `${p.year}-${p.quarter}`;
-          const def = row.defMap[key] ?? null;
-          const cust = row.custMap[key] ?? null;
-          return { default: def, custom: cust };
+          return { default: row.defMap[key] ?? null, custom: row.custMap[key] ?? null };
         }),
       }));
   }, [defaultRates, customRates, periods]);
@@ -533,19 +553,47 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
   return (
     <>
       {showSync && <SyncModal teamId={teamId} onSynced={fetchCustom} onClose={() => setShowSync(false)} />}
-      {showAdd && <AddRateModal
-        title="Add Custom Rate"
-        onSave={form => api.put('/api/fx-rates/custom', { ...form, team_id: teamId })}
-        onClose={() => { setShowAdd(false); fetchCustom(); }}
-      />}
+      {showAdd && (
+        <AddRateModal
+          title="Add Custom Rate"
+          onSave={form => api.put('/api/fx-rates/custom', { ...form, team_id: teamId })}
+          onClose={() => { setShowAdd(false); fetchCustom(); }}
+        />
+      )}
       {editCell && (
         <EditRateModal
           pair={{ from: editCell.row.from, to: editCell.row.to }}
           period={editCell.period}
           currentRate={editCell.cell?.custom ?? null}
-          defaultRate={editCell.cell?.default ?? null}
+          referenceLabel={
+            editCell.cell?.default !== null && editCell.cell?.default !== undefined
+              ? `Platform default: ${Number(editCell.cell.default).toFixed(6)}`
+              : 'No platform default for this period'
+          }
+          hasOverride={editCell.cell?.custom !== null && editCell.cell?.custom !== undefined}
           periods={periods}
-          teamId={teamId}
+          onUpsert={(p, rate) => api.put('/api/fx-rates/custom', {
+            team_id: teamId,
+            from_currency: editCell.row.from,
+            to_currency: editCell.row.to,
+            year: p.year,
+            quarter: p.quarter,
+            rate,
+          })}
+          onReset={editCell.cell?.custom !== null && editCell.cell?.custom !== undefined
+            ? async () => {
+                await api.delete('/api/fx-rates/custom-by-key', {
+                  params: {
+                    team_id: teamId,
+                    from_currency: editCell.row.from,
+                    to_currency: editCell.row.to,
+                    year: editCell.period.year,
+                    quarter: editCell.period.quarter,
+                  },
+                });
+              }
+            : undefined}
+          resetLabel="Reset to Default"
           onSaved={fetchCustom}
           onClose={() => setEditCell(null)}
         />
@@ -553,7 +601,7 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <p className="ca-subtitle" style={{ margin: 0 }}>
-          Team overrides (<span style={{ color: 'var(--accent4)' }}>highlighted</span>) take priority over platform defaults in all costing calculations.
+          Team overrides (<span style={{ color: 'var(--accent4)' }}>highlighted</span>) take priority over platform defaults.
           {canEdit && ' Click any cell to set or edit a rate.'}
         </p>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -568,8 +616,8 @@ function CustomTab({ teamId, canEdit, defaultRates }) {
             </>
           )}
           <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => {
-            const flat = customRates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate]);
-            exportCsv('fx_rates_custom.csv', ['From', 'To', 'Year', 'Quarter', 'Rate'], flat);
+            exportCsv('fx_rates_custom.csv', ['From', 'To', 'Year', 'Quarter', 'Rate'],
+              customRates.map(r => [r.from_currency, r.to_currency, r.year, r.quarter, r.rate]));
           }}>Export CSV</button>
         </div>
       </div>
@@ -628,13 +676,14 @@ export default function FxRates() {
       .catch(() => setCanEdit(false));
   }, [activeTeamId]);
 
-  // Build period columns from default rates
+  // Periods: descending order, always include current quarter even if no data yet
   const periods = useMemo(() => {
     const set = new Set();
+    set.add(`${LIVE_YEAR}-${LIVE_QUARTER}`);
     defaultRates.forEach(r => set.add(`${r.year}-${r.quarter}`));
     return [...set]
       .map(s => { const [y, q] = s.split('-'); return { year: +y, quarter: +q }; })
-      .sort((a, b) => a.year - b.year || a.quarter - b.quarter)
+      .sort((a, b) => b.year - a.year || b.quarter - a.quarter)
       .map(p => ({ ...p, label: `Q${p.quarter}-${String(p.year).slice(2)}` }));
   }, [defaultRates]);
 
@@ -668,7 +717,13 @@ export default function FxRates() {
       </div>
 
       {tab === 'default' && (
-        <DefaultTab user={user} defaultRates={defaultRates} loading={defaultLoading} onRefresh={fetchDefaults} periods={periods} />
+        <DefaultTab
+          user={user}
+          defaultRates={defaultRates}
+          loading={defaultLoading}
+          onRefresh={fetchDefaults}
+          periods={periods}
+        />
       )}
       {tab === 'custom' && (
         <CustomTab teamId={activeTeamId} canEdit={canEdit} defaultRates={defaultRates} />

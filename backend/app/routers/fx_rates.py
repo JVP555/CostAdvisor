@@ -70,6 +70,21 @@ def upsert_fx_rate(
     return db.query(FxRate).filter(FxRate.id == rate_id).first()
 
 
+@router.delete("/{rate_id}", status_code=204)
+def delete_fx_rate(
+    rate_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a platform default FX rate. Super admin only."""
+    require_super_admin(current_user)
+    rate = db.query(FxRate).filter(FxRate.id == rate_id).first()
+    if not rate:
+        raise HTTPException(status_code=404, detail="FX rate not found")
+    db.delete(rate)
+    db.commit()
+
+
 @router.post("/scrape")
 async def scrape_fx_rates(
     db: Session = Depends(get_db),

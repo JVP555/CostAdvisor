@@ -325,8 +325,8 @@ export default function CostModelBuilder() {
     const tokens = expr.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
     const unique = [...new Set(tokens)];
     setAdvancedVars(prev => {
-      const next = { ...prev };
-      unique.forEach(name => { if (!next[name]) next[name] = { type: 'fixed', value: 0 }; });
+      const next = {};
+      unique.forEach(name => { next[name] = prev[name] || { type: 'fixed', value: 0 }; });
       return next;
     });
   };
