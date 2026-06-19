@@ -239,7 +239,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 `TeamInvite` model with token, status (pending/accepted/revoked/declined), 7-day expiry; migration applied
   - 🟢 Duplicate pending invite blocked; existing member invite blocked
 
-- 🟡 **Scrum 13b** — Platform-level access gating (invite-only sign-up with admin approval)
+- 🟢 **Scrum 13b** — Platform-level access gating (invite-only sign-up with admin approval)
   - 🟢 `PlatformAccessRequest` model + Alembic migration (partial unique index on pending email)
   - 🟢 Public `POST /api/access-requests` endpoint — submits request, returns status without 409 to allow landing page messaging
   - 🟢 OAuth callback gates new users: must have accepted access request OR pending team invite
@@ -270,6 +270,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 UI toggle between Simple and Advanced mode; existing formulas open in the mode they were saved with
   - 🟢 Expression validated client-side (balanced brackets, recognised operators) and server-side before saving
   - 🟢 Costing engine evaluates advanced expressions deterministically with the same index/FX/incoterm pipeline as simple mode
+  - 🟢 `detectVars` rebuilds variable map from scratch on each expression change — stale variables from cleared/retyped expressions no longer persist
   - 🔴 Should-cost drill-down (Scrum 17) works for advanced formulas — shows resolved variable values (deferred to Scrum 17)
 
 - 🟢 **Scrum 14c** — Formula library + Chemist platform role
@@ -278,7 +279,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 `has_platform_permission` / `require_platform_permission` in permissions service
   - 🟢 Chemist platform role seeded with `formulas.view/edit/delete`; SuperAdmin role updated; Dream Plan updated
   - 🟢 `/api/formulas` CRUD router: GET/POST/PUT/DELETE gated per tier (platform vs team)
-  - 🟢 RLS policy on `formula_templates`: allows `team_id IS NULL` rows to all authenticated teams
+  - 🟢 RLS policy on `formula_templates`: allows `team_id IS NULL` rows to all authenticated teams; team-scoped rows use membership-subquery (fixed broken `current_team_id` policy)
   - 🟢 Admin → Users → Edit Role: Chemist checkbox stores in `user_platform_roles` (not `is_super_admin`); `PlatformRoleChips` shows all assigned roles
   - 🟢 `/formulas` page: Default Formulas + Team Formulas sections; full CRUD gated by permission
   - 🟢 CostModelBuilder advanced mode: "Load Template" dropdown pre-fills expression + variables
@@ -286,7 +287,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
 
 - 🟢 **Scrum 14d** — FX Rates page + team custom overrides
   - 🟢 `/fx-rates` nav page with two tabs: Default (platform rates, read-only) and Custom (team overrides, editable)
-  - 🟢 `custom_fx_rates` table with RLS (`team_id` scoped); Alembic migration (`r9s0t1u2v3w4`)
+  - 🟢 `custom_fx_rates` table with RLS (`team_id` scoped); Alembic migration (`r9s0t1u2v3w4`); RLS policy fixed to use membership-subquery (was broken with `current_team_id`)
   - 🟢 `GET/PUT/DELETE /api/fx-rates/custom` endpoints; `POST /api/fx-rates/custom/copy-from-default` bulk-seeds team overrides from platform rates
   - 🟢 Custom tab: inline-editable rate cells, "Sync from Default" modal, "+ Add Rate" modal, delete per row
   - 🟢 `fx_converter.py` checks `custom_fx_rates` first (team priority), falls back to platform `fx_rates`
@@ -328,7 +329,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Per-row errors returned with row number and description (`file_parser.py` + Pricing page display)
   - 🔴 Common column name variants accepted without failing
   - 🔴 Both CSV and `.xlsx` accepted for all uploads
-  - 🟡 "Download template" available at every upload dialog (Pricing page has it; other upload dialogs do not)
+  - 🟡 "Download template" available at every upload dialog (Pricing page + FX Rates page have it; other upload dialogs do not)
   - 🟢 Export CSV button on every data table and result view (Dashboard, Pricing/FX, Evolution, Squeeze)
   - 🟢 Exported CSV column names are human-readable (not internal field names)
 
