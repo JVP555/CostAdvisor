@@ -311,7 +311,7 @@ function EditRoleModal({ user, platformRoles, onSetRole, onClose, onRefresh }) {
   };
 
   return (
-    <div className="ca-modal-overlay" onClick={onClose}>
+    <div className="ca-modal-backdrop" onClick={onClose}>
       <div className="ca-modal" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
         <div className="ca-modal-header">
           <div className="ca-modal-title">Edit Platform Roles</div>

@@ -97,7 +97,7 @@ function EditRateModal({ pair, period, currentRate, defaultRate, periods, teamId
   const opts = periodOptions();
 
   return createPortal(
-    <div className="ca-modal-overlay" onClick={onClose}>
+    <div className="ca-modal-backdrop" onClick={onClose}>
       <div className="ca-modal" style={{ width: 420 }} onClick={e => e.stopPropagation()}>
         <div className="ca-modal-header">
           <div className="ca-modal-title">{pair.from}/{pair.to} · {periodLabel}</div>
@@ -260,7 +260,7 @@ function SyncModal({ teamId, onSynced, onClose }) {
   };
 
   return createPortal(
-    <div className="ca-modal-overlay" onClick={onClose}>
+    <div className="ca-modal-backdrop" onClick={onClose}>
       <div className="ca-modal" style={{ width: 360 }} onClick={e => e.stopPropagation()}>
         <div className="ca-modal-header">
           <div className="ca-modal-title">Sync from Default</div>
@@ -387,7 +387,7 @@ function AddRateModal({ title, onSave, onClose }) {
   };
 
   return createPortal(
-    <div className="ca-modal-overlay" onClick={onClose}>
+    <div className="ca-modal-backdrop" onClick={onClose}>
       <div className="ca-modal" style={{ width: 400 }} onClick={e => e.stopPropagation()}>
         <div className="ca-modal-header">
           <div className="ca-modal-title">{title || 'Add Rate'}</div>

@@ -315,6 +315,9 @@ input[type=range] { padding: 0; cursor: pointer; accent-color: var(--accent); }
 .ca-modal-backdrop { position:fixed; inset:0; background:var(--backdrop); z-index:200; display:flex; align-items:center; justify-content:center; }
 .ca-modal { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); max-height:80vh; overflow-y:auto; }
 .ca-modal-header { display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid var(--border); }
+.ca-modal-title { font-family:'Syne',sans-serif; font-weight:700; font-size:15px; }
+.ca-modal-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:20px; line-height:1; padding:4px; }
+.ca-modal-close:hover { color:var(--text); }
 .ca-modal-body { padding:22px; }
 .ca-modal-footer { padding:14px 22px; border-top:1px solid var(--border); display:flex; gap:10px; justify-content:flex-end; }
 
