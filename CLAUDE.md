@@ -310,6 +310,15 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 PDF is legible when printed in black and white
   - 🔴 Customer logo / branding can be added
   - 🔴 File is named sensibly (e.g., `brief-product-supplier-Q12025.pdf`)
+  - **Verification (7 checks — audited against the server-side brief content behind the printed page; tests in `backend/tests/test_brief.py`: 6 tests, full suite 20 passed):**
+    - 🟢 Function works — `calculate_brief` (`costing_engine.py:647`): exact should-cost / gap / total-impact + drivers ranked by absolute cost contribution
+    - 🟢 Security — `@limiter.limit("30/minute")` on the endpoint, Pydantic UUID validation, ORM-only (no raw SQL in the calc path)
+    - 🟢 Authentication — `get_current_user` cookie-JWT → 401 when unauthenticated
+    - 🟢 Authorization — `require_permission(..., "briefs.view")` → 403 for a same-team member lacking the permission
+    - 🟢 RLS — `CostModel` lookup is unfiltered and relies on the `tenant_isolation` policy; cross-tenant request → 403/404
+    - 🟢 Transit — cookies `HttpOnly`+`Secure` in prod, HTTPS via Cloudflare/Railway; Ollama narrative over Tailscale with graceful fallback. Caveat: `ca_token` is `SameSite=none`, not `Strict` (a Scrum 9 auth-hardening gap, not Scrum 15)
+    - 🟢 Comments — `Brief.jsx` + engine comment only the non-obvious *why* (null-passthrough, active-formula choice); no redundant comments
+    - ⚠️ Note: the PDF export itself is still browser `window.print()` — there is no server-generated PDF, logo/branding, or custom filename, so the five criteria above remain 🔴
 
 - 🔴 **Scrum 16** — Self-serve onboarding (empty states, example data, guidance to first should-cost vs actual gap)
   - 🟡 Every list/chart page has a non-empty empty state with a clear next action (Dashboard + Pricing covered; others incomplete)

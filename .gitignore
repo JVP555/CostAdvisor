@@ -46,8 +46,5 @@ Thumbs.db
 
 /docs/
 
-# Claude Code — local only
-CLAUDE.md
-
 # Local planning docs — never commit
 jvpdocs/

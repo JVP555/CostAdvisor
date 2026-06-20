@@ -30,7 +30,12 @@
       "Bash(python3 *)",
       "PowerShell(python --version 2>&1; python3 --version 2>&1; where.exe python 2>&1)",
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/api/indexes/\" -UseBasicParsing -TimeoutSec 3; \"Backend is UP - status $\\($r.StatusCode\\)\" } catch { \"Backend is DOWN or unreachable: $_\" })",
-      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5173\" -UseBasicParsing -TimeoutSec 3; \"Frontend UP - $\\($r.StatusCode\\)\" } catch { \"Frontend DOWN: $_\" })"
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5173\" -UseBasicParsing -TimeoutSec 3; \"Frontend UP - $\\($r.StatusCode\\)\" } catch { \"Frontend DOWN: $_\" })",
+      "Bash(cat venv/pyvenv.cfg)",
+      "Bash(ls -la venv/bin/python*)",
+      "Bash(file venv/bin/python)",
+      "Bash(command -v wsl)",
+      "Bash(wsl bash *)"
     ]
   }
 }
