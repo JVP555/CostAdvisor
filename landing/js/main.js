@@ -287,6 +287,7 @@ document.addEventListener('keydown', (e) => {
 
 // ─── Demo scheduling modal ───
 let _demoYear, _demoMonth, _demoSelectedDate, _demoSelectedSlot;
+const _demoAvailDates = {}; // cache: "YYYY-M" → Set<"YYYY-MM-DD">
 
 function openDemoModal() {
   const now = new Date();
@@ -295,8 +296,21 @@ function openDemoModal() {
   _demoSelectedDate = null;
   _demoSelectedSlot = null;
   _showDemoStep(1);
-  renderDemoCalendar(_demoYear, _demoMonth);
+  renderDemoCalendar(_demoYear, _demoMonth); // renders optimistically; re-renders after fetch
   document.getElementById('lpDemoModal').style.display = 'flex';
+}
+
+async function _fetchAvailDates(year, month) {
+  const key = `${year}-${month}`;
+  if (_demoAvailDates[key]) return;
+  try {
+    const res = await fetch(`${API_URL}/api/demos/available-dates?year=${year}&month=${month + 1}`);
+    const dates = await res.json();
+    _demoAvailDates[key] = new Set(Array.isArray(dates) ? dates : []);
+  } catch (e) {
+    _demoAvailDates[key] = new Set();
+  }
+  renderDemoCalendar(_demoYear, _demoMonth);
 }
 
 function closeDemoModal() {
@@ -323,10 +337,12 @@ function _showDemoStep(n) {
 function demoGoStep(n) { _showDemoStep(n); }
 
 function demoCalNav(dir) {
-  _demoMonth += dir;
+  // Only forward navigation is allowed (can't book past dates)
+  if (dir < 0) return;
+  _demoMonth += 1;
   if (_demoMonth > 11) { _demoMonth = 0; _demoYear++; }
-  if (_demoMonth < 0)  { _demoMonth = 11; _demoYear--; }
   renderDemoCalendar(_demoYear, _demoMonth);
+  _fetchAvailDates(_demoYear, _demoMonth);
 }
 
 function renderDemoCalendar(year, month) {
@@ -346,36 +362,44 @@ function renderDemoCalendar(year, month) {
   const today = new Date();
   today.setHours(0,0,0,0);
   const first = new Date(year, month, 1);
-  // Week starts Monday (0=Mon…6=Sun)
-  let startDow = first.getDay(); // 0=Sun..6=Sat
-  startDow = (startDow + 6) % 7; // convert to Mon-start
-  for (let i = 0; i < startDow; i++) {
-    const blank = document.createElement('div');
-    cal.appendChild(blank);
-  }
+  // Week starts Monday; convert Sun-based (0=Sun) to Mon-based (0=Mon)
+  let startDow = (first.getDay() + 6) % 7;
+  for (let i = 0; i < startDow; i++) cal.appendChild(document.createElement('div'));
+
+  const availKey = `${year}-${month}`;
+  const availSet = _demoAvailDates[availKey]; // undefined = not yet fetched
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   for (let d = 1; d <= daysInMonth; d++) {
     const dayDate = new Date(year, month, d);
     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isPast = dayDate < today;
+
+    // Past days: empty invisible cell (no number, no interaction)
+    if (isPast) {
+      cal.appendChild(document.createElement('div'));
+      continue;
+    }
+
     const btn = document.createElement('button');
     btn.className = 'lp-cal-day';
     btn.textContent = d;
-    const isPast = dayDate < today;
-    if (isPast) {
+
+    const hasSlots = !availSet || availSet.has(dateStr); // optimistic until fetch returns
+    if (availSet && !availSet.has(dateStr)) {
+      // Known to have no slots
       btn.classList.add('lp-cal-day--disabled');
     } else {
       btn.onclick = () => selectDemoDate(dateStr);
     }
+
     if (dateStr === _demoSelectedDate) btn.classList.add('lp-cal-day--selected');
-    // Today highlight
     if (dayDate.getTime() === today.getTime()) btn.classList.add('lp-cal-day--today');
     cal.appendChild(btn);
   }
 
-  // Disable prev-nav when current month is today's month
-  const isCurrentMonth = (year === today.getFullYear() && month === today.getMonth());
-  document.getElementById('lpCalPrev').disabled = isCurrentMonth;
+  // Kick off fetch if not cached yet (will re-render when data arrives)
+  if (!availSet) _fetchAvailDates(year, month);
 }
 
 async function selectDemoDate(dateStr) {

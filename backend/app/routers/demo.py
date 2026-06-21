@@ -1,6 +1,7 @@
 """Public demo-scheduling endpoints — no authentication required."""
 
-from datetime import datetime, timezone, date as date_type, time as time_type
+from calendar import monthrange
+from datetime import datetime, timezone, date as date_type
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -107,6 +108,56 @@ def get_available_slots(
         end = _minutes_to_time(sm + duration)
         result.append(AvailableSlot(start_time=start, end_time=end))
     return result
+
+
+@router.get("/available-dates", response_model=list[str])
+def get_available_dates(
+    year: int = Query(...),
+    month: int = Query(...),
+    db: Session = Depends(get_db),
+):
+    """Return YYYY-MM-DD strings that have at least one slot available in the given month.
+
+    Only today and future dates are included — past dates are always omitted.
+    """
+    _, days_in_month = monthrange(year, month)
+    today = date_type.today()
+
+    bypass_rls_var.set(True)
+    try:
+        hosts = db.query(DemoHost).filter(DemoHost.is_active == True).all()  # noqa: E712
+        if not hosts:
+            return []
+
+        # Load all accepted bookings for this month in one query
+        month_prefix = f"{year:04d}-{month:02d}-"
+        accepted_reqs = db.query(DemoRequest).filter(
+            DemoRequest.status == "accepted",
+            DemoRequest.requested_date.like(f"{month_prefix}%"),
+        ).all()
+
+        # Index accepted starts per host per date
+        host_accepted: dict = {}
+        for req in accepted_reqs:
+            hid = str(req.assigned_host_id)
+            host_accepted.setdefault(hid, {}).setdefault(req.requested_date, set()).add(req.requested_start)
+
+        available_dates: list[str] = []
+        for day in range(1, days_in_month + 1):
+            d = date_type(year, month, day)
+            if d < today:
+                continue
+            date_str = d.strftime("%Y-%m-%d")
+            for host in hosts:
+                hid = str(host.id)
+                accepted_starts = host_accepted.get(hid, {}).get(date_str, set())
+                if _slots_for_host(host, date_str, accepted_starts):
+                    available_dates.append(date_str)
+                    break
+    finally:
+        bypass_rls_var.set(False)
+
+    return available_dates
 
 
 @router.post("")

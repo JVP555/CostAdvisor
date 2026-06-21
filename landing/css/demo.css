@@ -20,15 +20,13 @@
 .lp-cal-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
   margin-bottom: 12px;
 }
 .lp-cal-month {
-  flex: 1;
   font-size: 14px;
   font-weight: 700;
   color: var(--text, #e0e0e0);
-  text-align: center;
 }
 .lp-cal-nav {
   background: var(--surface2, #1e1e30);
