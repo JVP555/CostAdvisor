@@ -298,7 +298,43 @@ async def scrape_fx_rates(
                 pass
 
         synced = sync_fx_rates(db)
-        return {"scraped": scraped, "synced": synced, "pairs": pairs}
+
+        # Backfill quarterly rates for Frankfurter-source pairs directly into fx_rates
+        from app.services.scrapers.frankfurter import fetch_quarterly_rates
+        from app.models.fx_rate import FxRate
+        from datetime import datetime, timezone
+
+        frankfurter_pairs = db.query(FxPair).filter(
+            FxPair.scrape_enabled == True,  # noqa: E712
+            FxPair.source_type.in_(["frankfurter", "google_finance"]),
+        ).all()
+        frankfurter_scraped = 0
+        for fp in frankfurter_pairs:
+            quarterly = await fetch_quarterly_rates(fp.from_currency, fp.to_currency)
+            for (year, quarter), rate in quarterly.items():
+                existing = db.query(FxRate).filter(
+                    FxRate.from_currency == fp.from_currency,
+                    FxRate.to_currency == fp.to_currency,
+                    FxRate.year == year,
+                    FxRate.quarter == quarter,
+                ).first()
+                if existing:
+                    existing.rate = rate
+                    existing.uploaded_at = datetime.now(timezone.utc)
+                else:
+                    db.add(FxRate(
+                        from_currency=fp.from_currency,
+                        to_currency=fp.to_currency,
+                        year=year,
+                        quarter=quarter,
+                        rate=rate,
+                        uploaded_by=None,
+                    ))
+                frankfurter_scraped += 1
+            pairs.append(fp.name)
+        db.commit()
+
+        return {"scraped": scraped + frankfurter_scraped, "synced": synced, "pairs": pairs}
     finally:
         bypass_rls_var.set(False)
 

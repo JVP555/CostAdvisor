@@ -863,10 +863,10 @@ function DefaultTab({ user, canManage, defaultRates, loading, onRefresh, periods
     setScraping(true);
     try {
       const { data } = await api.post('/api/fx-rates/scrape');
-      addToast(`Synced ${data.synced} quarterly rates from ECB`, 'success');
+      addToast(`Synced ${data.synced} quarterly rates`, 'success');
       onRefresh();
     } catch {
-      addToast('ECB scrape failed', 'error');
+      addToast('Quarterly scrape failed', 'error');
     } finally { setScraping(false); }
   };
 
@@ -932,7 +932,7 @@ function DefaultTab({ user, canManage, defaultRates, loading, onRefresh, periods
                 Download Template
               </a>
               <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={handleScrape} disabled={scraping}>
-                {scraping ? 'Scraping…' : 'Scrape Quarterly (ECB)'}
+                {scraping ? 'Scraping…' : 'Scrape Quarterly'}
               </button>
               <FileUpload endpoint="/api/fx-rates/upload" onSuccess={onRefresh} />
               <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => setShowAdd(true)}>+ Add Rate</button>
@@ -950,7 +950,7 @@ function DefaultTab({ user, canManage, defaultRates, loading, onRefresh, periods
         <div className="ca-card" style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
       ) : rows.length === 0 ? (
         <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
-          No quarterly rates found.{canManage ? ' Scrape from ECB or upload a CSV to get started.' : ' Ask an FX Manager to upload rates.'}
+          No quarterly rates found.{canManage ? ' Click "Scrape Quarterly" or upload a CSV to get started.' : ' Ask an FX Manager to upload rates.'}
         </div>
       ) : (
         <div className="ca-card">
