@@ -155,8 +155,8 @@ section{padding:96px 0}
 .pulse-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:48px}
 @media(max-width:1100px){.pulse-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:640px){.pulse-grid{grid-template-columns:1fr 1fr}}
-.pulse-card{border-radius:16px;padding:20px 20px 14px;transition:transform .3s ease,box-shadow .3s ease}
-.pulse-card:hover{transform:translateY(-4px) rotateX(2deg);box-shadow:8px 16px 40px rgba(0,0,0,.6),-2px -2px 8px rgba(255,255,255,.04),inset 0 1px 0 rgba(255,255,255,.08)}
+.pulse-card{border-radius:16px;padding:20px 20px 14px;transition:transform .12s ease-out,box-shadow .3s ease}
+.pulse-card:hover{box-shadow:8px 16px 40px rgba(0,0,0,.6),-2px -2px 8px rgba(255,255,255,.04),inset 0 1px 0 rgba(255,255,255,.08)}
 .pulse-card-name{font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-bottom:6px;letter-spacing:.5px}
 .pulse-card-val{font-size:22px;font-weight:700;font-family:var(--font-mono);margin-bottom:2px}
 .pulse-card-unit{font-size:10px;color:var(--dim);font-family:var(--font-mono)}
@@ -308,6 +308,62 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .demo-error-small{font-size:12px;color:var(--red);margin-top:8px;display:none}
 .demo-nav{display:flex;gap:10px;margin-top:18px}
 
+/* ── Hero mesh background ─────────────────────────────────── */
+.hero-mesh{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.hero-blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.22;will-change:transform}
+.hero-blob.b1{width:620px;height:620px;background:radial-gradient(circle,#3B82F6,transparent 70%);top:-180px;left:-120px;animation:blobFloat1 18s ease-in-out infinite}
+.hero-blob.b2{width:540px;height:540px;background:radial-gradient(circle,#0EA5E9,transparent 70%);top:30px;right:-160px;animation:blobFloat2 22s ease-in-out infinite}
+.hero-blob.b3{width:460px;height:460px;background:radial-gradient(circle,#10B981,transparent 70%);bottom:-200px;left:28%;opacity:.13;animation:blobFloat3 26s ease-in-out infinite}
+@keyframes blobFloat1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(90px,70px) scale(1.12)}}
+@keyframes blobFloat2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-80px,50px) scale(1.16)}}
+@keyframes blobFloat3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(50px,-60px) scale(1.06)}}
+.hero-dots{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.6;background-image:radial-gradient(rgba(255,255,255,.07) 1px,transparent 1px);background-size:34px 34px;-webkit-mask-image:radial-gradient(ellipse 78% 62% at 50% 40%,#000 28%,transparent 76%);mask-image:radial-gradient(ellipse 78% 62% at 50% 40%,#000 28%,transparent 76%)}
+.hero .container{position:relative;z-index:1}
+
+/* ── Trust strip ──────────────────────────────────────────── */
+.trust-label{font-family:var(--font-mono);font-size:10px;color:var(--dim);letter-spacing:1.5px;text-transform:uppercase;margin-top:34px;margin-bottom:12px}
+.trust-strip{display:flex;flex-wrap:wrap;gap:8px}
+.trust-pill{font-family:var(--font-mono);font-size:11px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:20px;padding:6px 14px;transition:all .2s}
+.trust-pill:hover{color:var(--text);border-color:rgba(59,130,246,.35);background:rgba(59,130,246,.07);transform:translateY(-1px)}
+
+/* ── Path draw + tilt ─────────────────────────────────────── */
+.draw-path{stroke-dasharray:640;stroke-dashoffset:640;animation:drawPath 2.2s cubic-bezier(.6,0,.2,1) forwards .6s}
+@keyframes drawPath{to{stroke-dashoffset:0}}
+.tilt-card{transform-style:preserve-3d;will-change:transform}
+
+/* ── Market signal tiles ──────────────────────────────────── */
+.signal-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
+@media(max-width:768px){.signal-row{grid-template-columns:1fr}}
+.signal-tile{border-radius:12px;padding:18px 20px;border-left:3px solid var(--green);background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:flex;gap:14px;align-items:flex-start;box-shadow:0 2px 14px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.05)}
+.signal-tile.down{border-left-color:var(--red)}
+.signal-arrow{font-size:18px;line-height:1;margin-top:1px}
+.signal-tile-name{font-size:13px;font-weight:700;margin-bottom:5px}
+.signal-tile-impact{font-size:12px;color:var(--muted);font-family:var(--font-mono);line-height:1.5}
+.signal-tile-impact b{color:var(--text);font-weight:600}
+
+/* ── Evolution showcase ───────────────────────────────────── */
+.evo-inner{display:grid;grid-template-columns:1.6fr 1fr;gap:28px;align-items:stretch;margin-top:48px}
+@media(max-width:860px){.evo-inner{grid-template-columns:1fr}}
+.evo-chart-panel{border-radius:var(--radius);padding:26px}
+.evo-legend{display:flex;gap:18px;margin-bottom:6px;flex-wrap:wrap}
+.evo-legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-family:var(--font-mono)}
+.evo-legend-dot{width:10px;height:10px;border-radius:3px}
+.evo-chart-wrap{height:300px;margin-top:12px}
+.evo-stats{display:flex;flex-direction:column;gap:14px;justify-content:center}
+.evo-stat-card{border-radius:14px;padding:22px 24px}
+.evo-stat-label{font-family:var(--font-mono);font-size:11px;color:var(--muted);letter-spacing:.5px;margin-bottom:8px}
+.evo-stat-val{font-size:34px;font-weight:800;font-family:var(--font-mono);line-height:1}
+.evo-stat-sub{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.5}
+
+/* ── Testimonial ──────────────────────────────────────────── */
+.quote-section{padding:84px 0}
+.quote-card{max-width:840px;margin:0 auto;text-align:center;border-radius:24px;padding:56px 48px;position:relative}
+.quote-mark{font-family:Georgia,serif;font-size:110px;line-height:.5;color:var(--blue);opacity:.28;height:48px;user-select:none}
+.quote-text{font-size:clamp(19px,2.5vw,27px);font-weight:600;line-height:1.5;margin:18px 0 26px;letter-spacing:-.01em}
+.quote-attr{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
+.quote-badge{display:inline-flex;align-items:center;gap:8px;margin-top:18px;font-family:var(--font-mono);font-size:11px;color:var(--teal);background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.2);border-radius:20px;padding:6px 14px}
+@media(max-width:600px){.quote-card{padding:40px 24px}}
+
 /* ── Reveal ──────────────────────────────────────────────── */
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
 .reveal.visible{opacity:1;transform:none}
@@ -353,6 +409,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- ── Hero ─────────────────────────────────────────────────── -->
 <section class="hero">
+  <div class="hero-mesh">
+    <div class="hero-blob b1"></div>
+    <div class="hero-blob b2"></div>
+    <div class="hero-blob b3"></div>
+  </div>
+  <div class="hero-dots"></div>
   <div class="container">
     <div class="hero-grid">
       <div>
@@ -368,19 +430,29 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
         </div>
         <div class="hero-stats">
           <div class="hero-stat">
-            <span class="hero-stat-val">13%</span>
+            <span class="hero-stat-val count-stat" data-count="13" data-suffix="%">13%</span>
             <span class="hero-stat-label">raw material savings*</span>
           </div>
           <div class="hero-stat">
-            <span class="hero-stat-val">~50%</span>
+            <span class="hero-stat-val count-stat" data-count="50" data-prefix="~" data-suffix="%">~50%</span>
             <span class="hero-stat-label">price increases deflected*</span>
           </div>
           <div class="hero-stat">
-            <span class="hero-stat-val">31</span>
+            <span class="hero-stat-val count-stat" data-count="31">31</span>
             <span class="hero-stat-label">currency pairs tracked</span>
           </div>
         </div>
         <p style="font-size:10px;color:var(--dim);font-family:var(--font-mono);margin-top:8px">* McKinsey &amp; AlixPartners research</p>
+
+        <div class="trust-label">Built for procurement teams in</div>
+        <div class="trust-strip">
+          <span class="trust-pill">Chemicals</span>
+          <span class="trust-pill">Paper &amp; Pulp</span>
+          <span class="trust-pill">Food &amp; Beverage</span>
+          <span class="trust-pill">Mining</span>
+          <span class="trust-pill">Specialty Chemicals</span>
+          <span class="trust-pill">Agriculture</span>
+        </div>
       </div>
 
       <div class="hero-mockup-wrap">
@@ -415,8 +487,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
                   <stop offset="100%" stop-color="#ef4444" stop-opacity="0"/>
                 </linearGradient>
               </defs>
-              <polyline points="0,58 60,56 120,53 180,51 240,49 300,47 360,45 420,43" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round"/>
-              <polyline points="0,57 60,52 120,47 180,41 240,35 300,29 360,25 420,20" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+              <polyline class="draw-path" points="0,58 60,56 120,53 180,51 240,49 300,47 360,45 420,43" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round"/>
+              <polyline class="draw-path" points="0,57 60,52 120,47 180,41 240,35 300,29 360,25 420,20" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
               <polygon points="0,57 60,52 120,47 180,41 240,35 300,29 360,25 420,20 420,43 360,45 300,47 240,49 180,51 120,53 60,56 0,58" fill="url(#gFill)"/>
               <line x1="0" y1="18" x2="420" y2="18" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
               <line x1="0" y1="38" x2="420" y2="38" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
@@ -454,6 +526,30 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <h2 class="section-title">Commodity indices that drive your costs</h2>
     <p class="section-sub">Every should-cost model links to these real indices. Watch them move — and know exactly what that means for your procurement position.</p>
     <div class="pulse-grid" id="pulseGrid"></div>
+
+    <div class="signal-row">
+      <div class="signal-tile reveal">
+        <span class="signal-arrow" style="color:var(--green)">▲</span>
+        <div>
+          <div class="signal-tile-name">Ammonia +4.2% QoQ</div>
+          <div class="signal-tile-impact">Should-cost impact: <b style="color:var(--green)">+€8.40/t</b> on a 40%-weighted model</div>
+        </div>
+      </div>
+      <div class="signal-tile down reveal" style="transition-delay:.08s">
+        <span class="signal-arrow" style="color:var(--red)">▼</span>
+        <div>
+          <div class="signal-tile-name">Brent Crude −2.1% QoQ</div>
+          <div class="signal-tile-impact">Should-cost impact: <b style="color:var(--red)">−€3.20/t</b> on energy-linked components</div>
+        </div>
+      </div>
+      <div class="signal-tile reveal" style="transition-delay:.16s">
+        <span class="signal-arrow" style="color:var(--green)">▲</span>
+        <div>
+          <div class="signal-tile-name">Natural Gas +6.9% QoQ</div>
+          <div class="signal-tile-impact">Should-cost impact: <b style="color:var(--green)">+€5.10/t</b> on a 30%-weighted model</div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -479,6 +575,42 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           </div>
         </div>
         <div class="fx-current-grid" id="fxCurrentGrid"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Evolution Showcase ────────────────────────────────────── -->
+<section id="evolution">
+  <div class="container">
+    <p class="section-label">Cost Evolution</p>
+    <h2 class="section-title">Watch the gap open up — quarter by quarter</h2>
+    <p class="section-sub">Track how your should-cost model evolves as commodity markets move, and exactly where your supplier's price diverges. Never walk into a price negotiation blind.</p>
+    <div class="evo-inner">
+      <div class="evo-chart-panel glass skeuo reveal">
+        <div class="evo-legend">
+          <div class="evo-legend-item"><span class="evo-legend-dot" style="background:#10B981"></span>Should-Cost</div>
+          <div class="evo-legend-item"><span class="evo-legend-dot" style="background:#EF4444"></span>Supplier Price</div>
+          <div class="evo-legend-item"><span class="evo-legend-dot" style="background:rgba(239,68,68,.35)"></span>Negotiation Gap</div>
+        </div>
+        <div class="evo-chart-wrap"><canvas id="evoChart"></canvas></div>
+      </div>
+      <div class="evo-stats">
+        <div class="evo-stat-card glass skeuo reveal">
+          <div class="evo-stat-label">TOTAL GAP / YEAR</div>
+          <div class="evo-stat-val" style="color:var(--red)">€2.3M</div>
+          <div class="evo-stat-sub">Supplier price above defensible should-cost across 38,000 t/yr.</div>
+        </div>
+        <div class="evo-stat-card glass skeuo reveal" style="transition-delay:.08s">
+          <div class="evo-stat-label">SUPPLIER OVERCHARGE</div>
+          <div class="evo-stat-val" style="color:var(--amber)">18.4%</div>
+          <div class="evo-stat-sub">Current quarter premium over the modelled cost.</div>
+        </div>
+        <div class="evo-stat-card glass skeuo reveal" style="transition-delay:.16s">
+          <div class="evo-stat-label">QUARTERS TRACKED</div>
+          <div class="evo-stat-val" style="color:var(--blue)">8</div>
+          <div class="evo-stat-sub">Continuous history feeding the negotiation brief.</div>
+        </div>
       </div>
     </div>
   </div>
@@ -628,6 +760,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
         <h4>RBAC + 38 Permissions</h4>
         <p>Team-scoped roles with granular permission gates. Plan ceilings enforced server-side. Invite-only sign-up.</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Testimonial ───────────────────────────────────────────── -->
+<section class="quote-section">
+  <div class="container">
+    <div class="quote-card glass skeuo reveal">
+      <div class="quote-mark">&ldquo;</div>
+      <p class="quote-text">CostAdvisor turns a two-week analysis into a 20-minute preparation. We walked into our last ammonia negotiation with numbers our supplier simply couldn't dispute.</p>
+      <div class="quote-attr">Head of Procurement</div>
+      <div class="quote-badge">European Specialty Chemicals Manufacturer</div>
     </div>
   </div>
 </section>
@@ -946,7 +1090,7 @@ function buildPulseCards() {
     const last=c.data[c.data.length-1], prev=c.data[c.data.length-2];
     const chg=((last-prev)/prev*100).toFixed(1), up=chg>=0;
     const valStr = c.unit.includes('t') && last>999 ? last.toLocaleString() : last;
-    return `<div class="pulse-card skeuo reveal" style="transition-delay:${i*70}ms">
+    return `<div class="pulse-card skeuo reveal tilt-card" style="transition-delay:${i*70}ms">
       <div class="pulse-card-name">${c.name}</div>
       <div class="pulse-card-val">${valStr}</div>
       <div class="pulse-card-unit">${c.unit} · Q4-25</div>
@@ -1328,6 +1472,89 @@ async function submitDemoRequest(){
   }
 }
 
+// ── Evolution chart ──────────────────────────────────────────
+let evoChartInst=null;
+function initEvoChart(){
+  if(typeof Chart==='undefined'){setTimeout(initEvoChart,150);return}
+  const canvas=document.getElementById('evoChart');
+  if(!canvas)return;
+  const labels=['Q1-24','Q2-24','Q3-24','Q4-24','Q1-25','Q2-25','Q3-25','Q4-25'];
+  const should=[310,318,325,332,328,335,342,348];
+  const supplier=[340,345,355,372,368,382,398,405];
+  const ctx=canvas.getContext('2d');
+  const gapFill=ctx.createLinearGradient(0,0,0,300);
+  gapFill.addColorStop(0,'rgba(239,68,68,.22)');gapFill.addColorStop(1,'rgba(239,68,68,.02)');
+  evoChartInst=new Chart(canvas,{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Supplier Price',data:supplier,borderColor:'#EF4444',backgroundColor:gapFill,fill:'+1',tension:.35,pointRadius:3,pointBackgroundColor:'#EF4444',borderWidth:2.5},
+      {label:'Should-Cost',data:should,borderColor:'#10B981',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:3,pointBackgroundColor:'#10B981',borderWidth:2.5}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: €${c.raw}/t`,afterBody:items=>{
+        const s=items.find(i=>i.dataset.label==='Supplier Price'),m=items.find(i=>i.dataset.label==='Should-Cost');
+        if(s&&m){const gap=((s.raw-m.raw)/m.raw*100).toFixed(1);return `\nGap: +${gap}%`}return ''}}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{font:{size:10}}},
+              y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{font:{size:10},callback:v=>'€'+v}}}}
+  });
+}
+
+// ── Animated counters ─────────────────────────────────────────
+function animateCount(el,target,duration){
+  const prefix=el.dataset.prefix||'',suffix=el.dataset.suffix||'';
+  const start=performance.now();
+  function step(now){
+    const p=Math.min((now-start)/duration,1);
+    const ease=1-Math.pow(1-p,4);
+    el.textContent=prefix+Math.round(ease*target)+suffix;
+    if(p<1)requestAnimationFrame(step);
+    else el.textContent=prefix+target+suffix;
+  }
+  requestAnimationFrame(step);
+}
+const countObs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const t=parseInt(e.target.dataset.count,10);
+      if(!isNaN(t))animateCount(e.target,t,1300);
+      countObs.unobserve(e.target);
+    }
+  });
+},{threshold:.5});
+function observeCounters(){document.querySelectorAll('.count-stat').forEach(el=>countObs.observe(el))}
+
+// ── Mouse-tilt cards ──────────────────────────────────────────
+function initTilt(){
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  if(window.matchMedia('(hover: none)').matches)return; // skip on touch
+  document.querySelectorAll('.tilt-card').forEach(card=>{
+    card.addEventListener('mousemove',e=>{
+      const r=card.getBoundingClientRect();
+      const x=e.clientX-r.left-r.width/2;
+      const y=e.clientY-r.top-r.height/2;
+      card.style.transition='transform .08s ease-out';
+      card.style.transform=`perspective(600px) rotateX(${-(y/r.height)*9}deg) rotateY(${(x/r.width)*9}deg) translateZ(6px)`;
+    });
+    card.addEventListener('mouseleave',()=>{
+      card.style.transition='transform .5s cubic-bezier(.23,1,.32,1)';
+      card.style.transform='';
+    });
+  });
+}
+
+// ── Slider fill ───────────────────────────────────────────────
+function updateSliderFill(s){
+  const min=+s.min,max=+s.max,val=+s.value;
+  const pct=((val-min)/(max-min))*100;
+  s.style.background=`linear-gradient(to right,var(--blue) ${pct}%,#1a2238 ${pct}%)`;
+}
+function initSliderFills(){
+  document.querySelectorAll('input[type=range]').forEach(s=>{
+    updateSliderFill(s);
+    s.addEventListener('input',()=>updateSliderFill(s));
+  });
+}
+
 // ── Keyboard ─────────────────────────────────────────────────
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){closeAccessModal();closeDemoModal()}
@@ -1373,10 +1600,13 @@ buildFxTabs();
 
 function boot(){
   observeReveal();
+  observeCounters();
+  initSliderFills();
   initDemoChart();
   initFxChart();
-  // sparklines need cards in DOM — slight delay to ensure they've rendered
-  setTimeout(()=>{initSparklines();observeReveal();},250);
+  initEvoChart();
+  // sparklines + tilt need cards in DOM — slight delay to ensure they've rendered
+  setTimeout(()=>{initSparklines();initTilt();observeReveal();},250);
 }
 
 if(document.readyState==='loading'){
