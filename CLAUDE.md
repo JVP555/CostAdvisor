@@ -251,6 +251,26 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 CORS updated for `www.costadvisor.org`; router registered in `main.py`
   - 🟢 Landing page CTA form submits email to API via `fetch POST` (replaced mailto fallback)
 
+- 🟡 **Scrum 12c** — Demo scheduling (landing page book-a-demo flow + admin management)
+  - 🟢 `DemoHost`, `DemoBlockedSlot`, `DemoRequest` models + Alembic migration (`dem0_1a2b3c4d5e`)
+  - 🟢 `GET /api/demos/available-slots?date=` (public) — slots where at least one host is free
+  - 🟢 `POST /api/demos/` (public) — submit demo request; 409 if active request for email; receipt email sent
+  - 🟢 Admin demo-hosts CRUD: GET/POST/PUT/DELETE `/api/admin/demo-hosts`, disconnect calendar endpoint
+  - 🟢 Admin blocked slots CRUD: GET/POST/DELETE per host
+  - 🟢 Admin demo-requests: GET list, accept (creates Google Meet + Calendar event + confirmation email), reject, edit remarks
+  - 🟢 `GET /auth/google-calendar/start` + `GET /auth/google-calendar/callback` — per-host OAuth (offline, prompt=consent)
+  - 🟢 `google_calendar.py` — Fernet-encrypt/decrypt refresh token; `create_google_meet()` with conferenceDataVersion=1
+  - 🟢 `send_demo_request_received_email` + `send_demo_confirmation_email` added to email.py
+  - 🟢 `google_calendar_encryption_key` setting added to config.py; `google-api-python-client` added to requirements.txt
+  - 🟢 Admin Requests tab split into Access / Demo sub-tabs (pill toggle)
+  - 🟢 DemoRequestsTab: Name/Company/Phone/Email/Date-Time/Status/Meet/Remarks/Actions columns; Accept (opens dialog with remarks + creates Meet) / Reject; inline remarks editing
+  - 🟢 Admin Settings → Demo Hosts section: table with calendar status, active toggle, edit config, blocked slots expander, remove
+  - 🟢 Landing page hero + CTA: "Schedule a demo" button added
+  - 🟢 Landing page 3-step demo modal: date calendar → time slot picker → contact form → success/error
+  - 🟢 `landing/css/demo.css` — calendar grid, slot button, step indicator styles
+  - 🔴 "Connect Google Calendar" in admin redirects correctly after OAuth (requires GOOGLE_CALENDAR_ENCRYPTION_KEY env var set)
+  - 🔴 Google Cloud project: Calendar API enabled, redirect URIs registered for prod/staging/dev
+
 - 🟢 **Scrum 14** — End-to-end win-a-negotiation flow (product → components → indices → should-cost → actuals → gap → export brief)
   - 🟢 A new user can complete the full flow (steps 1–8) without external help
   - 🟢 Every empty or missing-data state has a clear message and a next action

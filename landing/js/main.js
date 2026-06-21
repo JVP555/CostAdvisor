@@ -282,8 +282,212 @@ async function submitAccessModal() {
 
 // Close modal on Escape key
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeAccessModal();
+  if (e.key === 'Escape') { closeAccessModal(); closeDemoModal(); }
 });
+
+// ─── Demo scheduling modal ───
+let _demoYear, _demoMonth, _demoSelectedDate, _demoSelectedSlot;
+
+function openDemoModal() {
+  const now = new Date();
+  _demoYear  = now.getFullYear();
+  _demoMonth = now.getMonth();
+  _demoSelectedDate = null;
+  _demoSelectedSlot = null;
+  _showDemoStep(1);
+  renderDemoCalendar(_demoYear, _demoMonth);
+  document.getElementById('lpDemoModal').style.display = 'flex';
+}
+
+function closeDemoModal() {
+  document.getElementById('lpDemoModal').style.display = 'none';
+}
+
+function handleDemoBackdrop(e) {
+  if (e.target === document.getElementById('lpDemoModal')) closeDemoModal();
+}
+
+function _showDemoStep(n) {
+  ['lpDemoStep1','lpDemoStep2','lpDemoStep3','lpDemoSuccess','lpDemoError'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  const stepMap = { 1: 'lpDemoStep1', 2: 'lpDemoStep2', 3: 'lpDemoStep3' };
+  if (stepMap[n]) document.getElementById(stepMap[n]).style.display = '';
+  ['lpStep1Dot','lpStep2Dot','lpStep3Dot'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', i + 1 === n);
+  });
+}
+
+function demoGoStep(n) { _showDemoStep(n); }
+
+function demoCalNav(dir) {
+  _demoMonth += dir;
+  if (_demoMonth > 11) { _demoMonth = 0; _demoYear++; }
+  if (_demoMonth < 0)  { _demoMonth = 11; _demoYear--; }
+  renderDemoCalendar(_demoYear, _demoMonth);
+}
+
+function renderDemoCalendar(year, month) {
+  const label = new Date(year, month, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+  document.getElementById('lpCalMonthLabel').textContent = label;
+
+  const cal = document.getElementById('lpCal');
+  cal.innerHTML = '';
+  const DOW = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+  DOW.forEach(d => {
+    const h = document.createElement('div');
+    h.className = 'lp-cal-dow';
+    h.textContent = d;
+    cal.appendChild(h);
+  });
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const first = new Date(year, month, 1);
+  // Week starts Monday (0=Mon…6=Sun)
+  let startDow = first.getDay(); // 0=Sun..6=Sat
+  startDow = (startDow + 6) % 7; // convert to Mon-start
+  for (let i = 0; i < startDow; i++) {
+    const blank = document.createElement('div');
+    cal.appendChild(blank);
+  }
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayDate = new Date(year, month, d);
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const btn = document.createElement('button');
+    btn.className = 'lp-cal-day';
+    btn.textContent = d;
+    const isPast = dayDate < today;
+    if (isPast) {
+      btn.classList.add('lp-cal-day--disabled');
+    } else {
+      btn.onclick = () => selectDemoDate(dateStr);
+    }
+    if (dateStr === _demoSelectedDate) btn.classList.add('lp-cal-day--selected');
+    // Today highlight
+    if (dayDate.getTime() === today.getTime()) btn.classList.add('lp-cal-day--today');
+    cal.appendChild(btn);
+  }
+
+  // Disable prev-nav when current month is today's month
+  const isCurrentMonth = (year === today.getFullYear() && month === today.getMonth());
+  document.getElementById('lpCalPrev').disabled = isCurrentMonth;
+}
+
+async function selectDemoDate(dateStr) {
+  _demoSelectedDate = dateStr;
+  // Re-render calendar to show selection
+  renderDemoCalendar(_demoYear, _demoMonth);
+  document.getElementById('lpDemoDateError').style.display = 'none';
+
+  try {
+    const res = await fetch(`${API_URL}/api/demos/available-slots?date=${dateStr}`);
+    const slots = await res.json();
+    if (!Array.isArray(slots) || slots.length === 0) {
+      document.getElementById('lpDemoDateError').style.display = '';
+      return;
+    }
+    renderDemoSlots(slots, dateStr);
+    _showDemoStep(2);
+  } catch (err) {
+    document.getElementById('lpDemoDateError').style.display = '';
+  }
+}
+
+function renderDemoSlots(slots, dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const label = d.toLocaleDateString('default', { weekday:'long', month:'long', day:'numeric' });
+  document.getElementById('lpDemoSlotSub').textContent = label;
+
+  const grid = document.getElementById('lpSlotGrid');
+  grid.innerHTML = '';
+  _demoSelectedSlot = null;
+
+  slots.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'lp-slot-btn';
+    btn.textContent = `${s.start_time}–${s.end_time}`;
+    btn.onclick = () => selectDemoSlot(s.start_time, s.end_time, btn);
+    grid.appendChild(btn);
+  });
+}
+
+function selectDemoSlot(start, end, btn) {
+  _demoSelectedSlot = { start, end };
+  document.querySelectorAll('.lp-slot-btn').forEach(b => b.classList.remove('lp-slot-btn--selected'));
+  btn.classList.add('lp-slot-btn--selected');
+  const d = new Date(_demoSelectedDate + 'T00:00:00');
+  const label = d.toLocaleDateString('default', { weekday:'long', month:'long', day:'numeric' });
+  document.getElementById('lpDemoDetailsSub').textContent = `${label} · ${start}–${end} UTC`;
+  setTimeout(() => _showDemoStep(3), 200);
+}
+
+async function submitDemoRequest() {
+  const name    = document.getElementById('lpDemoName').value.trim();
+  const email   = document.getElementById('lpDemoEmail').value.trim();
+  const phone   = document.getElementById('lpDemoPhone').value.trim();
+  const company = document.getElementById('lpDemoCompany').value.trim();
+  const errEl   = document.getElementById('lpDemoFormError');
+  errEl.style.display = 'none';
+
+  if (!name || !email || !phone || !company) {
+    errEl.textContent = 'Please fill in all required fields.';
+    errEl.style.display = '';
+    return;
+  }
+  if (!_demoSelectedDate || !_demoSelectedSlot) {
+    errEl.textContent = 'Please go back and select a date and time.';
+    errEl.style.display = '';
+    return;
+  }
+
+  const btn = document.getElementById('lpDemoSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  try {
+    const res = await fetch(`${API_URL}/api/demos/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name, email, phone, company,
+        requested_date: _demoSelectedDate,
+        requested_start: _demoSelectedSlot.start,
+        requested_end: _demoSelectedSlot.end,
+        visitor_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      }),
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'Book demo';
+
+    if (res.status === 409) {
+      errEl.textContent = 'A demo request already exists for this email address. Check your inbox or contact us directly.';
+      errEl.style.display = '';
+      return;
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      document.getElementById('lpDemoErrorMsg').textContent = data.detail || 'Something went wrong. Please try again.';
+      ['lpDemoStep1','lpDemoStep2','lpDemoStep3'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+      document.getElementById('lpDemoError').style.display = '';
+      return;
+    }
+
+    ['lpDemoStep1','lpDemoStep2','lpDemoStep3'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    document.getElementById('lpDemoSuccess').style.display = '';
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Book demo';
+    document.getElementById('lpDemoErrorMsg').textContent = 'Network error. Please try again.';
+    ['lpDemoStep1','lpDemoStep2','lpDemoStep3'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    document.getElementById('lpDemoError').style.display = '';
+  }
+}
 
 // ─── Count-up for stat numbers ───
 function animateLpStat(el) {

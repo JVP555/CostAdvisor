@@ -53,6 +53,7 @@
   <link rel="stylesheet" href="css/security.css" />
   <link rel="stylesheet" href="css/cta.css" />
   <link rel="stylesheet" href="css/modal.css" />
+  <link rel="stylesheet" href="css/demo.css" />
   <link rel="stylesheet" href="css/footer.css" />
 
   <!-- Structured data -->
@@ -182,6 +183,7 @@
             </div>
             <div class="lp-hero-cta" id="hero-cta">
               <a href="#" class="lp-btn lp-btn-primary lp-btn-lg" onclick="openAccessModal();return false;">Request early access</a>
+              <a href="#" class="lp-btn lp-btn-outline lp-btn-lg" onclick="openDemoModal();return false;">Schedule a demo</a>
               <a href="http://localhost:8000/auth/login" class="lp-btn lp-btn-ghost lp-btn-lg">Sign in →</a>
             </div>
           </div>
@@ -1305,6 +1307,7 @@
           </p>
           <div id="cta-actions">
             <button class="lp-btn lp-btn-primary lp-btn-lg" onclick="openAccessModal()">Request access →</button>
+            <button class="lp-btn lp-btn-outline lp-btn-lg" onclick="openDemoModal()">Schedule a demo</button>
             <a href="http://localhost:8000/auth/login" class="lp-cta-signin">Already have an account →</a>
           </div>
           <p class="lp-cta-note" id="cta-note">Invite-only. We review every request personally.</p>
@@ -1359,6 +1362,83 @@
       </div>
     </div>
   </footer>
+
+  <!-- ═══════════════════════════════ DEMO SCHEDULING MODAL ═══ -->
+  <div id="lpDemoModal" class="lp-modal-backdrop" role="dialog" aria-modal="true"
+       aria-labelledby="lpDemoTitle" style="display:none" onclick="handleDemoBackdrop(event)">
+    <div class="lp-modal lp-modal-wide">
+      <button class="lp-modal-close" onclick="closeDemoModal()" aria-label="Close">✕</button>
+
+      <!-- Step indicator -->
+      <div class="lp-demo-steps" id="lpDemoStepIndicator">
+        <span class="lp-demo-step" id="lpStep1Dot">1 · Choose date</span>
+        <span class="lp-demo-step-sep">›</span>
+        <span class="lp-demo-step" id="lpStep2Dot">2 · Choose time</span>
+        <span class="lp-demo-step-sep">›</span>
+        <span class="lp-demo-step" id="lpStep3Dot">3 · Your details</span>
+      </div>
+
+      <!-- Step 1: Calendar -->
+      <div id="lpDemoStep1">
+        <h2 class="lp-modal-title" id="lpDemoTitle">Schedule a demo</h2>
+        <p class="lp-modal-sub">Pick a date that works for you. We'll send you a Google Meet link once confirmed.</p>
+        <div class="lp-cal-header">
+          <button class="lp-cal-nav" id="lpCalPrev" onclick="demoCalNav(-1)">&#8249;</button>
+          <span id="lpCalMonthLabel" class="lp-cal-month"></span>
+          <button class="lp-cal-nav" id="lpCalNext" onclick="demoCalNav(+1)">&#8250;</button>
+        </div>
+        <div class="lp-cal" id="lpCal"></div>
+        <p id="lpDemoDateError" class="lp-modal-error" style="display:none">No availability on this date — try another day.</p>
+      </div>
+
+      <!-- Step 2: Time slots -->
+      <div id="lpDemoStep2" style="display:none">
+        <h2 class="lp-modal-title">Choose a time</h2>
+        <p class="lp-modal-sub" id="lpDemoSlotSub"></p>
+        <div class="lp-slot-grid" id="lpSlotGrid"></div>
+        <p id="lpDemoSlotError" class="lp-modal-error" style="display:none">No slots available — please choose another date.</p>
+        <div class="lp-demo-nav">
+          <button class="lp-btn lp-btn-ghost" onclick="demoGoStep(1)">← Back</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Contact details -->
+      <div id="lpDemoStep3" style="display:none">
+        <h2 class="lp-modal-title">Your details</h2>
+        <p class="lp-modal-sub" id="lpDemoDetailsSub"></p>
+        <label class="lp-modal-label" for="lpDemoName">Your name <span class="lp-modal-req">*</span></label>
+        <input class="lp-modal-input" id="lpDemoName" type="text" placeholder="Jane Smith" autocomplete="name" />
+        <label class="lp-modal-label" for="lpDemoEmail">Work email <span class="lp-modal-req">*</span></label>
+        <input class="lp-modal-input" id="lpDemoEmail" type="email" placeholder="you@company.com" autocomplete="email" />
+        <label class="lp-modal-label" for="lpDemoPhone">Phone <span class="lp-modal-req">*</span></label>
+        <input class="lp-modal-input" id="lpDemoPhone" type="tel" placeholder="+44 20 1234 5678" autocomplete="tel" />
+        <label class="lp-modal-label" for="lpDemoCompany">Company <span class="lp-modal-req">*</span></label>
+        <input class="lp-modal-input" id="lpDemoCompany" type="text" placeholder="Acme Corp" autocomplete="organization" />
+        <p id="lpDemoFormError" class="lp-modal-error" style="display:none"></p>
+        <div class="lp-modal-actions">
+          <button class="lp-btn lp-btn-primary" id="lpDemoSubmitBtn" onclick="submitDemoRequest()">Book demo</button>
+          <button class="lp-btn lp-btn-ghost" onclick="demoGoStep(2)">← Back</button>
+        </div>
+      </div>
+
+      <!-- Success -->
+      <div id="lpDemoSuccess" style="display:none" class="lp-modal-success">
+        <div class="lp-modal-success-icon">✓</div>
+        <p>Demo request received! We'll send you a confirmation email shortly.</p>
+        <button class="lp-btn lp-btn-ghost" onclick="closeDemoModal()">Close</button>
+      </div>
+
+      <!-- Error -->
+      <div id="lpDemoError" style="display:none" class="lp-modal-success">
+        <div class="lp-modal-success-icon" style="background:var(--accent2-dim,#2b1111);color:var(--accent2,#ef4444);border-color:var(--accent2,#ef4444)">✕</div>
+        <p id="lpDemoErrorMsg">Something went wrong. Please try again.</p>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button class="lp-btn lp-btn-ghost" onclick="demoGoStep(3)">← Try again</button>
+          <button class="lp-btn lp-btn-ghost" onclick="closeDemoModal()">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ═══════════════════════════════ ACCESS REQUEST MODAL ═══ -->
   <div id="lpAccessModal" class="lp-modal-backdrop" role="dialog" aria-modal="true"

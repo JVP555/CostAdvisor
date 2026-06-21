@@ -13,13 +13,22 @@ from app.models.team import Team, TeamMembership
 from app.models.audit_log import AuditLog
 from app.models.access_request import PlatformAccessRequest
 from app.models.rbac import Plan, Role, TeamMemberRole, UserPlatformRole
+from app.models.demo import DemoHost, DemoBlockedSlot, DemoRequest
 from app.config import get_settings
 from app.routers.auth import get_current_user, create_jwt
 from app.schemas.user import UserOut
 from app.schemas.audit_log import AuditLogOut
 from app.schemas.access_request import AccessRequestOut
+from app.schemas.demo import (
+    DemoHostCreate, DemoHostUpdate, DemoHostOut,
+    BlockedSlotCreate, BlockedSlotOut,
+    DemoRequestOut, DemoRemarkUpdate,
+)
 from app.services.audit import log_event
-from app.services.email import send_access_granted_email, send_welcome_email
+from app.services.email import (
+    send_access_granted_email, send_welcome_email,
+    send_demo_confirmation_email,
+)
 
 router = APIRouter()
 settings = get_settings()
@@ -744,3 +753,363 @@ def list_admin_audit_logs(
         )
         for log in logs
     ]
+
+
+# ── Demo Hosts ────────────────────────────────────────────────────────────────
+
+def _host_out(host: DemoHost) -> DemoHostOut:
+    return DemoHostOut(
+        id=host.id,
+        user_id=host.user_id,
+        user_name=host.user.display_name if host.user else None,
+        user_email=host.user.email if host.user else None,
+        is_active=host.is_active,
+        timezone=host.timezone,
+        slot_duration_minutes=host.slot_duration_minutes,
+        working_days=host.working_days or [0, 1, 2, 3, 4],
+        working_start=host.working_start,
+        working_end=host.working_end,
+        calendar_connected=bool(host.google_refresh_token_encrypted),
+        google_email=host.google_email,
+        created_at=host.created_at,
+    )
+
+
+@router.get("/demo-hosts", response_model=list[DemoHostOut])
+def list_demo_hosts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    hosts = db.query(DemoHost).all()
+    return [_host_out(h) for h in hosts]
+
+
+@router.post("/demo-hosts", response_model=DemoHostOut)
+def create_demo_host(
+    payload: DemoHostCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    existing = db.query(DemoHost).filter(DemoHost.user_id == payload.user_id).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="User is already a demo host")
+    host = DemoHost(
+        user_id=payload.user_id,
+        timezone=payload.timezone,
+        slot_duration_minutes=payload.slot_duration_minutes,
+        working_days=payload.working_days,
+        working_start=payload.working_start,
+        working_end=payload.working_end,
+    )
+    db.add(host)
+    db.commit()
+    db.refresh(host)
+    return _host_out(host)
+
+
+@router.put("/demo-hosts/{host_id}", response_model=DemoHostOut)
+def update_demo_host(
+    host_id: uuid.UUID,
+    payload: DemoHostUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    host = db.get(DemoHost, host_id)
+    if not host:
+        raise HTTPException(status_code=404, detail="Demo host not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(host, field, value)
+    db.commit()
+    db.refresh(host)
+    return _host_out(host)
+
+
+@router.delete("/demo-hosts/{host_id}")
+def delete_demo_host(
+    host_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    host = db.get(DemoHost, host_id)
+    if not host:
+        raise HTTPException(status_code=404, detail="Demo host not found")
+    db.delete(host)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@router.delete("/demo-hosts/{host_id}/calendar")
+def disconnect_demo_host_calendar(
+    host_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """Remove stored Google Calendar credentials from a demo host."""
+    host = db.get(DemoHost, host_id)
+    if not host:
+        raise HTTPException(status_code=404, detail="Demo host not found")
+    host.google_email = None
+    host.google_refresh_token_encrypted = None
+    host.google_token_expiry = None
+    db.commit()
+    return {"status": "disconnected"}
+
+
+# ── Blocked Slots ─────────────────────────────────────────────────────────────
+
+@router.get("/demo-hosts/{host_id}/blocked-slots", response_model=list[BlockedSlotOut])
+def list_blocked_slots(
+    host_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    host = db.get(DemoHost, host_id)
+    if not host:
+        raise HTTPException(status_code=404, detail="Demo host not found")
+    slots = db.query(DemoBlockedSlot).filter(DemoBlockedSlot.host_id == host_id).all()
+    return slots
+
+
+@router.post("/demo-hosts/{host_id}/blocked-slots", response_model=BlockedSlotOut)
+def add_blocked_slot(
+    host_id: uuid.UUID,
+    payload: BlockedSlotCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    host = db.get(DemoHost, host_id)
+    if not host:
+        raise HTTPException(status_code=404, detail="Demo host not found")
+    slot = DemoBlockedSlot(
+        host_id=host_id,
+        blocked_date=payload.blocked_date,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+    )
+    db.add(slot)
+    db.commit()
+    db.refresh(slot)
+    return slot
+
+
+@router.delete("/demo-hosts/{host_id}/blocked-slots/{slot_id}")
+def delete_blocked_slot(
+    host_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    slot = db.get(DemoBlockedSlot, slot_id)
+    if not slot or slot.host_id != host_id:
+        raise HTTPException(status_code=404, detail="Blocked slot not found")
+    db.delete(slot)
+    db.commit()
+    return {"status": "deleted"}
+
+
+# ── Demo Requests ─────────────────────────────────────────────────────────────
+
+def _req_out(req: DemoRequest) -> DemoRequestOut:
+    return DemoRequestOut(
+        id=req.id,
+        email=req.email,
+        name=req.name,
+        phone=req.phone,
+        company=req.company,
+        requested_date=req.requested_date,
+        requested_start=req.requested_start,
+        requested_end=req.requested_end,
+        visitor_timezone=req.visitor_timezone,
+        status=req.status,
+        meet_link=req.meet_link,
+        remarks=req.remarks,
+        created_at=req.created_at,
+        reviewed_at=req.reviewed_at,
+        reviewed_by_name=(
+            req.reviewed_by.display_name or req.reviewed_by.email
+            if req.reviewed_by else None
+        ),
+        assigned_host_name=(
+            req.assigned_host.user.display_name or req.assigned_host.user.email
+            if req.assigned_host and req.assigned_host.user else None
+        ),
+    )
+
+
+@router.get("/demo-requests", response_model=list[DemoRequestOut])
+def list_demo_requests(
+    status: str | None = Query(None),
+    search: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    query = db.query(DemoRequest)
+    if status:
+        query = query.filter(DemoRequest.status == status)
+    if search:
+        term = f"%{search.lower()}%"
+        query = query.filter(
+            or_(
+                DemoRequest.email.ilike(term),
+                DemoRequest.name.ilike(term),
+                DemoRequest.company.ilike(term),
+            )
+        )
+    reqs = query.order_by(DemoRequest.created_at.desc()).all()
+    return [_req_out(r) for r in reqs]
+
+
+class DemoAcceptPayload(BaseModel):
+    remarks: str | None = None
+
+
+@router.post("/demo-requests/{request_id}/accept")
+def accept_demo_request(
+    request_id: uuid.UUID,
+    payload: DemoAcceptPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """Accept a demo request. The current user must be a configured demo host
+    with a Google Calendar connection — they become the host for this meeting."""
+    req = db.get(DemoRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="Demo request not found")
+    if req.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Request is already {req.status}")
+
+    # Current user must be an active demo host with calendar connected
+    host = db.query(DemoHost).filter(
+        DemoHost.user_id == current_user.id,
+        DemoHost.is_active == True,  # noqa: E712
+    ).first()
+    if not host:
+        raise HTTPException(
+            status_code=400,
+            detail="You are not configured as a demo host. Ask a super-admin to add you in Admin → Settings → Demo Hosts.",
+        )
+    if not host.google_refresh_token_encrypted:
+        raise HTTPException(
+            status_code=400,
+            detail="Connect your Google Calendar first in Admin → Settings → Demo Hosts.",
+        )
+
+    # Check this host doesn't already have an accepted booking at this slot
+    conflict = db.query(DemoRequest).filter(
+        DemoRequest.assigned_host_id == host.id,
+        DemoRequest.requested_date == req.requested_date,
+        DemoRequest.requested_start == req.requested_start,
+        DemoRequest.status == "accepted",
+    ).first()
+    if conflict:
+        raise HTTPException(
+            status_code=409,
+            detail="You already have a confirmed demo at this time slot.",
+        )
+
+    # Create Google Calendar event with Meet
+    from datetime import datetime as dt
+    from app.services.google_calendar import create_google_meet
+
+    start_dt = dt.strptime(
+        f"{req.requested_date} {req.requested_start}", "%Y-%m-%d %H:%M"
+    )
+    end_dt = dt.strptime(
+        f"{req.requested_date} {req.requested_end}", "%Y-%m-%d %H:%M"
+    )
+
+    try:
+        meet_link, event_id = create_google_meet(
+            host=host,
+            requester_email=req.email,
+            requester_name=req.name,
+            company=req.company,
+            start_dt=start_dt,
+            end_dt=end_dt,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to create Google Meet: {exc}",
+        )
+
+    req.status = "accepted"
+    req.assigned_host_id = host.id
+    req.meet_link = meet_link
+    req.calendar_event_id = event_id
+    req.remarks = payload.remarks
+    req.reviewed_at = datetime.now(timezone.utc)
+    req.reviewed_by_id = current_user.id
+    db.commit()
+
+    host_name = current_user.display_name or current_user.email
+    date_fmt = req.requested_date
+    time_fmt = f"{req.requested_start}–{req.requested_end}"
+    send_demo_confirmation_email(
+        req.email, req.name, date_fmt, time_fmt, meet_link, host_name
+    )
+
+    log_event(
+        db,
+        event_type="admin_accept_demo_request",
+        user_id=current_user.id,
+        new_value={"email": req.email, "date": req.requested_date, "host": host_name},
+    )
+
+    return _req_out(req)
+
+
+class DemoRejectPayload(BaseModel):
+    remarks: str | None = None
+
+
+@router.post("/demo-requests/{request_id}/reject")
+def reject_demo_request(
+    request_id: uuid.UUID,
+    payload: DemoRejectPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    req = db.get(DemoRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="Demo request not found")
+    if req.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Request is already {req.status}")
+
+    req.status = "rejected"
+    req.remarks = payload.remarks
+    req.reviewed_at = datetime.now(timezone.utc)
+    req.reviewed_by_id = current_user.id
+    db.commit()
+
+    log_event(
+        db,
+        event_type="admin_reject_demo_request",
+        user_id=current_user.id,
+        new_value={"email": req.email, "date": req.requested_date},
+    )
+
+    return _req_out(req)
+
+
+@router.patch("/demo-requests/{request_id}/remarks")
+def update_demo_remarks(
+    request_id: uuid.UUID,
+    payload: DemoRemarkUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    req = db.get(DemoRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="Demo request not found")
+    req.remarks = payload.remarks
+    db.commit()
+
+    log_event(
+        db,
+        event_type="admin_edit_demo_remarks",
+        user_id=current_user.id,
+        new_value={"email": req.email, "remarks": payload.remarks},
+    )
+
+    return _req_out(req)

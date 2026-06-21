@@ -177,6 +177,55 @@ def send_welcome_email(to_email: str, display_name: str, app_url: str) -> bool:
     return _send(to_email, "Welcome to CostAdvisor", html)
 
 
+def send_demo_request_received_email(to_email: str, name: str) -> bool:
+    """Acknowledge receipt of a demo request — sent immediately on submission."""
+    display = name or to_email.split("@")[0]
+    settings = get_settings()
+    html = build_welcome_html(
+        display_name=display,
+        app_url=settings.app_url,
+        heading=f"We received your demo request, {display}!",
+        body_lines=[
+            "Thanks for your interest in CostAdvisor.",
+            "We'll review your request and confirm the date and time shortly.",
+            "You'll receive another email once your demo is confirmed, "
+            "including a Google Meet link for the call.",
+            "If you have any questions in the meantime, "
+            "feel free to reply to this email.",
+        ],
+        cta_label="Learn more →",
+    )
+    return _send(to_email, "Demo request received — CostAdvisor", html)
+
+
+def send_demo_confirmation_email(
+    to_email: str,
+    name: str,
+    date_str: str,
+    time_str: str,
+    meet_link: str,
+    host_name: str,
+) -> bool:
+    """Confirm an accepted demo — includes the Google Meet link."""
+    display = name or to_email.split("@")[0]
+    settings = get_settings()
+    html = build_welcome_html(
+        display_name=display,
+        app_url=meet_link or settings.app_url,
+        heading=f"Your demo is confirmed, {display}!",
+        body_lines=[
+            f"<strong>Date:</strong> {date_str}",
+            f"<strong>Time:</strong> {time_str} UTC",
+            f"<strong>Host:</strong> {host_name}",
+            "Join the call using the Google Meet link below. "
+            "You'll also receive a calendar invite shortly.",
+            "If you need to reschedule, please reply to this email.",
+        ],
+        cta_label="Join Google Meet →",
+    )
+    return _send(to_email, "Your CostAdvisor demo is confirmed", html)
+
+
 def send_invite_email(
     to_email: str,
     team_name: str,

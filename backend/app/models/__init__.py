@@ -15,6 +15,7 @@ from app.models.invite import TeamInvite
 from app.models.access_request import PlatformAccessRequest
 from app.models.rbac import Permission, Role, RolePermission, Plan, PlanPermission, TeamMemberRole, UserPlatformRole
 from app.models.formula_template import FormulaTemplate
+from app.models.demo import DemoHost, DemoBlockedSlot, DemoRequest
 
 __all__ = [
     "User",
@@ -46,4 +47,7 @@ __all__ = [
     "TeamMemberRole",
     "UserPlatformRole",
     "FormulaTemplate",
+    "DemoHost",
+    "DemoBlockedSlot",
+    "DemoRequest",
 ]

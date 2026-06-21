@@ -12,6 +12,7 @@ from app.database import get_db, current_user_id_var, bypass_rls_var, impersonat
 from app.models.user import User
 from app.models.invite import TeamInvite
 from app.models.access_request import PlatformAccessRequest
+from app.models.demo import DemoHost
 from app.rate_limit import limiter
 from app.schemas.user import UserOut, UserWithTeams
 from app.services.email import send_welcome_email
@@ -272,3 +273,110 @@ def logout(response: Response):
     """Clear the auth cookie."""
     response.delete_cookie("ca_token")
     return {"status": "logged out"}
+
+
+GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events"
+
+
+@router.get("/google-calendar/start")
+@limiter.limit("10/minute")
+async def google_calendar_start(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Start the Google Calendar OAuth flow for a demo host.
+
+    Stores {state}:{user_id} in a short-lived HttpOnly cookie so the callback
+    can verify state and know which user to update.
+    """
+    client = AsyncOAuth2Client(
+        client_id=settings.google_client_id,
+        client_secret=settings.google_client_secret,
+        redirect_uri=f"{settings.api_url}/auth/google-calendar/callback",
+        scope=f"openid email profile {GOOGLE_CALENDAR_SCOPE}",
+    )
+    uri, state = client.create_authorization_url(
+        GOOGLE_AUTH_URL,
+        access_type="offline",
+        prompt="consent",  # Forces refresh token issuance even for existing grants
+    )
+    response = RedirectResponse(url=uri)
+    is_prod = settings.environment != "development"
+    response.set_cookie(
+        "gc_state",
+        f"{state}:{str(current_user.id)}",
+        httponly=True,
+        secure=is_prod,
+        samesite="none" if is_prod else "lax",
+        max_age=600,
+    )
+    return response
+
+
+@router.get("/google-calendar/callback")
+@limiter.limit("10/minute")
+async def google_calendar_callback(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Handle the Google Calendar OAuth callback.
+
+    Stores the encrypted refresh token in the DemoHost row for this user,
+    then redirects back to the admin settings page.
+    """
+    code = request.query_params.get("code")
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing authorization code")
+
+    gc_state_cookie = request.cookies.get("gc_state", "")
+    if not gc_state_cookie or ":" not in gc_state_cookie:
+        raise HTTPException(status_code=400, detail="Missing or invalid state")
+
+    # Cookie format: "{state}:{user_id}" — split on last colon
+    last_colon = gc_state_cookie.rfind(":")
+    user_id_str = gc_state_cookie[last_colon + 1:]
+
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid state")
+
+    client = AsyncOAuth2Client(
+        client_id=settings.google_client_id,
+        client_secret=settings.google_client_secret,
+        redirect_uri=f"{settings.api_url}/auth/google-calendar/callback",
+    )
+    token = await client.fetch_token(GOOGLE_TOKEN_URL, code=code)
+
+    refresh_token = token.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(
+            status_code=400,
+            detail="No refresh token returned. Re-authorise and ensure 'prompt=consent' is set.",
+        )
+
+    # Fetch Google email for this token
+    client.token = token
+    resp = await client.get(GOOGLE_USERINFO_URL)
+    google_email = resp.json().get("email", "")
+
+    from app.services.google_calendar import encrypt_token
+    encrypted = encrypt_token(refresh_token)
+
+    bypass_rls_var.set(True)
+    try:
+        host = db.query(DemoHost).filter(DemoHost.user_id == user_id).first()
+        if not host:
+            host = DemoHost(user_id=user_id)
+            db.add(host)
+        host.google_email = google_email
+        host.google_refresh_token_encrypted = encrypted
+        host.google_token_expiry = None  # refresh token has no fixed expiry
+        db.commit()
+    finally:
+        bypass_rls_var.set(False)
+
+    response = RedirectResponse(url=f"{settings.app_url}/admin?tab=settings", status_code=302)
+    is_prod = settings.environment != "development"
+    response.delete_cookie("gc_state", secure=is_prod, samesite="none" if is_prod else "lax")
+    return response

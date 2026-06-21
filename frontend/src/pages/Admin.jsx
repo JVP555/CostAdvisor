@@ -14,6 +14,7 @@ export default function Admin() {
   const [platformRoles, setPlatformRoles] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [accessRequests, setAccessRequests] = useState([]);
+  const [demoRequests, setDemoRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('users');
   const [impersonating, setImpersonating] = useState(false);
@@ -54,17 +55,20 @@ export default function Admin() {
       .finally(() => setLoading(false));
   };
 
-  const fetchAccessRequests = () => {
+  const fetchRequests = () => {
     setLoading(true);
-    api.get('/api/admin/access-requests')
-      .then(r => setAccessRequests(r.data))
+    Promise.all([
+      api.get('/api/admin/access-requests'),
+      api.get('/api/admin/demo-requests'),
+    ])
+      .then(([aRes, dRes]) => { setAccessRequests(aRes.data); setDemoRequests(dRes.data); })
       .catch(console.error)
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     if (tab === 'audit') fetchAuditLogs();
-    else if (tab === 'requests') fetchAccessRequests();
+    else if (tab === 'requests') fetchRequests();
     else if (tab !== 'settings') fetchData();
   }, [tab, showDeleted]);
 
@@ -168,7 +172,8 @@ export default function Admin() {
           {
             key: 'requests',
             label: (() => {
-              const pending = accessRequests.filter(r => r.status === 'pending').length;
+              const pending = accessRequests.filter(r => r.status === 'pending').length
+                + demoRequests.filter(r => r.status === 'pending').length;
               return pending > 0 ? `Requests (${pending})` : 'Requests';
             })(),
           },
@@ -216,12 +221,14 @@ export default function Admin() {
           onTeamExpanded={() => setTargetTeamId(null)}
         />
       ) : tab === 'requests' ? (
-        <RequestsTab
-          requests={accessRequests}
-          onRefresh={fetchAccessRequests}
+        <RequestsTabWrapper
+          accessRequests={accessRequests}
+          demoRequests={demoRequests}
+          currentUser={user}
+          onRefresh={fetchRequests}
         />
       ) : tab === 'settings' ? (
-        <AdminSettingsTab />
+        <AdminSettingsTab users={users} />
       ) : (
         <AuditTab
           logs={auditLogs}
@@ -1261,7 +1268,273 @@ function RequestsTab({ requests, onRefresh }) {
 }
 
 
-function AdminSettingsTab() {
+function RequestsTabWrapper({ accessRequests, demoRequests, currentUser, onRefresh }) {
+  const [subTab, setSubTab] = useState('access');
+  const pendingAccess = accessRequests.filter(r => r.status === 'pending').length;
+  const pendingDemo   = demoRequests.filter(r => r.status === 'pending').length;
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+        <button
+          className={`ca-btn ca-btn-sm ${subTab === 'access' ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+          onClick={() => setSubTab('access')}
+        >
+          Access{pendingAccess > 0 ? ` (${pendingAccess})` : ''}
+        </button>
+        <button
+          className={`ca-btn ca-btn-sm ${subTab === 'demo' ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+          onClick={() => setSubTab('demo')}
+        >
+          Demo{pendingDemo > 0 ? ` (${pendingDemo})` : ''}
+        </button>
+      </div>
+      {subTab === 'access'
+        ? <RequestsTab requests={accessRequests} onRefresh={onRefresh} />
+        : <DemoRequestsTab requests={demoRequests} currentUser={currentUser} onRefresh={onRefresh} />
+      }
+    </>
+  );
+}
+
+
+function DemoRequestsTab({ requests, currentUser, onRefresh }) {
+  const showAlert = useAlert();
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [actionDialog, setActionDialog] = useState(null); // { type: 'accept'|'reject', req }
+  const [actionRemarks, setActionRemarks] = useState('');
+  const [editingRemarks, setEditingRemarks] = useState(null); // req.id
+  const [editingRemarksText, setEditingRemarksText] = useState('');
+
+  const filtered = requests.filter(r => {
+    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return r.email.toLowerCase().includes(q) ||
+           r.name?.toLowerCase().includes(q) ||
+           r.company?.toLowerCase().includes(q);
+  });
+
+  const handleAction = async () => {
+    const req = actionDialog?.req;
+    const type = actionDialog?.type;
+    if (!req) return;
+    try {
+      await api.post(`/api/admin/demo-requests/${req.id}/${type}`, { remarks: actionRemarks || null });
+      setActionDialog(null);
+      setActionRemarks('');
+      onRefresh();
+    } catch (err) {
+      showAlert({ title: `${type === 'accept' ? 'Accept' : 'Reject'} failed`, message: formatApiError(err) });
+    }
+  };
+
+  const saveRemarks = async (req) => {
+    try {
+      await api.patch(`/api/admin/demo-requests/${req.id}/remarks`, { remarks: editingRemarksText });
+      setEditingRemarks(null);
+      onRefresh();
+    } catch (err) {
+      showAlert({ title: 'Error', message: formatApiError(err) });
+    }
+  };
+
+  const statusBadge = (status) => {
+    const styles = {
+      pending:  { background: 'var(--accent3-dim, #fef3c7)', color: 'var(--accent3, #f59e0b)' },
+      accepted: { background: 'var(--success-bg)',           color: 'var(--accent)'             },
+      rejected: { background: 'var(--accent2-dim)',          color: 'var(--accent2)'            },
+    };
+    const s = styles[status] || {};
+    return (
+      <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, ...s }}>
+        {status.toUpperCase()}
+      </span>
+    );
+  };
+
+  return (
+    <>
+      {actionDialog && (
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setActionDialog(null)}
+          />
+          <div style={{
+            position: 'fixed', zIndex: 201, top: '50%', left: '50%',
+            transform: 'translate(-50%,-50%)', background: 'var(--surface)',
+            border: '1px solid var(--border)', borderRadius: 10, padding: 24, width: 420,
+            boxShadow: 'var(--shadow-popover)',
+          }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 8 }}>
+              {actionDialog.type === 'accept' ? 'Accept Demo Request' : 'Reject Demo Request'}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
+              {actionDialog.type === 'accept' ? (
+                <>Accept demo for <strong>{actionDialog.req.name}</strong> ({actionDialog.req.email})?<br />
+                A Google Calendar event and Meet link will be created on your calendar.</>
+              ) : (
+                <>Reject demo request from <strong>{actionDialog.req.name}</strong>?</>
+              )}
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label className="ca-label">Remarks (optional)</label>
+              <textarea
+                className="ca-input"
+                rows={3}
+                value={actionRemarks}
+                onChange={e => setActionRemarks(e.target.value)}
+                placeholder={actionDialog.type === 'accept' ? 'e.g. Looking forward to chatting!' : 'e.g. No availability this week.'}
+                style={{ resize: 'vertical', fontFamily: 'inherit' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="ca-btn ca-btn-ghost ca-btn-sm"
+                onClick={() => { setActionDialog(null); setActionRemarks(''); }}>Cancel</button>
+              {actionDialog.type === 'accept' ? (
+                <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={handleAction}>
+                  Accept &amp; Create Meet
+                </button>
+              ) : (
+                <button
+                  className="ca-btn ca-btn-ghost ca-btn-sm"
+                  style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                  onClick={handleAction}
+                >Reject</button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input
+          className="ca-input"
+          placeholder="Search by email, name or company…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ maxWidth: 260 }}
+        />
+        <select className="ca-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ width: 'auto' }}>
+          <option value="all">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="accepted">Accepted</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={onRefresh}>Refresh</button>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{filtered.length} request{filtered.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      <div className="ca-card">
+        <div className="ca-scroll-x" style={{ minHeight: 200 }}>
+          <table className="ca-table">
+            <thead>
+              <tr>
+                <th>Name / Company</th>
+                <th>Contact</th>
+                <th>Requested</th>
+                <th className="center">Status</th>
+                <th>Remarks</th>
+                <th>Meet</th>
+                <th className="center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--muted)' }}>No demo requests yet.</td></tr>
+              )}
+              {filtered.map(r => (
+                <tr key={r.id}>
+                  <td>
+                    <div style={{ fontWeight: 600, fontSize: 12 }}>{r.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{r.company}</div>
+                  </td>
+                  <td>
+                    <div style={{ fontSize: 12 }}>{r.email}</div>
+                    {r.phone && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{r.phone}</div>}
+                  </td>
+                  <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+                    <div>{r.requested_date}</div>
+                    <div style={{ color: 'var(--muted)' }}>{r.requested_start}–{r.requested_end}</div>
+                    {r.visitor_timezone && r.visitor_timezone !== 'UTC' &&
+                      <div style={{ fontSize: 10, color: 'var(--muted)' }}>{r.visitor_timezone}</div>}
+                  </td>
+                  <td className="center">
+                    <div>{statusBadge(r.status)}</div>
+                    {(r.assigned_host_name || r.reviewed_by_name) && (
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3, whiteSpace: 'nowrap' }}>
+                        by {r.assigned_host_name || r.reviewed_by_name}
+                        {r.reviewed_at && <><br />{new Date(r.reviewed_at).toLocaleDateString()}</>}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ maxWidth: 160 }}>
+                    {editingRemarks === r.id ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <textarea
+                          className="ca-input"
+                          rows={2}
+                          value={editingRemarksText}
+                          onChange={e => setEditingRemarksText(e.target.value)}
+                          style={{ fontSize: 11, resize: 'vertical' }}
+                        />
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button className="ca-btn ca-btn-primary ca-btn-sm" style={{ fontSize: 10 }}
+                            onClick={() => saveRemarks(r)}>Save</button>
+                          <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 10 }}
+                            onClick={() => setEditingRemarks(null)}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                        <span style={{ fontSize: 11, color: r.remarks ? 'var(--text)' : 'var(--muted)' }}>
+                          {r.remarks || '—'}
+                        </span>
+                        <button
+                          title="Edit remarks"
+                          onClick={() => { setEditingRemarks(r.id); setEditingRemarksText(r.remarks || ''); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 12, padding: '0 2px', flexShrink: 0 }}
+                        >✎</button>
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    {r.meet_link
+                      ? <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 10 }}
+                          onClick={() => navigator.clipboard.writeText(r.meet_link)}>Copy</button>
+                      : <span style={{ fontSize: 11, color: 'var(--muted)' }}>—</span>
+                    }
+                  </td>
+                  <td className="center">
+                    {r.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        <button
+                          className="ca-btn ca-btn-primary ca-btn-sm"
+                          style={{ fontSize: 11 }}
+                          onClick={() => { setActionDialog({ type: 'accept', req: r }); setActionRemarks(''); }}
+                        >Accept</button>
+                        <button
+                          className="ca-btn ca-btn-ghost ca-btn-sm"
+                          style={{ fontSize: 11, color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                          onClick={() => { setActionDialog({ type: 'reject', req: r }); setActionRemarks(''); }}
+                        >Reject</button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
+function AdminSettingsTab({ users = [] }) {
   const showAlert = useAlert();
   const confirm = useConfirm();
   const [section, setSection] = useState('permissions');
@@ -1276,6 +1549,17 @@ function AdminSettingsTab() {
   const [editingRole, setEditingRole] = useState(null);
   const [newRole, setNewRole] = useState(null);
 
+  // Demo hosts
+  const [demoHosts, setDemoHosts] = useState([]);
+  const [loadingDemoHosts, setLoadingDemoHosts] = useState(false);
+  const [addingHost, setAddingHost] = useState(false);
+  const [newHostForm, setNewHostForm] = useState({ user_id: '', timezone: 'UTC', slot_duration_minutes: 30, working_days: [0,1,2,3,4], working_start: '09:00', working_end: '18:00' });
+  const [editingHost, setEditingHost] = useState(null);
+  const [editHostForm, setEditHostForm] = useState({});
+  const [expandedSlots, setExpandedSlots] = useState(null);
+  const [blockedSlots, setBlockedSlots] = useState({});
+  const [newBlock, setNewBlock] = useState({ blocked_date: '', start_time: '09:00', end_time: '10:00' });
+
   useEffect(() => {
     api.get('/api/settings/permissions')
       .then(r => setPermissions(r.data))
@@ -1286,6 +1570,7 @@ function AdminSettingsTab() {
   useEffect(() => {
     if (section === 'plans') fetchPlans();
     if (section === 'roles') fetchRoles();
+    if (section === 'demo_hosts') fetchDemoHosts();
   }, [section]);
 
   const fetchPlans = () => {
@@ -1341,13 +1626,80 @@ function AdminSettingsTab() {
     catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
   };
 
+  const fetchDemoHosts = () => {
+    setLoadingDemoHosts(true);
+    api.get('/api/admin/demo-hosts')
+      .then(r => setDemoHosts(r.data))
+      .catch(console.error)
+      .finally(() => setLoadingDemoHosts(false));
+  };
+
+  const addDemoHost = async () => {
+    if (!newHostForm.user_id) return;
+    try {
+      await api.post('/api/admin/demo-hosts', newHostForm);
+      setAddingHost(false);
+      setNewHostForm({ user_id: '', timezone: 'UTC', slot_duration_minutes: 30, working_days: [0,1,2,3,4], working_start: '09:00', working_end: '18:00' });
+      fetchDemoHosts();
+    } catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
+  };
+
+  const removeDemoHost = async (host) => {
+    const ok = await confirm({ title: `Remove ${host.user_name || host.user_email} as demo host?`, message: 'Host configuration will be deleted.', confirmLabel: 'Remove', danger: true });
+    if (!ok) return;
+    try { await api.delete(`/api/admin/demo-hosts/${host.id}`); fetchDemoHosts(); }
+    catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
+  };
+
+  const disconnectCalendar = async (host) => {
+    const ok = await confirm({ title: 'Disconnect Google Calendar?', message: `Remove calendar access for ${host.user_name || host.user_email}.`, confirmLabel: 'Disconnect', danger: true });
+    if (!ok) return;
+    try { await api.delete(`/api/admin/demo-hosts/${host.id}/calendar`); fetchDemoHosts(); }
+    catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
+  };
+
+  const saveHostEdit = async (hostId) => {
+    try { await api.put(`/api/admin/demo-hosts/${hostId}`, editHostForm); setEditingHost(null); fetchDemoHosts(); }
+    catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
+  };
+
+  const loadBlockedSlots = async (hostId) => {
+    try {
+      const r = await api.get(`/api/admin/demo-hosts/${hostId}/blocked-slots`);
+      setBlockedSlots(prev => ({ ...prev, [hostId]: r.data }));
+    } catch (e) { console.error(e); }
+  };
+
+  const toggleExpandedSlots = (hostId) => {
+    if (expandedSlots === hostId) { setExpandedSlots(null); return; }
+    setExpandedSlots(hostId);
+    loadBlockedSlots(hostId);
+  };
+
+  const addBlockedSlot = async (hostId) => {
+    if (!newBlock.blocked_date) return;
+    try {
+      await api.post(`/api/admin/demo-hosts/${hostId}/blocked-slots`, newBlock);
+      setNewBlock({ blocked_date: '', start_time: '09:00', end_time: '10:00' });
+      loadBlockedSlots(hostId);
+    } catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
+  };
+
+  const deleteBlockedSlot = async (hostId, slotId) => {
+    try { await api.delete(`/api/admin/demo-hosts/${hostId}/blocked-slots/${slotId}`); loadBlockedSlots(hostId); }
+    catch (e) { showAlert({ title: 'Error', message: e.response?.data?.detail || e.message }); }
+  };
+
+  const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
   return (
     <>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         {[
           { key: 'permissions', label: `Permissions (${permissions.length})` },
           { key: 'plans', label: `Plans (${plans.length})` },
           { key: 'roles', label: `Roles (${roles.length})` },
+          { key: 'demo_hosts', label: `Demo Hosts (${demoHosts.length})` },
         ].map(s => (
           <button key={s.key} className={`ca-btn ca-btn-sm ${section === s.key ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
             onClick={() => setSection(s.key)}>{s.label}</button>
@@ -1502,6 +1854,253 @@ function AdminSettingsTab() {
             </div>
           ) : (
             <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setNewRole({})}>+ New Role</button>
+          )}
+        </>
+      )}
+
+      {section === 'demo_hosts' && (
+        <>
+          <div className="ca-card" style={{ marginBottom: 16 }}>
+            {loadingDemoHosts ? (
+              <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
+            ) : demoHosts.length === 0 ? (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+                No demo hosts configured yet. Add one below.
+              </div>
+            ) : (
+              <table className="ca-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Schedule</th>
+                    <th>Calendar</th>
+                    <th className="center">Active</th>
+                    <th className="center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {demoHosts.map(h => (
+                    <Fragment key={h.id}>
+                      <tr>
+                        <td>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{h.user_name || h.user_email}</div>
+                          {h.user_name && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{h.user_email}</div>}
+                        </td>
+                        <td style={{ fontSize: 11 }}>
+                          <div>{h.working_start}–{h.working_end} · {h.slot_duration_minutes}min slots</div>
+                          <div style={{ color: 'var(--muted)' }}>{(h.working_days || []).map(d => DAY_NAMES[d]).join(', ')}</div>
+                          <div style={{ color: 'var(--muted)' }}>{h.timezone}</div>
+                        </td>
+                        <td style={{ fontSize: 11 }}>
+                          {h.calendar_connected ? (
+                            <div>
+                              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Connected</span>
+                              {h.google_email && <div style={{ color: 'var(--muted)' }}>{h.google_email}</div>}
+                              <button
+                                className="ca-btn ca-btn-ghost ca-btn-sm"
+                                style={{ marginTop: 4, fontSize: 10, color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                                onClick={() => disconnectCalendar(h)}
+                              >Disconnect</button>
+                            </div>
+                          ) : (
+                            <div>
+                              <span style={{ color: 'var(--muted)' }}>Not connected</span>
+                              <div>
+                                <button
+                                  className="ca-btn ca-btn-ghost ca-btn-sm"
+                                  style={{ marginTop: 4, fontSize: 10 }}
+                                  onClick={() => { window.location.href = '/auth/google-calendar/start'; }}
+                                >Connect Google Calendar</button>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="center">
+                          <label style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={h.is_active}
+                              onChange={async e => {
+                                await api.put(`/api/admin/demo-hosts/${h.id}`, { is_active: e.target.checked });
+                                fetchDemoHosts();
+                              }}
+                            />
+                          </label>
+                        </td>
+                        <td className="center">
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap' }}>
+                            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => {
+                              setEditingHost(editingHost === h.id ? null : h.id);
+                              setEditHostForm({ timezone: h.timezone, slot_duration_minutes: h.slot_duration_minutes, working_days: h.working_days, working_start: h.working_start, working_end: h.working_end });
+                            }}>
+                              {editingHost === h.id ? 'Close' : 'Edit'}
+                            </button>
+                            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => toggleExpandedSlots(h.id)}>
+                              Blocked Slots
+                            </button>
+                            <button
+                              className="ca-btn ca-btn-ghost ca-btn-sm"
+                              style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                              onClick={() => removeDemoHost(h)}
+                            >Remove</button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {editingHost === h.id && (
+                        <tr>
+                          <td colSpan={5} style={{ padding: '14px 20px', background: 'var(--surface2)', borderLeft: '3px solid var(--accent3)' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, marginBottom: 10 }}>
+                              <div>
+                                <label className="ca-label">Timezone</label>
+                                <input className="ca-input" value={editHostForm.timezone || ''} onChange={e => setEditHostForm(f => ({ ...f, timezone: e.target.value }))} placeholder="e.g. Europe/London" />
+                              </div>
+                              <div>
+                                <label className="ca-label">Slot (min)</label>
+                                <select className="ca-input" value={editHostForm.slot_duration_minutes || 30} onChange={e => setEditHostForm(f => ({ ...f, slot_duration_minutes: +e.target.value }))}>
+                                  <option value={15}>15</option>
+                                  <option value={30}>30</option>
+                                  <option value={60}>60</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="ca-label">Start</label>
+                                <input className="ca-input" type="time" value={editHostForm.working_start || ''} onChange={e => setEditHostForm(f => ({ ...f, working_start: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label className="ca-label">End</label>
+                                <input className="ca-input" type="time" value={editHostForm.working_end || ''} onChange={e => setEditHostForm(f => ({ ...f, working_end: e.target.value }))} />
+                              </div>
+                            </div>
+                            <div style={{ marginBottom: 10 }}>
+                              <label className="ca-label">Working Days</label>
+                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                {DAY_NAMES.map((d, i) => (
+                                  <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={(editHostForm.working_days || []).includes(i)}
+                                      onChange={e => {
+                                        const days = editHostForm.working_days || [];
+                                        setEditHostForm(f => ({ ...f, working_days: e.target.checked ? [...days, i].sort() : days.filter(x => x !== i) }));
+                                      }}
+                                    />
+                                    {d}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => saveHostEdit(h.id)}>Save</button>
+                              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setEditingHost(null)}>Cancel</button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+
+                      {expandedSlots === h.id && (
+                        <tr>
+                          <td colSpan={5} style={{ padding: '14px 20px', background: 'var(--surface2)', borderLeft: '3px solid var(--border)' }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 8 }}>Blocked Slots</div>
+                            {(blockedSlots[h.id] || []).length === 0 ? (
+                              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10 }}>No blocked slots.</div>
+                            ) : (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                                {(blockedSlots[h.id] || []).map(s => (
+                                  <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 5, padding: '3px 8px', fontSize: 11 }}>
+                                    {s.blocked_date} {s.start_time}–{s.end_time}
+                                    <button
+                                      onClick={() => deleteBlockedSlot(h.id, s.id)}
+                                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent2)', fontSize: 12, padding: '0 2px', lineHeight: 1 }}
+                                    >×</button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                              <div>
+                                <label className="ca-label">Date</label>
+                                <input className="ca-input" type="date" value={newBlock.blocked_date} onChange={e => setNewBlock(b => ({ ...b, blocked_date: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label className="ca-label">From</label>
+                                <input className="ca-input" type="time" value={newBlock.start_time} onChange={e => setNewBlock(b => ({ ...b, start_time: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label className="ca-label">To</label>
+                                <input className="ca-input" type="time" value={newBlock.end_time} onChange={e => setNewBlock(b => ({ ...b, end_time: e.target.value }))} />
+                              </div>
+                              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => addBlockedSlot(h.id)}>+ Block Slot</button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {addingHost ? (
+            <div className="ca-card" style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Add Demo Host</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, marginBottom: 10 }}>
+                <div>
+                  <label className="ca-label">User</label>
+                  <select className="ca-input" value={newHostForm.user_id} onChange={e => setNewHostForm(f => ({ ...f, user_id: e.target.value }))}>
+                    <option value="">Select user…</option>
+                    {users.filter(u => !u.deleted_at && !demoHosts.some(h => h.user_id === u.id)).map(u => (
+                      <option key={u.id} value={u.id}>{u.display_name || u.email}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="ca-label">Timezone</label>
+                  <input className="ca-input" value={newHostForm.timezone} onChange={e => setNewHostForm(f => ({ ...f, timezone: e.target.value }))} placeholder="UTC" />
+                </div>
+                <div>
+                  <label className="ca-label">Slot (min)</label>
+                  <select className="ca-input" value={newHostForm.slot_duration_minutes} onChange={e => setNewHostForm(f => ({ ...f, slot_duration_minutes: +e.target.value }))}>
+                    <option value={15}>15</option>
+                    <option value={30}>30</option>
+                    <option value={60}>60</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="ca-label">Start</label>
+                  <input className="ca-input" type="time" value={newHostForm.working_start} onChange={e => setNewHostForm(f => ({ ...f, working_start: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="ca-label">End</label>
+                  <input className="ca-input" type="time" value={newHostForm.working_end} onChange={e => setNewHostForm(f => ({ ...f, working_end: e.target.value }))} />
+                </div>
+              </div>
+              <div style={{ marginBottom: 10 }}>
+                <label className="ca-label">Working Days</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {DAY_NAMES.map((d, i) => (
+                    <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={(newHostForm.working_days || []).includes(i)}
+                        onChange={e => {
+                          const days = newHostForm.working_days || [];
+                          setNewHostForm(f => ({ ...f, working_days: e.target.checked ? [...days, i].sort() : days.filter(x => x !== i) }));
+                        }}
+                      />
+                      {d}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={addDemoHost}>Add Host</button>
+                <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setAddingHost(false)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => setAddingHost(true)}>+ Add Demo Host</button>
           )}
         </>
       )}

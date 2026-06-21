@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
 
+    # Google Calendar — Fernet key for encrypting per-host refresh tokens.
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    google_calendar_encryption_key: str = ""
+
     # JWT
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"
