@@ -104,9 +104,9 @@ def scrape_fx_live():
             try:
                 if pair.source_type == "ecb":
                     live = asyncio.run(ECBLiveScraper(pair.name, pair.scrape_url).fetch_live())
-                elif pair.source_type == "google_finance":
-                    from app.services.scrapers.google_finance import GoogleFinanceScraper
-                    live = asyncio.run(GoogleFinanceScraper(pair.scrape_url).fetch_live())
+                elif pair.source_type in ("frankfurter", "google_finance"):
+                    from app.services.scrapers.frankfurter import FrankfurterScraper
+                    live = asyncio.run(FrankfurterScraper(pair.scrape_url).fetch_live())
                 else:
                     live = None
 

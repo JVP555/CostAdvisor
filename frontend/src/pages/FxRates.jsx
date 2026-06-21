@@ -67,8 +67,8 @@ function FxPairModal({ pair, onSave, onClose }) {
           <div>
             <label className="ca-label">Source Type</label>
             <select className="ca-select" value={form.source_type} onChange={updateForm('source_type')}>
-              <option value="ecb">ECB (auto-scrape)</option>
-              <option value="google_finance">Google Finance (daily)</option>
+              <option value="frankfurter">Frankfurter (JSON API, recommended)</option>
+              <option value="ecb">ECB (SDMX quarterly)</option>
               <option value="generic">Generic URL</option>
               <option value="manual">Manual only</option>
             </select>
@@ -76,14 +76,14 @@ function FxPairModal({ pair, onSave, onClose }) {
           <div style={{ gridColumn: '1 / -1' }}>
             <label className="ca-label">Scrape URL</label>
             <input className="ca-input"
-              placeholder={form.source_type === 'google_finance'
-                ? 'https://www.google.com/finance/quote/CNY-EUR'
+              placeholder={form.source_type === 'frankfurter'
+                ? 'https://api.frankfurter.app/latest?from=CNY&to=EUR'
                 : 'https://data-api.ecb.europa.eu/service/data/EXR/Q....'}
               value={form.scrape_url || ''} onChange={updateForm('scrape_url')} />
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
-              {form.source_type === 'google_finance'
-                ? <>Google Finance URL — use a dash for the pair: <code>https://www.google.com/finance/quote/CNY-EUR</code></>
-                : <>For ECB pairs: <code>https://data-api.ecb.europa.eu/service/data/EXR/Q.USD.EUR.SP00.A</code></>}
+              {form.source_type === 'frankfurter'
+                ? <>Frankfurter API — free ECB-backed JSON: <code>https://api.frankfurter.app/latest?from=CNY&to=EUR</code></>
+                : <>For ECB quarterly pairs: <code>https://data-api.ecb.europa.eu/service/data/EXR/Q.USD.EUR.SP00.A</code></>}
             </div>
           </div>
           <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -209,8 +209,8 @@ function FxPairsSection({ pairs, canManage, onRefresh }) {
                     <td style={{ fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{p.name}</td>
                     <td>
                       <span className={`ca-badge`} style={{
-                        background: p.source_type === 'ecb' ? 'var(--accent2-dim)' : p.source_type === 'google_finance' ? 'var(--accent-dim)' : p.source_type === 'generic' ? 'var(--accent3-dim)' : 'var(--surface-hover)',
-                        color: p.source_type === 'ecb' ? 'var(--accent2)' : p.source_type === 'google_finance' ? 'var(--accent)' : p.source_type === 'generic' ? 'var(--accent3)' : 'var(--text-secondary)',
+                        background: p.source_type === 'ecb' ? 'var(--accent2-dim)' : (p.source_type === 'frankfurter' || p.source_type === 'google_finance') ? 'var(--accent-dim)' : p.source_type === 'generic' ? 'var(--accent3-dim)' : 'var(--surface-hover)',
+                        color: p.source_type === 'ecb' ? 'var(--accent2)' : (p.source_type === 'frankfurter' || p.source_type === 'google_finance') ? 'var(--accent)' : p.source_type === 'generic' ? 'var(--accent3)' : 'var(--text-secondary)',
                         fontSize: 9, textTransform: 'uppercase',
                       }}>{p.source_type}</span>
                     </td>

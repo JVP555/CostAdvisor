@@ -131,9 +131,9 @@ async def scrape_pair_live(
         if pair.source_type == "ecb":
             from app.services.scrapers.ecb import ECBLiveScraper
             live = await ECBLiveScraper(pair.name, pair.scrape_url).fetch_live()
-        elif pair.source_type == "google_finance":
-            from app.services.scrapers.google_finance import GoogleFinanceScraper
-            live = await GoogleFinanceScraper(pair.scrape_url).fetch_live()
+        elif pair.source_type in ("frankfurter", "google_finance"):
+            from app.services.scrapers.frankfurter import FrankfurterScraper
+            live = await FrankfurterScraper(pair.scrape_url).fetch_live()
         else:
             live = None
 
@@ -169,9 +169,9 @@ async def scrape_all_pairs_live(
         for pair in pairs:
             if pair.source_type == "ecb":
                 live = await ECBLiveScraper(pair.name, pair.scrape_url).fetch_live()
-            elif pair.source_type == "google_finance":
-                from app.services.scrapers.google_finance import GoogleFinanceScraper
-                live = await GoogleFinanceScraper(pair.scrape_url).fetch_live()
+            elif pair.source_type in ("frankfurter", "google_finance"):
+                from app.services.scrapers.frankfurter import FrankfurterScraper
+                live = await FrankfurterScraper(pair.scrape_url).fetch_live()
             else:
                 live = None
             if live is not None:
