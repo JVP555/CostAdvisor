@@ -52,4 +52,4 @@ jvpdocs/
 # Impeccable design tool — local only
 PRODUCT.md
 DESIGN.md
-.impeccable/
+.impeccable/.claude/
