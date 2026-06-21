@@ -850,9 +850,16 @@ function RateGrid({ periods, rows, onCellClick, canEdit, scrollRef, liveRateMap 
 }
 
 
+// ── FX Pairs Tab ──────────────────────────────────────────────────────────────
+
+function FxPairsTab({ pairs, canManage, onRefresh }) {
+  return <FxPairsSection pairs={pairs} canManage={canManage} onRefresh={onRefresh} />;
+}
+
+
 // ── Default Tab ───────────────────────────────────────────────────────────────
 
-function DefaultTab({ user, canManage, defaultRates, loading, onRefresh, periods, pairs, pairsLoading }) {
+function DefaultTab({ user, canManage, defaultRates, loading, onRefresh, periods }) {
   const { addToast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [scraping, setScraping] = useState(false);
@@ -914,10 +921,6 @@ function DefaultTab({ user, canManage, defaultRates, loading, onRefresh, periods
         />
       )}
 
-      {/* FX Pairs management */}
-      <FxPairsSection pairs={pairs} canManage={canManage} onRefresh={onRefresh} />
-
-      {/* Quarterly rates */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <p className="ca-subtitle" style={{ margin: 0 }}>
@@ -961,6 +964,101 @@ function DefaultTab({ user, canManage, defaultRates, loading, onRefresh, periods
             onCellClick={(row, period, cell) => canManage && setEditCell({ row, period, cell })}
             scrollRef={scrollRef}
           />
+        </div>
+      )}
+    </>
+  );
+}
+
+
+// ── History Tab ───────────────────────────────────────────────────────────────
+
+function HistoryTab({ defaultRates, pairs, periods, loading }) {
+  const scrollRef = useRef(null);
+
+  const liveRateMap = useMemo(() => {
+    const m = {};
+    pairs.forEach(p => { if (p.live_rate != null) m[p.name] = p.live_rate; });
+    return m;
+  }, [pairs]);
+
+  // Build rows from all configured pairs; fill quarterly cells from defaultRates
+  const rows = useMemo(() => {
+    const defMap = {};
+    for (const r of defaultRates) {
+      const key = `${r.from_currency}/${r.to_currency}`;
+      if (!defMap[key]) defMap[key] = {};
+      defMap[key][`${r.year}-${r.quarter}`] = r.rate;
+    }
+    // Include all pairs (even those with only live rates and no quarterly data yet)
+    const allKeys = new Set([
+      ...Object.keys(defMap),
+      ...pairs.map(p => p.name),
+    ]);
+    return [...allKeys]
+      .sort()
+      .map(key => {
+        const [from, to] = key.split('/');
+        const cellMap = defMap[key] || {};
+        return {
+          from, to,
+          cells: periods.map(p => {
+            const v = cellMap[`${p.year}-${p.quarter}`] ?? null;
+            return v !== null ? { default: v } : null;
+          }),
+        };
+      });
+  }, [defaultRates, pairs, periods]);
+
+  const exportData = useMemo(() => {
+    const out = [];
+    for (const row of rows) {
+      const live = liveRateMap[`${row.from}/${row.to}`];
+      out.push([`${row.from}/${row.to}`, 'live', '', '', live ?? '']);
+      row.cells.forEach((cell, i) => {
+        if (cell?.default != null) out.push([`${row.from}/${row.to}`, 'quarterly', periods[i].year, periods[i].quarter, cell.default]);
+      });
+    }
+    return out;
+  }, [rows, periods, liveRateMap]);
+
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div>
+          <p className="ca-subtitle" style={{ margin: 0 }}>
+            All configured pairs — daily live rate and full quarterly history in one view.
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--muted)' }}>
+            Live rate is refreshed daily. Use FX Pairs → Scrape All Live for an on-demand update.
+          </p>
+        </div>
+        <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() =>
+          exportCsv('fx_rates_history.csv', ['Pair', 'Type', 'Year', 'Quarter', 'Rate'], exportData)
+        }>Export CSV</button>
+      </div>
+
+      {loading ? (
+        <div className="ca-card" style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
+      ) : rows.length === 0 ? (
+        <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
+          No data yet. Scrape quarterly rates from the Default tab to populate history.
+        </div>
+      ) : (
+        <div className="ca-card">
+          <RateGrid
+            periods={periods}
+            rows={rows}
+            canEdit={false}
+            onCellClick={() => {}}
+            scrollRef={scrollRef}
+            liveRateMap={liveRateMap}
+          />
+          <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)' }}>
+            <span style={{ color: 'var(--accent2)', marginRight: 4 }}>■</span> Live (daily scraped) &nbsp;
+            <span style={{ color: 'var(--text)', marginRight: 4 }}>■</span> Quarterly average &nbsp;
+            <span style={{ color: 'var(--muted)', marginRight: 4 }}>—</span> No data
+          </div>
         </div>
       )}
     </>
@@ -1137,7 +1235,7 @@ function CustomTab({ teamId, canEdit, defaultRates, pairs }) {
 
 export default function FxRates() {
   const { user, activeTeamId } = useAuth();
-  const [tab, setTab] = useState('default');
+  const [tab, setTab] = useState('pairs');
   const [canEdit, setCanEdit] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [defaultRates, setDefaultRates] = useState([]);
@@ -1177,6 +1275,13 @@ export default function FxRates() {
       .map(p => ({ ...p, label: `Q${p.quarter}-${String(p.year).slice(2)}` }));
   }, [defaultRates]);
 
+  const TABS = [
+    { id: 'pairs', label: 'FX Pairs' },
+    { id: 'default', label: 'Default' },
+    { id: 'custom', label: 'Custom Overrides' },
+    { id: 'history', label: 'History' },
+  ];
+
   if (!activeTeamId) {
     return (
       <div className="ca-page ca-fade-in">
@@ -1196,12 +1301,18 @@ export default function FxRates() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <button className={`ca-btn ca-btn-sm ${tab === 'default' ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
-          onClick={() => setTab('default')}>Default</button>
-        <button className={`ca-btn ca-btn-sm ${tab === 'custom' ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
-          onClick={() => setTab('custom')}>Custom Overrides</button>
+        {TABS.map(t => (
+          <button key={t.id}
+            className={`ca-btn ca-btn-sm ${tab === t.id ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+            onClick={() => setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
+      {tab === 'pairs' && (
+        <FxPairsTab pairs={pairs} canManage={canManage} onRefresh={fetchAll} />
+      )}
       {tab === 'default' && (
         <DefaultTab
           user={user}
@@ -1210,8 +1321,6 @@ export default function FxRates() {
           loading={defaultLoading}
           onRefresh={fetchAll}
           periods={periods}
-          pairs={pairs}
-          pairsLoading={pairsLoading}
         />
       )}
       {tab === 'custom' && (
@@ -1220,6 +1329,14 @@ export default function FxRates() {
           canEdit={canEdit}
           defaultRates={defaultRates}
           pairs={pairs}
+        />
+      )}
+      {tab === 'history' && (
+        <HistoryTab
+          defaultRates={defaultRates}
+          pairs={pairs}
+          periods={periods}
+          loading={defaultLoading || pairsLoading}
         />
       )}
     </div>
