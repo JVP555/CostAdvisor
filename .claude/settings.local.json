@@ -35,7 +35,16 @@
       "Bash(ls -la venv/bin/python*)",
       "Bash(file venv/bin/python)",
       "Bash(command -v wsl)",
-      "Bash(wsl bash *)"
+      "Bash(wsl bash *)",
+      "Bash(git push *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npx vite *)",
+      "Bash(git stash *)",
+      "Bash(git pull *)",
+      "Bash(git commit *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/api/fx-rates/ -H \"Authorization: Bearer test\")",
+      "Bash(curl -v http://localhost:8000/api/fx-rates/)"
     ]
   }
 }

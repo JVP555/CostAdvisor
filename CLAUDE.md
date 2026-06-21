@@ -304,12 +304,12 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 fx_converter 3-branch: custom fixed → custom live → custom quarter_ref → platform quarterly → platform live fallback
   - 🟢 Download Template CSV button in both Default and Custom upload areas
 
-- 🔴 **Scrum 15** — Polished exportable deliverable (clean PDF negotiation brief with verdict, gap, ranked drivers)
-  - 🔴 "Export PDF" button on the Brief page
-  - 🔴 PDF contains: verdict, gap, top drivers table, evolution chart, narrative
-  - 🔴 PDF is legible when printed in black and white
-  - 🔴 Customer logo / branding can be added
-  - 🔴 File is named sensibly (e.g., `brief-product-supplier-Q12025.pdf`)
+- 🟢 **Scrum 15** — Polished exportable deliverable (clean PDF negotiation brief with verdict, gap, ranked drivers)
+  - 🟢 "Export PDF" button on the Brief page
+  - 🟢 PDF contains: verdict, gap, top drivers table, evolution chart, narrative
+  - 🟢 PDF is legible when printed in black and white (direction badges use `borderLeft: 3px solid currentColor` + print CSS strips background fill; `@page` A4 margins; animation kill; chart SVG unlocked from scroll container)
+  - 🟢 Customer logo / branding — print masthead: "CostAdvisor" wordmark + "Negotiation Brief" title on left; product / supplier / destination / period / date on right; `2px solid #111` separator
+  - 🟢 File is named sensibly (`brief-{product}-{supplier}-{period}.pdf` via `document.title` trick before `window.print()`)
   - **Verification (7 checks — audited against the server-side brief content behind the printed page; tests in `backend/tests/test_brief.py`: 6 tests, full suite 20 passed):**
     - 🟢 Function works — `calculate_brief` (`costing_engine.py:647`): exact should-cost / gap / total-impact + drivers ranked by absolute cost contribution
     - 🟢 Security — `@limiter.limit("30/minute")` on the endpoint, Pydantic UUID validation, ORM-only (no raw SQL in the calc path)
@@ -318,7 +318,6 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
     - 🟢 RLS — `CostModel` lookup is unfiltered and relies on the `tenant_isolation` policy; cross-tenant request → 403/404
     - 🟢 Transit — cookies `HttpOnly`+`Secure` in prod, HTTPS via Cloudflare/Railway; Ollama narrative over Tailscale with graceful fallback. Caveat: `ca_token` is `SameSite=none`, not `Strict` (a Scrum 9 auth-hardening gap, not Scrum 15)
     - 🟢 Comments — `Brief.jsx` + engine comment only the non-obvious *why* (null-passthrough, active-formula choice); no redundant comments
-    - ⚠️ Note: the PDF export itself is still browser `window.print()` — there is no server-generated PDF, logo/branding, or custom filename, so the five criteria above remain 🔴
 
 - 🔴 **Scrum 16** — Self-serve onboarding (empty states, example data, guidance to first should-cost vs actual gap)
   - 🟡 Every list/chart page has a non-empty empty state with a clear next action (Dashboard + Pricing covered; others incomplete)

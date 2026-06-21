@@ -560,26 +560,47 @@ input[type=range] { padding: 0; cursor: pointer; accent-color: var(--accent); }
   --pie-9: #c45e3a;
 }
 
+/* @page must be outside @media print for reliable cross-browser support */
+@page {
+  size: A4 portrait;
+  margin: 18mm 15mm;
+}
+
 /* Print styles */
 @media print {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
   body, #root { background: #fff; color: #111; }
   .ca-nav, .ca-no-print { display: none !important; }
   .ca-print-only { display: block !important; }
   .ca-card { border: 1px solid #ddd; background: #fff; box-shadow: none; }
   .ca-metric { border: 1px solid #ddd; background: #fafafa; }
-  .ca-page { padding: 16px; max-width: 100%; }
+  .ca-page { padding: 0; max-width: 100%; }
   .ca-table th, .ca-table td { border-bottom: 1px solid #ddd; }
-  .ca-table th { background: #fff; }
-  .ca-scroll-x { max-height: none; overflow-y: visible; }
+  .ca-table th { background: #f5f5f5; }
+  /* Unlock scroll container so SVG charts print in full */
+  .ca-scroll-x { max-height: none !important; overflow: visible !important; overflow-y: visible !important; }
+  .ca-print-page svg { max-width: 100% !important; }
+  /* Direction badges: strip background fill, keep text + left-border stripe */
+  .ca-print-page span[style*="borderLeft"] {
+    background: transparent !important;
+  }
+  /* Verdict card accent border: ensure it prints dark */
+  .ca-print-page .ca-card[style*="borderLeft"] {
+    border-left-color: #111 !important;
+    border-left-width: 3px !important;
+  }
   :root {
     --accent: #0a7c42;
     --accent2: #c0392b;
     --accent3: #b8860b;
-    --accent4: #2a6ebf;
-    --muted: #666;
+    --accent4: #1a5fa8;
+    --muted: #555;
     --text: #111;
     --text-secondary: #444;
     --border: #ddd;
+    --danger-bg: rgba(192,57,43,0.08);
+    --success-bg: rgba(10,124,66,0.08);
+    --neutral-bg: rgba(0,0,0,0.04);
   }
 }
 .ca-print-only { display: none; }
