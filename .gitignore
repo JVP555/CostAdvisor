@@ -48,3 +48,8 @@ Thumbs.db
 
 # Local planning docs — never commit
 jvpdocs/
+
+# Impeccable design tool — local only
+PRODUCT.md
+DESIGN.md
+.impeccable/
