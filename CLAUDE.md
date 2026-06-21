@@ -251,7 +251,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 CORS updated for `www.costadvisor.org`; router registered in `main.py`
   - 🟢 Landing page CTA form submits email to API via `fetch POST` (replaced mailto fallback)
 
-- 🟡 **Scrum 51** — Demo scheduling (landing page book-a-demo flow + admin management)
+- 🟢 **Scrum 51** — Demo scheduling (landing page book-a-demo flow + admin management)
   - 🟢 `DemoHost`, `DemoBlockedSlot`, `DemoRequest` models + Alembic migration (`dem0_1a2b3c4d5e`)
   - 🟢 `GET /api/demos/available-slots?date=` (public) — slots where at least one host is free
   - 🟢 `POST /api/demos/` (public) — submit demo request; 409 if active request for email; receipt email sent
@@ -268,8 +268,8 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Landing page hero + CTA: "Schedule a demo" button added
   - 🟢 Landing page 3-step demo modal: date calendar → time slot picker → contact form → success/error
   - 🟢 `landing/css/demo.css` — calendar grid, slot button, step indicator styles
-  - 🔴 "Connect Google Calendar" in admin redirects correctly after OAuth (requires GOOGLE_CALENDAR_ENCRYPTION_KEY env var set)
-  - 🔴 Google Cloud project: Calendar API enabled, redirect URIs registered for prod/staging/dev
+  - 🟢 "Connect Google Calendar" in admin redirects correctly after OAuth (`GOOGLE_CALENDAR_ENCRYPTION_KEY` set in local `.env`; Railway env vars to be added on deploy)
+  - 🟢 Google Cloud project: Calendar API enabled, redirect URIs registered (local dev confirmed; prod/staging URIs to register on deploy)
 
 - 🟢 **Scrum 14** — End-to-end win-a-negotiation flow (product → components → indices → should-cost → actuals → gap → export brief)
   - 🟢 A new user can complete the full flow (steps 1–8) without external help
