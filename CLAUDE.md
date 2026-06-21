@@ -251,7 +251,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 CORS updated for `www.costadvisor.org`; router registered in `main.py`
   - 🟢 Landing page CTA form submits email to API via `fetch POST` (replaced mailto fallback)
 
-- 🟡 **Scrum 12c** — Demo scheduling (landing page book-a-demo flow + admin management)
+- 🟡 **Scrum 51** — Demo scheduling (landing page book-a-demo flow + admin management)
   - 🟢 `DemoHost`, `DemoBlockedSlot`, `DemoRequest` models + Alembic migration (`dem0_1a2b3c4d5e`)
   - 🟢 `GET /api/demos/available-slots?date=` (public) — slots where at least one host is free
   - 🟢 `POST /api/demos/` (public) — submit demo request; 409 if active request for email; receipt email sent
