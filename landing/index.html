@@ -364,6 +364,46 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .quote-badge{display:inline-flex;align-items:center;gap:8px;margin-top:18px;font-family:var(--font-mono);font-size:11px;color:var(--teal);background:rgba(14,165,233,.1);border:1px solid rgba(14,165,233,.2);border-radius:20px;padding:6px 14px}
 @media(max-width:600px){.quote-card{padding:40px 24px}}
 
+/* ── Interactive demo (donut) ─────────────────────────────── */
+.demo-viz{border-radius:18px;padding:26px;background:rgba(255,255,255,.045);backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);border:1px solid rgba(255,255,255,.09);box-shadow:0 8px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.07)}
+.demo-viz-title{font-size:12px;color:var(--muted);font-family:var(--font-mono);margin-bottom:18px;text-align:center;letter-spacing:.5px}
+.demo-donut-wrap{position:relative;height:236px;margin:0 auto}
+.demo-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.demo-donut-center-label{font-size:10px;color:var(--dim);font-family:var(--font-mono);letter-spacing:1.5px}
+.demo-donut-center-val{font-size:36px;font-weight:800;font-family:var(--font-mono);color:var(--green);line-height:1.1;transition:color .3s}
+.demo-donut-center-unit{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
+.demo-legend{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-top:22px}
+.demo-leg-item{display:flex;align-items:center;gap:9px;font-size:12px}
+.demo-leg-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0;box-shadow:0 0 8px currentColor}
+.demo-leg-name{color:var(--muted);flex:1}
+.demo-leg-val{font-family:var(--font-mono);font-weight:600;color:var(--text)}
+.demo-verdict{display:inline-flex;align-items:center;gap:8px;margin-top:16px;padding:9px 15px;border-radius:10px;font-size:13px;font-weight:700;font-family:var(--font-mono);transition:all .3s;width:fit-content}
+.demo-verdict.over{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+.demo-verdict.fair{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.25)}
+.demo-verdict.under{background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.25)}
+
+/* ── Legal cards ──────────────────────────────────────────── */
+.legal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+@media(max-width:900px){.legal-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.legal-grid{grid-template-columns:1fr}}
+.legal-card{border-radius:16px;padding:26px 24px;background:rgba(255,255,255,.04);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border:1px solid rgba(255,255,255,.08);box-shadow:0 4px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.05)}
+.legal-card:hover{box-shadow:0 12px 44px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08);border-color:rgba(59,130,246,.22)}
+.legal-card-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.18);margin-bottom:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.legal-card h4{font-size:15px;font-weight:700;margin-bottom:10px}
+.legal-card p{font-size:13px;color:var(--muted);line-height:1.7}
+
+/* ── Engagement popup ─────────────────────────────────────── */
+.lp-popup{position:fixed;bottom:22px;right:22px;z-index:950;max-width:330px;display:flex;gap:14px;padding:18px 20px 18px 18px;border-radius:18px;background:rgba(13,20,37,.68);backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);border:1px solid rgba(255,255,255,.11);box-shadow:0 16px 50px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.09);transform:translateY(160%);opacity:0;transition:transform .55s cubic-bezier(.23,1,.32,1),opacity .55s}
+.lp-popup.show{transform:translateY(0);opacity:1}
+.lp-popup-close{position:absolute;top:9px;right:11px;background:none;border:none;color:var(--dim);font-size:17px;cursor:pointer;line-height:1;padding:2px}
+.lp-popup-close:hover{color:var(--text)}
+.lp-popup-icon{font-size:27px;line-height:1.2;flex-shrink:0}
+.lp-popup-title{font-size:14px;font-weight:700;margin-bottom:4px}
+.lp-popup-text{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px}
+.btn-sm{padding:8px 16px;font-size:13px;border-radius:9px}
+@media(max-width:600px){.lp-popup{left:16px;right:16px;bottom:16px;max-width:none}}
+@media(prefers-reduced-motion:reduce){.lp-popup{transition:opacity .3s}}
+
 /* ── Reveal ──────────────────────────────────────────────── */
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
 .reveal.visible{opacity:1;transform:none}
@@ -438,8 +478,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
             <span class="hero-stat-label">price increases deflected*</span>
           </div>
           <div class="hero-stat">
-            <span class="hero-stat-val count-stat" data-count="31">31</span>
-            <span class="hero-stat-label">currency pairs tracked</span>
+            <span class="hero-stat-val">Daily</span>
+            <span class="hero-stat-label">live FX &amp; index refresh</span>
           </div>
         </div>
         <p style="font-size:10px;color:var(--dim);font-family:var(--font-mono);margin-top:8px">* McKinsey &amp; AlixPartners research</p>
@@ -557,8 +597,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <section id="fx">
   <div class="container">
     <p class="section-label">FX Rate Monitor</p>
-    <h2 class="section-title">31 currency pairs. Daily live rates.</h2>
-    <p class="section-sub">Quarterly historical averages back to 2020, refreshed daily via ECB-backed data. Your costing engine always uses the right rate.</p>
+    <h2 class="section-title">Every currency you buy in. Daily live rates.</h2>
+    <p class="section-sub">Quarterly historical averages back to 2020, refreshed daily from ECB-backed data — across every currency pair you trade in. Your costing engine always uses the right rate.</p>
     <div class="fx-inner reveal">
       <div class="fx-pair-tabs" id="fxTabs"></div>
       <div>
@@ -681,6 +721,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
               <div class="demo-gap-tile-val" style="color:var(--red)" id="demoImpact">€2.1M</div>
             </div>
           </div>
+          <div class="demo-verdict over" id="demoVerdict">⚠ Supplier €56/t over should-cost</div>
         </div>
         <div class="reveal" style="transition-delay:.1s">
           <div class="slider-group">
@@ -725,9 +766,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           </div>
         </div>
       </div>
-      <div class="demo-chart-wrap glass skeuo reveal" style="transition-delay:.15s">
-        <div style="font-size:12px;color:var(--muted);font-family:var(--font-mono);margin-bottom:14px">Component cost breakdown (€/t)</div>
-        <canvas id="demoChart" style="height:196px"></canvas>
+      <div class="demo-viz reveal" style="transition-delay:.15s">
+        <div class="demo-viz-title">COMPONENT COST BREAKDOWN · €/t</div>
+        <div class="demo-donut-wrap">
+          <canvas id="demoChart"></canvas>
+          <div class="demo-donut-center">
+            <div class="demo-donut-center-label">SHOULD-COST</div>
+            <div class="demo-donut-center-val" id="demoDonutTotal">€342</div>
+            <div class="demo-donut-center-unit">/tonne</div>
+          </div>
+        </div>
+        <div class="demo-legend" id="demoLegend"></div>
       </div>
     </div>
   </div>
@@ -757,7 +806,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       </div>
       <div class="security-tile glass skeuo reveal" style="transition-delay:.24s">
         <div class="security-tile-icon">🔑</div>
-        <h4>RBAC + 38 Permissions</h4>
+        <h4>RBAC + Permissions</h4>
         <p>Team-scoped roles with granular permission gates. Plan ceilings enforced server-side. Invite-only sign-up.</p>
       </div>
     </div>
@@ -783,27 +832,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       <div class="cta-card glass skeuo reveal">
         <h3>Request Early Access</h3>
         <p>CostAdvisor is invite-only. Tell us about your procurement context and we'll be in touch within 48 hours.</p>
-        <div id="ctaForm">
-          <div class="form-group">
-            <label class="form-label">Full name</label>
-            <input type="text" id="ctaName" placeholder="Jane Smith" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Company</label>
-            <input type="text" id="ctaCompany" placeholder="Acme Chemicals" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Work email *</label>
-            <input type="email" id="ctaEmail" placeholder="jane@acme.com" />
-          </div>
-          <div class="form-error" id="ctaError"></div>
-          <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px" onclick="submitCtaForm()">Request Access →</button>
+        <div class="cta-demo-features">
+          <div class="cta-demo-feat"><span class="cta-demo-feat-check">✓</span> Free during early access</div>
+          <div class="cta-demo-feat"><span class="cta-demo-feat-check">✓</span> Guided onboarding on your first category</div>
+          <div class="cta-demo-feat"><span class="cta-demo-feat-check">✓</span> A direct line to the team building it</div>
+          <div class="cta-demo-feat"><span class="cta-demo-feat-check">✓</span> No credit card, no commitment</div>
         </div>
-        <div class="form-success" id="ctaSuccess">
-          <div class="form-success-icon">✅</div>
-          <h4>Request received</h4>
-          <p>We'll review your details and reach out within 48 hours.</p>
-        </div>
+        <button class="btn btn-primary btn-lg" style="width:100%;justify-content:center" onclick="openAccessModal()">Request Access →</button>
       </div>
 
       <div class="cta-card glass skeuo reveal" style="transition-delay:.1s">
@@ -821,42 +856,44 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   </div>
 </section>
 
-<!-- ── Terms & Privacy ───────────────────────────────────────── -->
+<!-- ── Legal ─────────────────────────────────────────────────── -->
 <section class="terms-section" id="terms">
   <div class="container">
-    <p class="section-label" style="margin-bottom:24px">Legal</p>
-    <details class="terms-details">
-      <summary>Terms of Service</summary>
-      <div class="terms-body">
-        <h5>Acceptance</h5>
-        <p>By accessing CostAdvisor you agree to these terms. Use is limited to authorised business procurement purposes.</p>
-        <h5>Permitted Use</h5>
-        <p>You may use CostAdvisor to build and analyse should-cost models for your organisation's procurement activities. Redistribution, resale, or reverse-engineering of the platform is prohibited.</p>
-        <h5>Data Accuracy</h5>
-        <p>Commodity index data is sourced from ECB, EIA, Eurostat, FRED, and World Bank. CostAdvisor provides this data for informational purposes. Always validate figures before committing to a negotiation position.</p>
-        <h5>Intellectual Property</h5>
-        <p>The CostAdvisor platform, formulas, and UI are proprietary. Your cost models, uploaded data, and negotiation briefs remain your intellectual property.</p>
-        <h5>Limitation of Liability</h5>
-        <p>CostAdvisor is a decision-support tool. We are not liable for commercial outcomes resulting from use of should-cost figures or negotiation briefs generated by the platform.</p>
+    <p class="section-label">Legal</p>
+    <h2 class="section-title">The fine print, in plain language</h2>
+    <p class="section-sub">How we handle your data, your IP, and your trust — no dark patterns.</p>
+    <div class="legal-grid">
+      <div class="legal-card reveal">
+        <div class="legal-card-icon">📜</div>
+        <h4>Terms of Service</h4>
+        <p>Use CostAdvisor to build and analyse should-cost models for your organisation's procurement. Redistribution, resale, or reverse-engineering is prohibited. It's a decision-support tool — we're not liable for commercial outcomes of the figures or briefs it generates.</p>
       </div>
-    </details>
-    <details class="terms-details">
-      <summary>Privacy Policy</summary>
-      <div class="terms-body">
-        <h5>Data We Collect</h5>
-        <p>Account data (name, email, company), usage data (feature interactions, queries), and procurement data you upload (product formulas, prices, volumes). We do not sell personal data.</p>
-        <h5>GDPR</h5>
-        <p>CostAdvisor is operated from the EU. Data is processed on the lawful basis of contract performance and legitimate interest. You have the right to access, correct, export, or delete your data at any time.</p>
-        <h5>Data Storage</h5>
-        <p>All data is stored on Railway Postgres instances in the EU (Frankfurt). Encrypted at rest (AES-256) and in transit (TLS 1.2+).</p>
-        <h5>Retention</h5>
-        <p>Active account data is retained for the duration of your subscription. On account deletion, personal data is removed within 30 days. Aggregated anonymised usage statistics may be retained indefinitely.</p>
-        <h5>Third Parties</h5>
-        <p>We use Google OAuth for authentication (no password storage). AI narrative generation uses a self-hosted Ollama instance — no data is sent to OpenAI or third-party AI providers.</p>
-        <h5>Contact</h5>
-        <p>Privacy queries: <a href="mailto:privacy@costadvisor.org" style="color:var(--blue)">privacy@costadvisor.org</a></p>
+      <div class="legal-card reveal" style="transition-delay:.07s">
+        <div class="legal-card-icon">🔒</div>
+        <h4>Privacy &amp; GDPR</h4>
+        <p>Operated from the EU on the lawful basis of contract performance and legitimate interest. You can access, correct, export, or delete your data at any time. We never sell personal data.</p>
       </div>
-    </details>
+      <div class="legal-card reveal" style="transition-delay:.14s">
+        <div class="legal-card-icon">🏛️</div>
+        <h4>Your Data, Your IP</h4>
+        <p>Your cost models, uploaded data, and negotiation briefs stay your intellectual property. The platform, formulas, and UI are ours. Index data (ECB, EIA, Eurostat, FRED, World Bank) is provided for information — always validate before negotiating.</p>
+      </div>
+      <div class="legal-card reveal" style="transition-delay:.21s">
+        <div class="legal-card-icon">🇪🇺</div>
+        <h4>Residency &amp; Retention</h4>
+        <p>Data is stored on EU (Frankfurt) Postgres, encrypted at rest (AES-256) and in transit (TLS 1.2+). Account data is kept for your subscription term; on deletion, personal data is removed within 30 days.</p>
+      </div>
+      <div class="legal-card reveal" style="transition-delay:.28s">
+        <div class="legal-card-icon">🔑</div>
+        <h4>Authentication &amp; AI</h4>
+        <p>Google OAuth for sign-in — we never store passwords. AI narratives run on a self-hosted model; no data is sent to OpenAI or any third-party AI provider.</p>
+      </div>
+      <div class="legal-card reveal" style="transition-delay:.35s">
+        <div class="legal-card-icon">✉️</div>
+        <h4>Questions?</h4>
+        <p>Privacy and legal queries go to <a href="mailto:privacy@costadvisor.org" style="color:var(--blue)">privacy@costadvisor.org</a>. We respond within two business days.</p>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -1003,6 +1040,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   </div>
 </div>
 
+<!-- ── Engagement popup ──────────────────────────────────────── -->
+<div class="lp-popup" id="lpPopup">
+  <button class="lp-popup-close" onclick="dismissPopup()" aria-label="Dismiss">×</button>
+  <div class="lp-popup-icon">👋</div>
+  <div class="lp-popup-body">
+    <div class="lp-popup-title">See it on your category</div>
+    <div class="lp-popup-text">Book a 20-minute live demo — no slides, just the product on your numbers.</div>
+    <button class="btn btn-primary btn-sm" onclick="dismissPopup();openDemoModal()">Book a demo →</button>
+  </div>
+</div>
+
 <script>
 // ── Config ───────────────────────────────────────────────────
 const API_URL = window.location.hostname.includes('dev.')
@@ -1050,7 +1098,7 @@ const FEATURES = [
   { icon:'⚗️', bg:'#3B82F6', title:'Should-Cost Modelling', desc:'Build weighted formulas from commodity components. Each links to a live index for automatic quarterly recalculation.' },
   { icon:'📈', bg:'#10B981', title:'Evolution Tracking', desc:'See how your should-cost moves quarter-over-quarter as underlying indices change. Spot trends before your next negotiation.' },
   { icon:'🎯', bg:'#F59E0B', title:'Gap Analysis', desc:'Instantly quantify the gap between should-cost and actual supplier price — in percentage and total financial exposure.' },
-  { icon:'💱', bg:'#0EA5E9', title:'FX Rate Engine', desc:'31 currency pairs. Daily live rates via ECB-backed Frankfurter API. Quarterly averages from 2020. Always the right rate.' },
+  { icon:'💱', bg:'#0EA5E9', title:'FX Rate Engine', desc:'Daily live rates from an ECB-backed source, with quarterly averages back to 2020 — across every currency pair you trade in. Always the right rate.' },
   { icon:'📄', bg:'#8B5CF6', title:'AI Negotiation Briefs', desc:'Export a branded PDF brief with verdict, gap, top cost drivers, and AI-generated narrative talking points — one click.' },
   { icon:'🧮', bg:'#EF4444', title:'Advanced Formula Mode', desc:'Write free-form expressions (e.g. 0.75*ACN + 1500*(1−h)) with variable mapping to indices, fixed values, or uploads.' },
   { icon:'🔧', bg:'#F59E0B', title:'Squeeze Analysis', desc:'Simulate cost impact of commodity moves ±5%, ±10%, ±20%. Know your exposure before your supplier quotes a new price.' },
@@ -1198,6 +1246,13 @@ function buildFeatures() {
 
 // ── Interactive Demo ─────────────────────────────────────────
 let demoChartInst=null;
+const DEMO_COMPONENTS=[
+  {name:'Ammonia',color:'#10B981'},
+  {name:'Natural Gas',color:'#0EA5E9'},
+  {name:'Packaging',color:'#8B5CF6'},
+  {name:'Labour',color:'#F59E0B'},
+];
+const DEMO_SUPPLIER=398, DEMO_VOLUME=38000;
 
 function updateDemo() {
   const amm=+document.getElementById('slAmm').value;
@@ -1208,19 +1263,40 @@ function updateDemo() {
   document.getElementById('slGasVal').textContent='$'+gas.toFixed(1)+'/MMBtu';
   document.getElementById('slPkgVal').textContent='$'+pkg+'/t';
   document.getElementById('slLabVal').textContent='$'+lab+'/t';
-  const cAmm=amm*0.40, cGas=gas*40*0.30, cPkg=pkg*0.20, cLab=lab*0.10;
-  const total=cAmm+cGas+cPkg+cLab;
-  const supplier=398;
-  const gap=((supplier-total)/total*100).toFixed(1);
-  const impact=((supplier-total)*37500/1e6).toFixed(1);
+  const parts=[amm*0.40, gas*40*0.30, pkg*0.20, lab*0.10];
+  const total=parts.reduce((a,b)=>a+b,0);
+  const diff=DEMO_SUPPLIER-total;
+  const gap=diff/total*100;
+  const impact=diff*DEMO_VOLUME/1e6;
+
   document.getElementById('demoTotal').textContent='€'+total.toFixed(2);
-  document.getElementById('demoGap').textContent=(gap>0?'+':'')+gap+'%';
-  document.getElementById('demoImpact').textContent='€'+Math.abs(impact)+'M';
-  document.getElementById('demoTotal').style.color=gap>10?'var(--red)':gap>0?'var(--amber)':'var(--green)';
+  document.getElementById('demoDonutTotal').textContent='€'+Math.round(total);
+  document.getElementById('demoGap').textContent=(gap>0?'+':'')+gap.toFixed(1)+'%';
+  document.getElementById('demoImpact').textContent=(impact<0?'−':'')+'€'+Math.abs(impact).toFixed(1)+'M';
+
+  // Verdict + colour severity
+  const sevColor=gap>5?'var(--red)':gap<-5?'var(--blue)':'var(--green)';
+  document.getElementById('demoTotal').style.color=sevColor;
+  document.getElementById('demoDonutTotal').style.color=sevColor;
+  const verdict=document.getElementById('demoVerdict');
+  if(gap>5){verdict.className='demo-verdict over';verdict.textContent=`⚠ Supplier €${Math.round(diff)}/t over should-cost`;}
+  else if(gap<-5){verdict.className='demo-verdict under';verdict.textContent=`↓ Supplier €${Math.round(-diff)}/t below should-cost`;}
+  else{verdict.className='demo-verdict fair';verdict.textContent='✓ Fair price — within range';}
+
   if(demoChartInst){
-    demoChartInst.data.datasets[0].data=[+cAmm.toFixed(2),+cGas.toFixed(2),+cPkg.toFixed(2),+cLab.toFixed(2)];
+    demoChartInst.data.datasets[0].data=parts.map(p=>+p.toFixed(2));
     demoChartInst.update('none');
   }
+  renderDemoLegend(parts);
+}
+
+function renderDemoLegend(parts){
+  const el=document.getElementById('demoLegend');
+  if(!el)return;
+  el.innerHTML=DEMO_COMPONENTS.map((c,i)=>
+    `<div class="demo-leg-item"><span class="demo-leg-dot" style="color:${c.color};background:${c.color}"></span>`+
+    `<span class="demo-leg-name">${c.name}</span><span class="demo-leg-val">€${parts[i].toFixed(0)}</span></div>`
+  ).join('');
 }
 
 function initDemoChart() {
@@ -1228,43 +1304,20 @@ function initDemoChart() {
   const canvas=document.getElementById('demoChart');
   if(!canvas)return;
   demoChartInst=new Chart(canvas,{
-    type:'bar',
+    type:'doughnut',
     data:{
-      labels:['🧪 Ammonia (40%)','⚡ Natural Gas (30%)','📦 Packaging (20%)','👷 Labour (10%)'],
+      labels:DEMO_COMPONENTS.map(c=>c.name),
       datasets:[{
         data:[136,36,16,5],
-        backgroundColor:['rgba(16,185,129,.7)','rgba(14,165,233,.7)','rgba(139,92,246,.7)','rgba(245,158,11,.7)'],
-        borderColor:['#10B981','#0EA5E9','#8B5CF6','#F59E0B'],
-        borderWidth:1,borderRadius:6
+        backgroundColor:DEMO_COMPONENTS.map(c=>c.color),
+        borderColor:'#0D1425',borderWidth:3,hoverOffset:7
       }]
     },
-    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,animation:{duration:200},
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'€'+c.raw.toFixed(2)+'/t'}}},
-      scales:{x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{font:{size:10},callback:v=>'€'+v}},
-              y:{grid:{display:false},ticks:{font:{size:11}}}}}
+    options:{cutout:'68%',responsive:true,maintainAspectRatio:false,animation:{duration:300},
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:c=>` ${c.label}: €${c.raw.toFixed(2)}/t`}}}}
   });
   updateDemo();
-}
-
-// ── CTA inline form ──────────────────────────────────────────
-async function submitCtaForm() {
-  const name=document.getElementById('ctaName').value.trim();
-  const company=document.getElementById('ctaCompany').value.trim();
-  const email=document.getElementById('ctaEmail').value.trim();
-  const errEl=document.getElementById('ctaError');
-  if(!email||!EMAIL_RE.test(email)){errEl.textContent='Please enter a valid work email.';errEl.style.display='block';return}
-  errEl.style.display='none';
-  try{
-    await fetch(`${API_URL}/api/access-requests`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email,name:name||undefined,company:company||undefined})
-    });
-    document.getElementById('ctaForm').style.display='none';
-    document.getElementById('ctaSuccess').style.display='block';
-  }catch{
-    errEl.textContent='Something went wrong. Try again or email access@costadvisor.org.';
-    errEl.style.display='block';
-  }
 }
 
 // ── Access modal ─────────────────────────────────────────────
@@ -1554,6 +1607,23 @@ function initSliderFills(){
     s.addEventListener('input',()=>updateSliderFill(s));
   });
 }
+
+// ── Engagement popup ──────────────────────────────────────────
+let _popupShown=false;
+function showPopup(){
+  try{if(sessionStorage.getItem('ca_popup_dismissed'))return}catch{}
+  const p=document.getElementById('lpPopup');if(p)p.classList.add('show');
+}
+function dismissPopup(){
+  const p=document.getElementById('lpPopup');if(p)p.classList.remove('show');
+  try{sessionStorage.setItem('ca_popup_dismissed','1')}catch{}
+}
+function maybePopup(){
+  if(_popupShown)return;
+  if(window.scrollY>window.innerHeight*1.3){_popupShown=true;showPopup()}
+}
+window.addEventListener('scroll',maybePopup,{passive:true});
+setTimeout(()=>{if(!_popupShown){_popupShown=true;showPopup()}},16000);
 
 // ── Keyboard ─────────────────────────────────────────────────
 document.addEventListener('keydown',e=>{
