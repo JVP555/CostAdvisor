@@ -2030,7 +2030,7 @@ function AdminSettingsTab({ users = [] }) {
                                 <label className="ca-label">To</label>
                                 <input className="ca-input" type="time" value={newBlock.end_time} onChange={e => setNewBlock(b => ({ ...b, end_time: e.target.value }))} />
                               </div>
-                              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => addBlockedSlot(h.id)}>+ Block Slot</button>
+                              <button className="ca-btn ca-btn-primary ca-btn-sm" onClick={() => addBlockedSlot(h.id)}>Save</button>
                             </div>
                           </td>
                         </tr>
