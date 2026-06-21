@@ -12,7 +12,7 @@ class FrankfurterScraper:
 
     async def fetch_live(self) -> float | None:
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
+            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
                 resp = await client.get(self.url)
                 resp.raise_for_status()
             rates = resp.json().get("rates", {})
