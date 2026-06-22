@@ -400,11 +400,37 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 /* ── Reveal ──────────────────────────────────────────────── */
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
 .reveal.visible{opacity:1;transform:none}
+
+/* ── Hero entrance choreography ─────────────────────────────── */
+@keyframes heroIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes heroMockupIn{from{opacity:0;filter:blur(8px)}to{opacity:1;filter:blur(0)}}
+@keyframes heroFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes badgePulse{0%,100%{border-color:rgba(59,130,246,.25);box-shadow:none}50%{border-color:rgba(59,130,246,.5);box-shadow:0 0 14px rgba(59,130,246,.18)}}
+@keyframes orbDrift1{0%,100%{transform:translate(0,0)}40%{transform:translate(30px,-18px)}75%{transform:translate(-15px,22px)}}
+@keyframes orbDrift2{0%,100%{transform:translate(0,0)}35%{transform:translate(-22px,16px)}70%{transform:translate(18px,-26px)}}
+/* left column — staggered top-to-bottom */
+.hero-badge{animation:heroIn .65s cubic-bezier(.16,1,.3,1) both,badgePulse 4s ease-in-out 1.6s infinite}
+.hero h1{animation:heroIn .72s cubic-bezier(.16,1,.3,1) .08s both}
+.hero-sub{animation:heroIn .7s cubic-bezier(.16,1,.3,1) .2s both}
+.hero-actions{animation:heroIn .65s cubic-bezier(.16,1,.3,1) .32s both}
+.hero-stats{animation:heroIn .6s cubic-bezier(.16,1,.3,1) .46s both}
+.trust-label{animation:heroIn .6s cubic-bezier(.16,1,.3,1) .55s both}
+.trust-strip{animation:heroIn .6s cubic-bezier(.16,1,.3,1) .6s both}
+/* right column — crystallise into focus, then idle float */
+.hero-mockup{animation:heroMockupIn .9s cubic-bezier(.16,1,.3,1) .12s both}
+.hero-mockup-wrap{animation:heroFloat 7s ease-in-out 1.8s infinite}
+/* atmospheric — subliminal orb movement */
+.hero::before{animation:orbDrift1 22s ease-in-out infinite}
+.hero::after{animation:orbDrift2 28s ease-in-out infinite}
+
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important}
   .ticker-inner{animation:none}
   .reveal{opacity:1;transform:none}
   .hero-mockup,.how-card{transform:none}
+  /* hero entrance — show everything instantly, no float, no orb drift */
+  .hero-badge,.hero h1,.hero-sub,.hero-actions,.hero-stats,.trust-label,.trust-strip,.hero-mockup,.hero-mockup-wrap{animation:none;opacity:1}
+  .hero-mockup-wrap,.hero::before,.hero::after{transform:none}
 }
 </style>
 </head>
