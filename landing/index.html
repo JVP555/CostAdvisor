@@ -28,7 +28,7 @@
   --glass:rgba(255,255,255,.85);--border:#d6dde4;
   --blue:#00A99D;--teal:#00c8bc;--green:#10B981;
   --amber:#c8911a;--red:#d64545;--purple:#7c5cbf;
-  --text:#333333;--muted:#666666;--dim:#6b7280;
+  --text:#333333;--muted:#666666;--dim:#5f6676;
   --font-sans:'Syne',system-ui,sans-serif;
   --font-mono:'JetBrains Mono',monospace;
   --radius:14px;--radius-sm:8px;
@@ -81,7 +81,7 @@ section{padding:96px 0}
 #lpProgress{position:fixed;top:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,var(--blue),var(--teal));transform-origin:left;transform:scaleX(0);z-index:9999;transition:transform .05s linear}
 
 /* ── Nav ────────────────────────────────────────────────── */
-.nav{position:fixed;top:0;left:0;right:0;z-index:900;backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);background:rgba(245,247,250,.92);border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(0,0,0,.06);transition:box-shadow .2s ease}
+.nav{position:fixed;top:0;left:0;right:0;z-index:900;backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);background:rgba(232,236,241,.92);border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(0,0,0,.06);transition:box-shadow .2s ease}
 .nav.scrolled{box-shadow:0 2px 20px rgba(0,0,0,.09)}
 .nav-inner{max-width:1180px;margin:0 auto;padding:0 24px;height:64px;display:flex;align-items:center;gap:32px}
 .nav-logo{display:flex;align-items:center;gap:10px;flex-shrink:0}
@@ -96,7 +96,7 @@ section{padding:96px 0}
   .nav-links,.nav-actions .btn-ghost{display:none}
   .nav-burger{display:flex}
 }
-.nav-mobile{display:none;flex-direction:column;gap:4px;padding:12px 24px 20px;border-top:1px solid var(--border);background:rgba(245,247,250,.97)}
+.nav-mobile{display:none;flex-direction:column;gap:4px;padding:12px 24px 20px;border-top:1px solid var(--border);background:rgba(232,236,241,.97)}
 .nav-mobile.open{display:flex}
 .nav-mobile a{font-size:14px;font-weight:500;color:var(--muted);padding:10px 0;border-bottom:1px solid var(--border);transition:color .15s}
 .nav-mobile a:hover{color:var(--text)}
@@ -133,7 +133,7 @@ section{padding:96px 0}
 .mockup-label{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
 .mockup-val{font-size:13px;font-weight:600;font-family:var(--font-mono)}
 .mockup-gap-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-family:var(--font-mono);font-weight:700;background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.25)}
-.mockup-chart-area{margin-top:14px;border-radius:10px;background:#eef2f6;padding:12px}
+.mockup-chart-area{margin-top:14px;border-radius:10px;background:var(--surface2);padding:12px}
 .mockup-chart-legend{display:flex;gap:16px;margin-bottom:8px}
 .mockup-legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
 .mockup-legend-line{width:16px;height:2px;border-radius:1px}
@@ -188,15 +188,7 @@ section{padding:96px 0}
 .fx-current-tile-pair{font-size:10px;color:var(--muted);font-family:var(--font-mono);margin-bottom:4px}
 .fx-current-tile-val{font-size:14px;font-weight:700;font-family:var(--font-mono)}
 
-/* ── How it works ────────────────────────────────────────── */
-.how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:56px}
-@media(max-width:768px){.how-grid{grid-template-columns:1fr}}
-.how-card{border-radius:18px;padding:36px 28px;transform:perspective(600px) rotateX(3deg);transform-origin:bottom center;transition:transform .4s cubic-bezier(.23,1,.32,1),box-shadow .4s}
-.how-card:hover{transform:perspective(600px) rotateX(0) translateY(-6px);box-shadow:0 12px 40px rgba(0,0,0,.12)}
-.how-num{font-size:48px;font-weight:800;font-family:var(--font-mono);color:var(--blue);margin-bottom:16px;line-height:1}
-.how-icon{width:44px;height:44px;border-radius:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;font-size:22px}
-.how-card h3{font-size:20px;font-weight:700;margin-bottom:10px}
-.how-card p{font-size:14px;color:var(--muted);line-height:1.7}
+/* .how-card/.how-grid/.how-num/.how-icon removed — section uses .hwb1 system */
 
 /* ── Demo calculator ─────────────────────────────────────── */
 .demo-inner{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start;margin-top:48px}
@@ -247,7 +239,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 /* ── Terms ───────────────────────────────────────────────── */
 .terms-section{padding:64px 0}
-.terms-details{border-radius:14px;border:1px solid var(--border);background:var(--glass);overflow:hidden}
+.terms-details{border-radius:14px;border:1px solid var(--border);background:var(--surface);overflow:hidden}
 .terms-details+.terms-details{margin-top:10px}
 .terms-details summary{padding:18px 24px;font-size:14px;font-weight:600;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;user-select:none}
 .terms-details summary::-webkit-details-marker{display:none}
@@ -319,7 +311,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 /* ── Market signal tiles ──────────────────────────────────── */
 .signal-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
 @media(max-width:768px){.signal-row{grid-template-columns:1fr}}
-.signal-tile{border-radius:12px;padding:18px 20px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.07);display:flex;gap:14px;align-items:flex-start;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.signal-tile{border-radius:12px;padding:18px 20px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.07);display:flex;gap:14px;align-items:flex-start}
 .signal-tile.down{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.07)}
 .signal-arrow{font-size:18px;line-height:1;margin-top:1px}
 .signal-tile-name{font-size:13px;font-weight:700;margin-bottom:5px}
@@ -371,7 +363,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .legal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
 @media(max-width:900px){.legal-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.legal-grid{grid-template-columns:1fr}}
-.legal-card{border-radius:16px;padding:26px 24px;background:var(--surface2);border:1px solid var(--border);box-shadow:0 2px 12px rgba(0,0,0,.05)}
+.legal-card{border-radius:16px;padding:26px 24px;background:var(--surface2);border:1px solid var(--border)}
 .legal-card:hover{box-shadow:0 8px 32px rgba(0,0,0,.1),inset 0 1px 0 rgba(255,255,255,.9);border-color:rgba(0,169,157,.3)}
 .legal-card-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px;background:rgba(0,169,157,.1);border:1px solid rgba(0,169,157,.18);margin-bottom:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
 .legal-card h4{font-size:15px;font-weight:700;margin-bottom:10px}
@@ -420,7 +412,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   *,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important}
   .ticker-inner{animation:none}
   .reveal,.reveal-ready .reveal{opacity:1;transform:none}
-  .hero-mockup,.how-card{transform:none}
+  .hero-mockup{transform:none}
   /* hero entrance — show everything instantly, no float, no orb drift */
   .hero-badge,.hero h1,.hero-sub,.hero-actions,.hero-stats,.hero-mockup,.hero-mockup-wrap{animation:none;opacity:1}
   .hero-mockup-wrap,.hero::before,.hero::after{transform:none}
