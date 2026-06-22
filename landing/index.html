@@ -45,18 +45,19 @@ input,textarea,select{
   width:100%;outline:none;transition:border-color .2s
 }
 input:focus,textarea:focus{border-color:var(--blue)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:4px}
+button:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
 
 /* ── Glass / skeuo ──────────────────────────────────────── */
+/* Glass: reserved for nav only (One Glass Rule). On cards it degrades to a clean white surface. */
 .glass{
-  background:rgba(255,255,255,.9);
-  backdrop-filter:blur(18px) saturate(150%);
-  -webkit-backdrop-filter:blur(18px) saturate(150%);
+  background:var(--surface);
   border:1px solid var(--border);
-  box-shadow:0 4px 24px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.95)
+  box-shadow:0 2px 12px rgba(0,0,0,.05),inset 0 1px 0 rgba(255,255,255,.9)
 }
 .skeuo{
   background:linear-gradient(145deg,#ffffff 0%,#f7f9fc 100%);
-  box-shadow:0 2px 8px rgba(0,0,0,.06),-1px -1px 3px rgba(255,255,255,.9),inset 0 1px 0 rgba(255,255,255,.95);
+  box-shadow:0 2px 8px rgba(0,0,0,.05),-1px -1px 3px rgba(255,255,255,.9),inset 0 1px 0 rgba(255,255,255,.95);
   border:1px solid var(--border)
 }
 
@@ -107,7 +108,7 @@ section{padding:96px 0}
 .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
 @media(max-width:900px){.hero-grid{grid-template-columns:1fr}}
 .hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,169,157,.1);border:1px solid rgba(0,169,157,.25);border-radius:20px;padding:6px 14px;font-size:12px;color:var(--blue);font-family:var(--font-mono);font-weight:500;margin-bottom:28px;width:fit-content}
-.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite}
+.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green)}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.3)}}
 .hero h1{font-size:clamp(32px,5vw,56px);font-weight:800;line-height:1.1;margin-bottom:24px;letter-spacing:-.02em}
 .hero h1 span{color:var(--blue)}
@@ -171,7 +172,7 @@ section{padding:96px 0}
 .fx-pair-tabs{display:flex;flex-direction:column;gap:8px}
 @media(max-width:768px){.fx-pair-tabs{flex-direction:row;flex-wrap:wrap}}
 .fx-tab{padding:11px 14px;border-radius:10px;font-size:12px;font-family:var(--font-mono);font-weight:600;border:1px solid var(--border);background:transparent;color:var(--muted);text-align:left;transition:all .18s}
-.fx-tab:hover{background:var(--glass);color:var(--text)}
+.fx-tab:hover{background:var(--surface2);color:var(--text)}
 .fx-tab.active{background:rgba(0,169,157,.1);border-color:rgba(0,169,157,.3);color:var(--blue)}
 .fx-chart-panel{border-radius:var(--radius);padding:24px}
 .fx-chart-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px}
@@ -199,7 +200,7 @@ section{padding:96px 0}
 @media(max-width:640px){.features-grid{grid-template-columns:1fr}}
 .feature-card{border-radius:14px;padding:22px;display:flex;gap:16px;align-items:flex-start;transition:transform .25s,box-shadow .25s}
 .feature-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.09)}
-.feature-icon{width:40px;height:40px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.1)}
+.feature-icon{width:40px;height:40px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.7)}
 .feature-card h4{font-size:14px;font-weight:700;margin-bottom:6px}
 .feature-card p{font-size:13px;color:var(--muted);line-height:1.6}
 
@@ -211,7 +212,7 @@ section{padding:96px 0}
 .demo-total-val{font-size:44px;font-weight:800;font-family:var(--font-mono);color:var(--green);transition:color .3s}
 .demo-total-unit{font-size:13px;color:var(--muted);margin-top:4px;font-family:var(--font-mono)}
 .demo-gap-row{display:flex;gap:12px;margin-top:14px}
-.demo-gap-tile{flex:1;border-radius:10px;padding:12px;border:1px solid var(--border);background:rgba(0,0,0,.2)}
+.demo-gap-tile{flex:1;border-radius:10px;padding:12px;border:1px solid var(--border);background:var(--surface2)}
 .demo-gap-tile-label{font-size:10px;color:var(--dim);font-family:var(--font-mono);margin-bottom:4px}
 .demo-gap-tile-val{font-size:15px;font-weight:700;font-family:var(--font-mono)}
 .slider-group{margin-bottom:22px}
@@ -299,7 +300,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .lp-cal-day--disabled{opacity:.3;cursor:not-allowed}
 .lp-cal-empty{pointer-events:none}
 .cal-nav{display:flex;justify-content:space-between;align-items:center}
-.cal-nav-btn{background:var(--glass);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:8px;font-size:14px;cursor:pointer}
+.cal-nav-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:8px;font-size:14px;cursor:pointer}
 .cal-nav-btn:hover{background:rgba(0,0,0,.06)}
 #lpCalMonthLabel{font-size:14px;font-weight:600}
 .slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
@@ -322,7 +323,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 /* ── Market signal tiles ──────────────────────────────────── */
 .signal-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}
 @media(max-width:768px){.signal-row{grid-template-columns:1fr}}
-.signal-tile{border-radius:12px;padding:18px 20px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.07);display:flex;gap:14px;align-items:flex-start;box-shadow:0 2px 14px rgba(0,0,0,.2)}
+.signal-tile{border-radius:12px;padding:18px 20px;border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.07);display:flex;gap:14px;align-items:flex-start;box-shadow:0 2px 12px rgba(0,0,0,.06)}
 .signal-tile.down{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.07)}
 .signal-arrow{font-size:18px;line-height:1;margin-top:1px}
 .signal-tile-name{font-size:13px;font-weight:700;margin-bottom:5px}
@@ -374,7 +375,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .legal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
 @media(max-width:900px){.legal-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.legal-grid{grid-template-columns:1fr}}
-.legal-card{border-radius:16px;padding:26px 24px;background:var(--surface2);border:1px solid var(--border);box-shadow:0 2px 12px rgba(0,0,0,.2)}
+.legal-card{border-radius:16px;padding:26px 24px;background:var(--surface2);border:1px solid var(--border);box-shadow:0 2px 12px rgba(0,0,0,.05)}
 .legal-card:hover{box-shadow:0 8px 32px rgba(0,0,0,.1),inset 0 1px 0 rgba(255,255,255,.9);border-color:rgba(0,169,157,.3)}
 .legal-card-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px;background:rgba(0,169,157,.1);border:1px solid rgba(0,169,157,.18);margin-bottom:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
 .legal-card h4{font-size:15px;font-weight:700;margin-bottom:10px}
@@ -383,10 +384,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 /* ── Engagement popup ─────────────────────────────────────── */
 .pa-popup{display:flex;flex-direction:column;gap:0;padding:22px 24px;background:#1d2535;border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 20px 56px rgba(0,0,0,.4),0 1px 0 rgba(255,255,255,.06) inset;width:330px;position:fixed;bottom:28px;right:28px;z-index:90;transform:translateY(160%);opacity:0;transition:transform .55s cubic-bezier(.23,1,.32,1),opacity .55s}
 .pa-popup.show{transform:translateY(0);opacity:1}
-.pa-close{position:absolute;top:9px;right:11px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;line-height:1;padding:4px;opacity:.4;transition:opacity .15s}
+.pa-close{position:absolute;top:9px;right:11px;background:none;border:none;color:#94a3b8;font-size:14px;cursor:pointer;line-height:1;padding:4px;opacity:.6;transition:opacity .15s}
 .pa-close:hover{opacity:1}
-.pa-title{font-family:var(--font-sans);font-weight:800;font-size:20px;line-height:1.1;letter-spacing:-.022em;color:var(--text);margin-bottom:8px;text-wrap:balance}
-.pa-sub{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:16px}
+.pa-title{font-family:var(--font-sans);font-weight:800;font-size:20px;line-height:1.1;letter-spacing:-.022em;color:#f1f5f9;margin-bottom:8px;text-wrap:balance}
+.pa-sub{font-family:var(--font-mono);font-size:11.5px;color:#94a3b8;line-height:1.6;margin-bottom:16px}
 .pa-cta{display:block;width:100%;padding:10px 0;background:var(--blue);color:#fff;font-family:var(--font-mono);font-size:11.5px;font-weight:600;border:none;border-radius:7px;cursor:pointer;text-align:center;transition:background .18s}
 .pa-cta:hover{background:#009990}
 .btn-sm{padding:8px 16px;font-size:13px;border-radius:9px}
@@ -394,8 +395,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 @media(prefers-reduced-motion:reduce){.pa-popup{transition:opacity .3s}}
 
 /* ── Reveal ──────────────────────────────────────────────── */
-.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
-.reveal.visible{opacity:1;transform:none}
+/* Content is visible by default. JS adds .reveal-ready to body, then hides until observed. */
+.reveal{transition:opacity .6s ease,transform .6s ease}
+.reveal-ready .reveal{opacity:0;transform:translateY(24px)}
+.reveal-ready .reveal.visible{opacity:1;transform:none}
 
 /* ── Hero entrance choreography ─────────────────────────────── */
 @keyframes heroIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
@@ -420,7 +423,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important}
   .ticker-inner{animation:none}
-  .reveal{opacity:1;transform:none}
+  .reveal,.reveal-ready .reveal{opacity:1;transform:none}
   .hero-mockup,.how-card{transform:none}
   /* hero entrance — show everything instantly, no float, no orb drift */
   .hero-badge,.hero h1,.hero-sub,.hero-actions,.hero-stats,.hero-mockup,.hero-mockup-wrap{animation:none;opacity:1}
@@ -677,7 +680,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   @keyframes hwba1enter { from { opacity:0; transform:translateY(22px) } to { opacity:1; transform:translateY(0) } }
   @keyframes hwba1float { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-6px) } }
   .hwb1a .hwb1-card { animation:hwba1enter 0.65s cubic-bezier(.22,1,.36,1) both; animation-delay:calc(var(--i,0) * 60ms + 0.08s); transition:transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s; }
-  .hwb1a .hwb1-card:hover { transform:translateY(-4px); box-shadow:0 14px 32px rgba(0,0,0,.32); }
+  .hwb1a .hwb1-card:hover { transform:translateY(-4px); box-shadow:0 14px 32px rgba(0,0,0,.10); }
   .hwb1a .hwb1-icon { animation:hwba1enter 0.5s cubic-bezier(.22,1,.36,1) both; animation-delay:calc(var(--i,0) * 60ms + 0.22s); }
   .hwb1a .hwb1-bg-num { animation:hwba1float 10s ease-in-out infinite; }
   @media(prefers-reduced-motion:reduce) { .hwb1a .hwb1-card,.hwb1a .hwb1-icon,.hwb1a .hwb1-bg-num { animation:none; } }
@@ -1695,6 +1698,8 @@ document.getElementById('lpMobileMenu').querySelectorAll('a').forEach(a=>{
 })();
 
 // ── Scroll reveal ─────────────────────────────────────────────
+// Add class to body first so CSS can hide reveals; without JS they remain visible.
+document.body.classList.add('reveal-ready');
 const revealObs=new IntersectionObserver(entries=>{
   entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');revealObs.unobserve(e.target)}});
 },{threshold:0.08,rootMargin:'0px 0px -24px 0px'});
