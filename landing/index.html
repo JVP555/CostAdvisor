@@ -386,16 +386,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .legal-card p{font-size:13px;color:var(--muted);line-height:1.7}
 
 /* ── Engagement popup ─────────────────────────────────────── */
-.lp-popup{position:fixed;bottom:22px;right:22px;z-index:950;max-width:330px;display:flex;gap:14px;padding:18px 20px 18px 18px;border-radius:18px;background:rgba(13,20,37,.68);backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);border:1px solid rgba(255,255,255,.11);box-shadow:0 16px 50px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.09);transform:translateY(160%);opacity:0;transition:transform .55s cubic-bezier(.23,1,.32,1),opacity .55s}
-.lp-popup.show{transform:translateY(0);opacity:1}
-.lp-popup-close{position:absolute;top:9px;right:11px;background:none;border:none;color:var(--dim);font-size:17px;cursor:pointer;line-height:1;padding:2px}
-.lp-popup-close:hover{color:var(--text)}
-.lp-popup-icon{font-size:27px;line-height:1.2;flex-shrink:0}
-.lp-popup-title{font-size:14px;font-weight:700;margin-bottom:4px}
-.lp-popup-text{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px}
+.pa-popup{display:flex;flex-direction:column;gap:0;padding:22px 24px;background:rgba(7,12,26,.95);border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 20px 56px rgba(0,0,0,.72),0 1px 0 rgba(255,255,255,.06) inset;width:330px;position:fixed;bottom:28px;right:28px;z-index:90;transform:translateY(160%);opacity:0;transition:transform .55s cubic-bezier(.23,1,.32,1),opacity .55s}
+.pa-popup.show{transform:translateY(0);opacity:1}
+.pa-close{position:absolute;top:9px;right:11px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;line-height:1;padding:4px;opacity:.4;transition:opacity .15s}
+.pa-close:hover{opacity:1}
+.pa-title{font-family:var(--font-sans);font-weight:800;font-size:20px;line-height:1.1;letter-spacing:-.022em;color:var(--text);margin-bottom:8px;text-wrap:balance}
+.pa-sub{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:16px}
+.pa-cta{display:block;width:100%;padding:10px 0;background:var(--blue);color:#fff;font-family:var(--font-mono);font-size:11.5px;font-weight:600;border:none;border-radius:7px;cursor:pointer;text-align:center;transition:background .18s}
+.pa-cta:hover{background:#2563eb}
 .btn-sm{padding:8px 16px;font-size:13px;border-radius:9px}
-@media(max-width:600px){.lp-popup{left:16px;right:16px;bottom:16px;max-width:none}}
-@media(prefers-reduced-motion:reduce){.lp-popup{transition:opacity .3s}}
+@media(max-width:600px){.pa-popup{left:16px;right:16px;bottom:16px;width:auto}}
+@media(prefers-reduced-motion:reduce){.pa-popup{transition:opacity .3s}}
 
 /* ── Reveal ──────────────────────────────────────────────── */
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
@@ -1047,14 +1048,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 </div>
 
 <!-- ── Engagement popup ──────────────────────────────────────── -->
-<div class="lp-popup" id="lpPopup">
-  <button class="lp-popup-close" onclick="dismissPopup()" aria-label="Dismiss">×</button>
-  <div class="lp-popup-icon">👋</div>
-  <div class="lp-popup-body">
-    <div class="lp-popup-title">See it on your category</div>
-    <div class="lp-popup-text">Book a 20-minute live demo — no slides, just the product on your numbers.</div>
-    <button class="btn btn-primary btn-sm" onclick="dismissPopup();openDemoModal()">Book a demo →</button>
-  </div>
+<div class="pa-popup" id="lpPopup">
+  <button class="pa-close" onclick="dismissPopup()" aria-label="Dismiss">×</button>
+  <div class="pa-title">What should this product cost?</div>
+  <div class="pa-sub">20-minute live demo — your indices, your model, no slides.</div>
+  <button class="pa-cta" onclick="dismissPopup();openDemoModal()">Book a demo →</button>
 </div>
 
 <script>
