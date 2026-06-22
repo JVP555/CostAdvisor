@@ -378,12 +378,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .legal-card p{font-size:13px;color:var(--muted);line-height:1.7}
 
 /* ── Engagement popup ─────────────────────────────────────── */
-.pa-popup{display:flex;flex-direction:column;gap:0;padding:22px 24px;background:#1d2535;border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 20px 56px rgba(0,0,0,.4),0 1px 0 rgba(255,255,255,.06) inset;width:330px;position:fixed;bottom:28px;right:28px;z-index:90;transform:translateY(160%);opacity:0;transition:transform .55s cubic-bezier(.23,1,.32,1),opacity .55s}
+.pa-popup{display:flex;flex-direction:column;gap:0;padding:22px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 56px rgba(0,0,0,.13),0 1px 0 rgba(255,255,255,.9) inset;width:330px;position:fixed;bottom:28px;right:28px;z-index:90;transform:translateY(160%);opacity:0;transition:transform .55s cubic-bezier(.23,1,.32,1),opacity .55s}
 .pa-popup.show{transform:translateY(0);opacity:1}
-.pa-close{position:absolute;top:9px;right:11px;background:none;border:none;color:#94a3b8;font-size:14px;cursor:pointer;line-height:1;padding:4px;opacity:.6;transition:opacity .15s}
+.pa-close{position:absolute;top:9px;right:11px;background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;line-height:1;padding:4px;opacity:.6;transition:opacity .15s}
 .pa-close:hover{opacity:1}
-.pa-title{font-family:var(--font-sans);font-weight:800;font-size:20px;line-height:1.1;letter-spacing:-.022em;color:#f1f5f9;margin-bottom:8px;text-wrap:balance}
-.pa-sub{font-family:var(--font-mono);font-size:11.5px;color:#94a3b8;line-height:1.6;margin-bottom:16px}
+.pa-title{font-family:var(--font-sans);font-weight:800;font-size:20px;line-height:1.1;letter-spacing:-.022em;color:var(--text);margin-bottom:8px;text-wrap:balance}
+.pa-sub{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:16px}
 .pa-cta{display:block;width:100%;padding:10px 0;background:var(--blue);color:#fff;font-family:var(--font-mono);font-size:11.5px;font-weight:600;border:none;border-radius:7px;cursor:pointer;text-align:center;transition:background .18s}
 .pa-cta:hover{background:#009990}
 .btn-sm{padding:8px 16px;font-size:13px;border-radius:9px}
