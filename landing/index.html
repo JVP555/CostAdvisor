@@ -673,31 +673,63 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <!-- ── How It Works ─────────────────────────────────────────── -->
 <section id="how" style="background:var(--surface)">
   <style>
-  @keyframes hwba1enter { from { opacity:0; transform:translateY(22px) } to { opacity:1; transform:translateY(0) } }
-  @keyframes hwba1float { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-6px) } }
-  .hwb1a .hwb1-card { animation:hwba1enter 0.65s cubic-bezier(.22,1,.36,1) both; animation-delay:calc(var(--i,0) * 60ms + 0.08s); transition:transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s; }
-  .hwb1a .hwb1-card:hover { transform:translateY(-4px); box-shadow:0 14px 32px rgba(0,0,0,.10); }
-  .hwb1a .hwb1-icon { animation:hwba1enter 0.5s cubic-bezier(.22,1,.36,1) both; animation-delay:calc(var(--i,0) * 60ms + 0.22s); }
-  .hwb1a .hwb1-bg-num { animation:hwba1float 10s ease-in-out infinite; }
-  @media(prefers-reduced-motion:reduce) { .hwb1a .hwb1-card,.hwb1a .hwb1-icon,.hwb1a .hwb1-bg-num { animation:none; } }
+  /* Directional entrance — --enter-from set per-card in HTML */
+  @keyframes hwba1enterDir { from{opacity:0;transform:var(--enter-from,translateY(24px))}to{opacity:1;transform:none} }
+  @keyframes hwba1enter    { from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none} }
+  @keyframes hwba1float    { 0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)} }
+
+  /* Base: cards visible by default — progressive enhancement */
+  .hwb1a .hwb1-card{transition:transform .28s cubic-bezier(.22,1,.36,1),box-shadow .28s}
+  .hwb1a .hwb1-icon{transition:transform .3s cubic-bezier(.22,1,.36,1),box-shadow .3s}
+
+  /* JS gate: hide heading + cards until section enters viewport */
+  .reveal-ready .hwb1a .hwb1-title,
+  .reveal-ready .hwb1a .hwb1-sub{opacity:0;transform:translateY(12px);transition:opacity .5s ease,transform .5s ease}
+  .reveal-ready .hwb1a .hwb1-card{opacity:0}
+  .reveal-ready .hwb1a .hwb1-icon{opacity:0}
+
+  /* In-view: cascade — heading first, then cards converge from three directions */
+  .reveal-ready .hwb1a.in-view .hwb1-title{opacity:1;transform:none}
+  .reveal-ready .hwb1a.in-view .hwb1-sub  {opacity:1;transform:none;transition-delay:.07s}
+  .reveal-ready .hwb1a.in-view .hwb1-card {animation:hwba1enterDir .7s cubic-bezier(.22,1,.36,1) both;animation-delay:calc(var(--i,0)*150ms + .05s)}
+  .reveal-ready .hwb1a.in-view .hwb1-icon {animation:hwba1enter .5s cubic-bezier(.22,1,.36,1) both;animation-delay:calc(var(--i,0)*150ms + .22s)}
+
+  /* Hover: card lifts + icon scales with colour-matched glow */
+  .hwb1a .hwb1-card:hover{transform:translateY(-4px);box-shadow:0 16px 36px rgba(0,0,0,.10)}
+  .hwb1a .hwb1-card:hover .hwb1-icon{transform:scale(1.12)}
+  .hwb1-card--blue:hover  .hwb1-icon{box-shadow:0 8px 22px rgba(0,169,157,.28)}
+  .hwb1-card--green:hover .hwb1-icon{box-shadow:0 8px 22px rgba(16,185,129,.28)}
+  .hwb1-card--amber:hover .hwb1-icon{box-shadow:0 8px 22px rgba(245,158,11,.28)}
+
+  /* Bg-nums: desynchronised float so they feel like independent depth layers */
+  .hwb1-card--blue  .hwb1-bg-num{animation:hwba1float 11s ease-in-out -1.2s infinite}
+  .hwb1-card--green .hwb1-bg-num{animation:hwba1float 13s ease-in-out -5.4s infinite}
+  .hwb1-card--amber .hwb1-bg-num{animation:hwba1float  9s ease-in-out -2.8s infinite}
+
+  /* Reduced motion: show everything instantly */
+  @media(prefers-reduced-motion:reduce){
+    .hwb1a .hwb1-card,.hwb1a .hwb1-icon,.hwb1a .hwb1-bg-num{animation:none}
+    .reveal-ready .hwb1a .hwb1-card,.reveal-ready .hwb1a .hwb1-icon{opacity:1}
+    .reveal-ready .hwb1a .hwb1-title,.reveal-ready .hwb1a .hwb1-sub{opacity:1;transform:none}
+  }
   </style>
   <div class="hwb1 hwb1a">
     <h2 class="hwb1-title">From raw material to negotiation table</h2>
     <p class="hwb1-sub">Three steps from product to defensible cost position — in minutes, not weeks.</p>
     <div class="hwb1-grid">
-      <div class="hwb1-card hwb1-card--blue" style="--i:0">
+      <div class="hwb1-card hwb1-card--blue" style="--i:0;--enter-from:translate(-32px,8px)">
         <span class="hwb1-bg-num" aria-hidden="true">01</span>
         <div class="hwb1-icon">🔬</div>
         <h3 class="hwb1-h3">Decompose</h3>
         <p class="hwb1-p">Break your product into weighted raw-material components. Map each to a commodity index by region — Ammonia 40%, Energy 30%, Packaging 20%, Labour 10%.</p>
       </div>
-      <div class="hwb1-card hwb1-card--green" style="--i:1">
+      <div class="hwb1-card hwb1-card--green" style="--i:1;--enter-from:translateY(28px)">
         <span class="hwb1-bg-num" aria-hidden="true">02</span>
         <div class="hwb1-icon">⚡</div>
         <h3 class="hwb1-h3">Calculate</h3>
         <p class="hwb1-p">CostAdvisor resolves live index values, applies FX conversion and Incoterm adjustments, and returns an auditable should-cost figure for any quarter.</p>
       </div>
-      <div class="hwb1-card hwb1-card--amber" style="--i:2">
+      <div class="hwb1-card hwb1-card--amber" style="--i:2;--enter-from:translate(32px,8px)">
         <span class="hwb1-bg-num" aria-hidden="true">03</span>
         <div class="hwb1-icon">📋</div>
         <h3 class="hwb1-h3">Negotiate</h3>
@@ -1720,6 +1752,15 @@ document.getElementById('lpMobileMenu').querySelectorAll('a').forEach(a=>{
 (function(){
   const nav=document.querySelector('.nav');if(!nav)return;
   window.addEventListener('scroll',()=>nav.classList.toggle('scrolled',window.scrollY>40),{passive:true});
+})();
+
+// ── How-it-works scroll entrance ──────────────────────────────
+(function(){
+  const sec=document.querySelector('.hwb1a');if(!sec)return;
+  const obs=new IntersectionObserver(entries=>{
+    if(entries[0].isIntersecting){sec.classList.add('in-view');obs.disconnect()}
+  },{threshold:.12});
+  obs.observe(sec);
 })();
 
 // ── Scroll progress ───────────────────────────────────────────
