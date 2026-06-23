@@ -675,8 +675,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
             <div>
               <div class="fx-chart-label" id="fxChartLabel">EUR / USD</div>
               <div class="fx-chart-val" id="fxChartVal">1.1600</div>
+              <div id="fxChartChg" style="margin-top:6px"></div>
             </div>
-            <div id="fxChartChg"></div>
           </div>
           <div class="fx-range-row" id="fxRangeRow"></div>
           <div class="fx-chart-canvas-wrap">
@@ -1421,13 +1421,14 @@ function switchFxPair(pair) {
   const w=fxWindow(pair);                       // series sliced to the selected range
   const arr=w.data;
   const last=arr[arr.length-1], first=arr[0];
-  const chg=((last-first)/first*100).toFixed(2), up=chg>=0;
+  const delta=last-first, pct=delta/first*100, up=delta>=0;
   const period=fxIsDaily?activeRange:'QoQ';
   const doUpdate=()=>{
     document.getElementById('fxChartLabel').textContent=pair.replace('/',' / ');
     document.getElementById('fxChartVal').textContent=last.toFixed(4);
     document.getElementById('fxChartChg').innerHTML=
-      `<span style="font-size:13px;font-family:var(--font-mono);color:${up?'var(--green)':'var(--red)'};padding:4px 10px;border-radius:6px;background:${up?'rgba(16,185,129,.12)':'rgba(239,68,68,.12)'}">${up?'▲':'▼'} ${Math.abs(chg)}% ${period}</span>`;
+      `<span style="font-size:13px;font-family:var(--font-mono);color:${up?'var(--green)':'var(--red)'};font-weight:600">${up?'▲':'▼'} ${Math.abs(delta).toFixed(4)} (${pct>=0?'+':''}${pct.toFixed(2)}%)</span>`+
+      `<span style="font-size:12px;font-family:var(--font-mono);color:var(--muted);margin-left:8px">${period}</span>`;
   };
   if(fxChartInst){
     const ids=['fxChartLabel','fxChartVal','fxChartChg'];
