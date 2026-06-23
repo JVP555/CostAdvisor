@@ -331,6 +331,14 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 All ECB-published currency pairs seeded vs EUR (migration `fxf2b3c4d5e6`: updates 6 existing pairs to `source_type=frankfurter`, inserts the rest); `fx_pairs.from_currency/to_currency` populated
   - 🟢 Quarterly backfill from Frankfurter (`fetch_quarterly_rates`: daily series since 2020 → quarterly averages written straight to `fx_rates`); `POST /api/fx-rates/scrape` runs ECB legacy path + Frankfurter backfill for all pairs in one click
   - 🟢 FX Rates page restructured into 4 tabs: **FX Pairs** (pair config + live scraping), **Default** (platform quarterly grid), **Custom Overrides**, **History** (read-only combined live + full quarterly grid, CSV export)
+  - **Verification (Frankfurter FX live + backfill — full suite 20 passed):**
+    - 🟢 Function works — live fetch end-to-end (CNY/EUR=0.1289) and quarterly range fetch (126 trading days/H1 → averaged into quarters via `fetch_quarterly_rates`); migration `fxf2b3c4d5e6` applied, all pairs seeded `source_type=frankfurter`
+    - 🟢 Security — Frankfurter is read-only outbound (no user input in URL beyond seeded currency codes); writes go through ORM (`FxRate`/`FxPair`), no raw SQL in the scrape paths; scraper swallows network errors → returns `None` (no swallowed errors in a *calculation* path — this is data ingestion)
+    - 🟢 Authentication — all three scrape endpoints (`/pairs/{id}/scrape-live`, `/scrape-live`, `/scrape`) depend on `get_current_user` → 401 when unauthenticated
+    - 🟢 Authorization — each calls `require_fx_manager` (super-admin OR `fx_rates.edit` platform permission) → 403 otherwise
+    - 🟢 RLS — `fx_pairs`/`fx_rates` are platform-level; `bypass_rls_var.set(True)` is scoped and reset in a `finally` on all three endpoints (no leaked bypass, no tenant data touched)
+    - 🟢 Transit — HTTPS to `api.frankfurter.app` with `follow_redirects=True` (the 301 fix); ECB-backed source, no auth/secrets in transit
+    - 🟢 Comments — only the non-obvious *why* is commented (redirect handling, `source_type` alias for old `google_finance` rows, backfill-writes-direct-to-`fx_rates` rationale)
 
 - 🟢 **Scrum 15** — Polished exportable deliverable (clean PDF negotiation brief with verdict, gap, ranked drivers)
   - 🟢 "Export PDF" button on the Brief page
