@@ -90,6 +90,9 @@ def create_cost_model(
         named_place=data.formula.named_place,
         landed_cost_adjustments=data.formula.landed_cost_adjustments,
         notes=data.formula.notes,
+        formula_type=data.formula.formula_type,
+        expression=data.formula.expression,
+        variables=data.formula.variables,
     )
     db.add(fv)
     db.flush()
@@ -198,6 +201,9 @@ def renegotiate(
         existing.named_place = data.named_place
         existing.landed_cost_adjustments = data.landed_cost_adjustments
         existing.notes = data.notes
+        existing.formula_type = data.formula_type
+        existing.expression = data.expression
+        existing.variables = data.variables
         existing.updated_at = datetime.now(timezone.utc)
 
         # Delete old components, create new ones
@@ -235,6 +241,9 @@ def renegotiate(
             named_place=data.named_place,
             landed_cost_adjustments=data.landed_cost_adjustments,
             notes=data.notes,
+            formula_type=data.formula_type,
+            expression=data.expression,
+            variables=data.variables,
         )
         db.add(fv)
         db.flush()
@@ -346,6 +355,9 @@ def clone_cost_model(
             incoterm=current_fv.incoterm,
             named_place=current_fv.named_place,
             landed_cost_adjustments=current_fv.landed_cost_adjustments,
+            formula_type=current_fv.formula_type,
+            expression=current_fv.expression,
+            variables=current_fv.variables,
         )
         db.add(fv)
         db.flush()

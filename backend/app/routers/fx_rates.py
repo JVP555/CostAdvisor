@@ -3,7 +3,7 @@ import csv
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from app.schemas.fx_rate import FxRateOut, FxRateUpsert, CustomFxRateOut, Custom
 from app.schemas.fx_pair import FxPairOut, FxPairCreate, FxPairUpdate
 from app.services.file_parser import parse_fx_upload
 from app.services.permissions import require_permission, has_platform_permission, require_platform_permission
+from app.rate_limit import limiter
 
 router = APIRouter()
 
@@ -390,7 +391,9 @@ def get_daily_history(
 
 
 @router.get("/public-daily", response_model=list[FxDailyRateOut])
+@limiter.limit("60/minute")
 def get_public_daily_history(
+    request: Request,
     from_currency: str = Query(...),
     to_currency: str = Query(...),
     limit: int = Query(2000, le=3000),
