@@ -305,6 +305,8 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Expression validated client-side (balanced brackets, recognised operators) and server-side before saving
   - 🟢 Costing engine evaluates advanced expressions deterministically with the same index/FX/incoterm pipeline as simple mode
   - 🟢 `detectVars` rebuilds variable map from scratch on each expression change — stale variables from cleared/retyped expressions no longer persist
+  - 🟢 Expression evaluated by a safe AST whitelist (`safe_eval_expr`, no `eval`/`exec`/calls/attributes) — verified no code-injection risk
+  - 🟢 **Audit fix:** cost_models router was dropping `formula_type`/`expression`/`variables` before insert (advanced models silently fell back to base price) — now persisted at all 4 sites (create / renegotiate update / renegotiate new / clone); API-level regression test `tests/test_advanced_formula.py`
   - 🔴 Should-cost drill-down (Scrum 17) works for advanced formulas — shows resolved variable values (deferred to Scrum 17)
 
 - 🟢 **Scrum 14c** — Formula library + Chemist platform role
@@ -341,6 +343,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 All ECB-published currency pairs seeded vs EUR (migration `fxf2b3c4d5e6`: updates 6 existing pairs to `source_type=frankfurter`, inserts the rest); `fx_pairs.from_currency/to_currency` populated
   - 🟢 Quarterly backfill from Frankfurter (`fetch_quarterly_rates`: daily series since 2020 → quarterly averages written straight to `fx_rates`); `POST /api/fx-rates/scrape` runs ECB legacy path + Frankfurter backfill for all pairs in one click
   - 🟢 FX Rates page restructured into 4 tabs: **FX Pairs** (pair config + live scraping), **Default** (platform quarterly grid), **Custom Overrides**, **History** (read-only combined live + full quarterly grid, CSV export)
+  - 🟢 Public `GET /api/fx-rates/public-daily` (no-auth, landing page) — platform ECB data only, no tenant column; rate-limited 60/min
   - **Verification (Frankfurter FX live + backfill — full suite 20 passed):**
     - 🟢 Function works — live fetch end-to-end (CNY/EUR=0.1289) and quarterly range fetch (126 trading days/H1 → averaged into quarters via `fetch_quarterly_rates`); migration `fxf2b3c4d5e6` applied, all pairs seeded `source_type=frankfurter`
     - 🟢 Security — Frankfurter is read-only outbound (no user input in URL beyond seeded currency codes); writes go through ORM (`FxRate`/`FxPair`), no raw SQL in the scrape paths; scraper swallows network errors → returns `None` (no swallowed errors in a *calculation* path — this is data ingestion)
