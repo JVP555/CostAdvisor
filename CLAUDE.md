@@ -221,11 +221,15 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Theme selector (4 swatches) in nav; persists via `localStorage.ca_theme`
   - 🟢 Redesigned — hero 2-col with product mockup, trust strip, editorial problem section, numbered how-it-works, 3 alternating showcase rows, principles block, social proof, security tiles
   - 🟢 Modernised — Platform roadmap bento section covering all waves/scrums with Live/Wave-2/Wave-3 status badges and wave rail; spotlight hover tiles; scroll progress bar (CSS scroll-timeline + JS fallback); mobile burger menu; JSON-LD structured data (SoftwareApplication + FAQPage); skip link, `:focus-visible`, `text-wrap: balance`, full `prefers-reduced-motion` support; hero grid backdrop
+  - 🟢 Rebuilt as a single self-contained `index.html` (inline CSS/JS, Chart.js from CDN) with interactive data viz: 5 commodity sparkline cards (Market Pulse) with QoQ deltas + market-signal tiles, FX Rate Monitor (pair-switching line chart + live tiles), Cost Evolution showcase (should-cost vs supplier-price with filled gap area)
+  - 🟢 Embedded interactive should-cost demo: 4 commodity sliders (filled-track) → live should-cost, gap, annual impact + colour-coded verdict pill; doughnut breakdown with center total and live €/t legend
+  - 🟢 Legal as scroll-revealing glassmorphic cards (Terms, Privacy/GDPR, IP, residency/retention, auth/AI, contact); dismissible engagement popup (book-a-demo, sessionStorage-gated)
+  - 🟢 Request Access / Book Demo are button-only on the page — forms live only in the modals; access form → `POST /api/access-requests`, demo flow → `GET /api/demos/available-slots` + `POST /api/demos/`
+  - 🟢 Light-theme conversion to StaminaChem teal branding; full mobile pass (safe-area, touch targets, rhythm); generic phrasing replacing hard counts ("every currency you trade in" vs a fixed pair count)
   - 🔴 Landing page deployed and live at `www.costadvisor.org` (Cloudflare dashboard wiring)
   - 🔴 Google Search Console shows page indexed
   - 🔴 Core Web Vitals pass (LCP < 2.5 s)
-  - 🔴 Stats verified and added (McKinsey 13%, AlixPartners ~50%, Bain 8–12%)
-  - 🔴 Embedded demo section (possible later-phase item: a tiny interactive demo using a common household product, e.g. Coca-Cola or a soda brand — to consider, not committed)
+  - 🟡 Stats added (McKinsey 13%, AlixPartners ~50%) with source footnote; Bain 8–12% not yet included; formal verification pending
 
 - 🟢 **Scrum 13** — Working team invites (send invite emails)
   - 🟢 Owner/admin can send an invite email to any address (creates TeamInvite with 256-bit token; sends via SMTP — no third-party SDK)
@@ -323,6 +327,10 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 ECBUrlScraper + ECBLiveScraper (Q→D URL swap for daily rate); scrape_fx_live Celery task (daily 08:00 UTC)
   - 🟢 fx_converter 3-branch: custom fixed → custom live → custom quarter_ref → platform quarterly → platform live fallback
   - 🟢 Download Template CSV button in both Default and Custom upload areas
+  - 🟢 Live FX rates via Frankfurter JSON API (`FrankfurterScraper`, ECB-backed, no auth, `follow_redirects=True`) — replaces brittle ECBLive/GoogleFinance HTML scraping; `scrape_fx_live` task + both router endpoints dispatch `source_type in ("frankfurter","google_finance")`
+  - 🟢 All ECB-published currency pairs seeded vs EUR (migration `fxf2b3c4d5e6`: updates 6 existing pairs to `source_type=frankfurter`, inserts the rest); `fx_pairs.from_currency/to_currency` populated
+  - 🟢 Quarterly backfill from Frankfurter (`fetch_quarterly_rates`: daily series since 2020 → quarterly averages written straight to `fx_rates`); `POST /api/fx-rates/scrape` runs ECB legacy path + Frankfurter backfill for all pairs in one click
+  - 🟢 FX Rates page restructured into 4 tabs: **FX Pairs** (pair config + live scraping), **Default** (platform quarterly grid), **Custom Overrides**, **History** (read-only combined live + full quarterly grid, CSV export)
 
 - 🟢 **Scrum 15** — Polished exportable deliverable (clean PDF negotiation brief with verdict, gap, ranked drivers)
   - 🟢 "Export PDF" button on the Brief page
