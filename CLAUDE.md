@@ -164,6 +164,16 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Super admin: full team management (view members, change role, remove member, delete team) via admin console
   - 🟢 Team ownership is a single-owner transfer — setting a new owner auto-demotes the old owner to admin
   - 🟢 Owner role manageable by team owner (transfer, role change, remove) from Team page
+  - 🟢 Fixed: `/stop-impersonate` now resets `bypass_rls_var` in a `finally` (was set without reset — defensive gap, not an exploitable leak given per-request context isolation)
+  - **Verification (audited `routers/admin.py` + impersonation flow; tests in `backend/tests/test_admin.py`: 9 tests, full suite 29 passed):**
+    - 🟢 Function works — ~32 admin endpoints (users, teams, plans, access requests, platform roles, audit logs, demo hosts); impersonation start swaps `ca_token`→target + stashes `ca_admin_token`, stop restores admin token and deletes impersonation cookies
+    - 🟢 Authentication — every `/api/admin/*` route depends on `require_super_admin` → `get_current_user` (cookie-JWT); unauthenticated → 401 (`test_unauthenticated_gets_401`)
+    - 🟢 Authorization — `require_super_admin` raises 403 for any non-super-admin (`test_non_super_admin_gets_403`); nested impersonation blocked (token swap makes you non-admin → 403)
+    - 🟢 RLS — `bypass_rls_var` set/reset around cross-team reads; super-admin bypass is set in `get_current_user` (gated by app-layer `require_super_admin`); `/stop-impersonate` bypass now reset in `finally`
+    - 🟢 Audit — 17 `admin_*` events written via `log_event`; impersonation start/stop attributed to the acting admin's `user_id` (`test_impersonate_sets_cookies_and_audits`, `test_stop_impersonate_restores_and_audits`); actions during impersonation tagged `_impersonated_by`
+    - 🟢 Transit/cookies — impersonation cookies `HttpOnly`+`Secure`(prod)+`SameSite`; `ca_impersonating` intentionally non-HttpOnly (UI flag); delete uses matching attributes so browsers honour it
+    - 🟢 Self-protection — signed-in super-admin excluded from own user list (`User.id != current_user.id`, `test_super_admin_excluded_from_own_list`); cannot impersonate a super-admin or deleted user (`test_cannot_impersonate_super_admin`)
+    - 🟢 Comments — non-obvious *why* commented (non-HttpOnly flag, cookie-delete attribute matching, bypass rationale + new finally); fixed a conftest teardown gap (cross-team audit rows blocked user deletes)
 
 - 🟢 **Scrum 8b** — RBAC + Plans (granular permissions, subscription tiers, team-scoped roles)
   - 🟢 38 permissions seeded across 11 categories (products, cost_models, suppliers, indexes, prices, volumes, fx_rates, costing, evolution, briefs, squeeze, scenarios)
@@ -221,11 +231,15 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Theme selector (4 swatches) in nav; persists via `localStorage.ca_theme`
   - 🟢 Redesigned — hero 2-col with product mockup, trust strip, editorial problem section, numbered how-it-works, 3 alternating showcase rows, principles block, social proof, security tiles
   - 🟢 Modernised — Platform roadmap bento section covering all waves/scrums with Live/Wave-2/Wave-3 status badges and wave rail; spotlight hover tiles; scroll progress bar (CSS scroll-timeline + JS fallback); mobile burger menu; JSON-LD structured data (SoftwareApplication + FAQPage); skip link, `:focus-visible`, `text-wrap: balance`, full `prefers-reduced-motion` support; hero grid backdrop
+  - 🟢 Rebuilt as a single self-contained `index.html` (inline CSS/JS, Chart.js from CDN) with interactive data viz: 5 commodity sparkline cards (Market Pulse) with QoQ deltas + market-signal tiles, FX Rate Monitor (pair-switching line chart + live tiles), Cost Evolution showcase (should-cost vs supplier-price with filled gap area)
+  - 🟢 Embedded interactive should-cost demo: 4 commodity sliders (filled-track) → live should-cost, gap, annual impact + colour-coded verdict pill; doughnut breakdown with center total and live €/t legend
+  - 🟢 Legal as scroll-revealing glassmorphic cards (Terms, Privacy/GDPR, IP, residency/retention, auth/AI, contact); dismissible engagement popup (book-a-demo, sessionStorage-gated)
+  - 🟢 Request Access / Book Demo are button-only on the page — forms live only in the modals; access form → `POST /api/access-requests`, demo flow → `GET /api/demos/available-slots` + `POST /api/demos/`
+  - 🟢 Light-theme conversion to StaminaChem teal branding; full mobile pass (safe-area, touch targets, rhythm); generic phrasing replacing hard counts ("every currency you trade in" vs a fixed pair count)
   - 🔴 Landing page deployed and live at `www.costadvisor.org` (Cloudflare dashboard wiring)
   - 🔴 Google Search Console shows page indexed
   - 🔴 Core Web Vitals pass (LCP < 2.5 s)
-  - 🔴 Stats verified and added (McKinsey 13%, AlixPartners ~50%, Bain 8–12%)
-  - 🔴 Embedded demo section (possible later-phase item: a tiny interactive demo using a common household product, e.g. Coca-Cola or a soda brand — to consider, not committed)
+  - 🟡 Stats added (McKinsey 13%, AlixPartners ~50%) with source footnote; Bain 8–12% not yet included; formal verification pending
 
 - 🟢 **Scrum 13** — Working team invites (send invite emails)
   - 🟢 Owner/admin can send an invite email to any address (creates TeamInvite with 256-bit token; sends via SMTP — no third-party SDK)
@@ -323,6 +337,18 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 ECBUrlScraper + ECBLiveScraper (Q→D URL swap for daily rate); scrape_fx_live Celery task (daily 08:00 UTC)
   - 🟢 fx_converter 3-branch: custom fixed → custom live → custom quarter_ref → platform quarterly → platform live fallback
   - 🟢 Download Template CSV button in both Default and Custom upload areas
+  - 🟢 Live FX rates via Frankfurter JSON API (`FrankfurterScraper`, ECB-backed, no auth, `follow_redirects=True`) — replaces brittle ECBLive/GoogleFinance HTML scraping; `scrape_fx_live` task + both router endpoints dispatch `source_type in ("frankfurter","google_finance")`
+  - 🟢 All ECB-published currency pairs seeded vs EUR (migration `fxf2b3c4d5e6`: updates 6 existing pairs to `source_type=frankfurter`, inserts the rest); `fx_pairs.from_currency/to_currency` populated
+  - 🟢 Quarterly backfill from Frankfurter (`fetch_quarterly_rates`: daily series since 2020 → quarterly averages written straight to `fx_rates`); `POST /api/fx-rates/scrape` runs ECB legacy path + Frankfurter backfill for all pairs in one click
+  - 🟢 FX Rates page restructured into 4 tabs: **FX Pairs** (pair config + live scraping), **Default** (platform quarterly grid), **Custom Overrides**, **History** (read-only combined live + full quarterly grid, CSV export)
+  - **Verification (Frankfurter FX live + backfill — full suite 20 passed):**
+    - 🟢 Function works — live fetch end-to-end (CNY/EUR=0.1289) and quarterly range fetch (126 trading days/H1 → averaged into quarters via `fetch_quarterly_rates`); migration `fxf2b3c4d5e6` applied, all pairs seeded `source_type=frankfurter`
+    - 🟢 Security — Frankfurter is read-only outbound (no user input in URL beyond seeded currency codes); writes go through ORM (`FxRate`/`FxPair`), no raw SQL in the scrape paths; scraper swallows network errors → returns `None` (no swallowed errors in a *calculation* path — this is data ingestion)
+    - 🟢 Authentication — all three scrape endpoints (`/pairs/{id}/scrape-live`, `/scrape-live`, `/scrape`) depend on `get_current_user` → 401 when unauthenticated
+    - 🟢 Authorization — each calls `require_fx_manager` (super-admin OR `fx_rates.edit` platform permission) → 403 otherwise
+    - 🟢 RLS — `fx_pairs`/`fx_rates` are platform-level; `bypass_rls_var.set(True)` is scoped and reset in a `finally` on all three endpoints (no leaked bypass, no tenant data touched)
+    - 🟢 Transit — HTTPS to `api.frankfurter.app` with `follow_redirects=True` (the 301 fix); ECB-backed source, no auth/secrets in transit
+    - 🟢 Comments — only the non-obvious *why* is commented (redirect handling, `source_type` alias for old `google_finance` rows, backfill-writes-direct-to-`fx_rates` rationale)
 
 - 🟢 **Scrum 15** — Polished exportable deliverable (clean PDF negotiation brief with verdict, gap, ranked drivers)
   - 🟢 "Export PDF" button on the Brief page

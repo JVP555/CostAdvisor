@@ -1,6 +1,13 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel
+
+
+class FxDailyRateOut(BaseModel):
+    date: date
+    rate: float
+
+    model_config = {"from_attributes": True}
 
 
 class FxRateOut(BaseModel):

@@ -31,7 +31,7 @@ export default function App() {
   return (
     <ToastProvider>
       {user && <Navbar />}
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/privacy" element={<Privacy />} />

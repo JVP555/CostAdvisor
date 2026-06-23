@@ -13,7 +13,7 @@ from app.models.fx_rate import FxRate
 from app.models.custom_fx_rate import CustomFxRate
 from app.models.fx_pair import FxPair
 from app.routers.auth import get_current_user
-from app.schemas.fx_rate import FxRateOut, FxRateUpsert, CustomFxRateOut, CustomFxRateUpsert
+from app.schemas.fx_rate import FxRateOut, FxRateUpsert, CustomFxRateOut, CustomFxRateUpsert, FxDailyRateOut
 from app.schemas.fx_pair import FxPairOut, FxPairCreate, FxPairUpdate
 from app.services.file_parser import parse_fx_upload
 from app.services.permissions import require_permission, has_platform_permission, require_platform_permission
@@ -299,9 +299,13 @@ async def scrape_fx_rates(
 
         synced = sync_fx_rates(db)
 
-        # Backfill quarterly rates for Frankfurter-source pairs directly into fx_rates
-        from app.services.scrapers.frankfurter import fetch_quarterly_rates
+        # Backfill from Frankfurter for all Frankfurter-source pairs. One daily
+        # series fetch per pair feeds BOTH the daily history table and the
+        # quarterly averages (no duplicate HTTP).
+        from app.services.scrapers.frankfurter import fetch_daily_series
         from app.models.fx_rate import FxRate
+        from app.models.fx_daily_rate import FxDailyRate
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
         from datetime import datetime, timezone
 
         frankfurter_pairs = db.query(FxPair).filter(
@@ -309,9 +313,31 @@ async def scrape_fx_rates(
             FxPair.source_type.in_(["frankfurter", "google_finance"]),
         ).all()
         frankfurter_scraped = 0
+        daily_rows = 0
         for fp in frankfurter_pairs:
-            quarterly = await fetch_quarterly_rates(fp.from_currency, fp.to_currency)
-            for (year, quarter), rate in quarterly.items():
+            daily = await fetch_daily_series(fp.from_currency, fp.to_currency)
+            if not daily:
+                continue
+
+            # Bulk-upsert the daily series (one statement per pair)
+            rows = [
+                {"from_currency": fp.from_currency, "to_currency": fp.to_currency, "date": d, "rate": r}
+                for d, r in daily.items()
+            ]
+            stmt = pg_insert(FxDailyRate).values(rows)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["from_currency", "to_currency", "date"],
+                set_={"rate": stmt.excluded.rate},
+            )
+            db.execute(stmt)
+            daily_rows += len(rows)
+
+            # Quarterly averages derived from the same daily data
+            buckets: dict[tuple[int, int], list[float]] = {}
+            for d, r in daily.items():
+                buckets.setdefault((d.year, (d.month - 1) // 3 + 1), []).append(r)
+            for (year, quarter), vals in buckets.items():
+                rate = sum(vals) / len(vals)
                 existing = db.query(FxRate).filter(
                     FxRate.from_currency == fp.from_currency,
                     FxRate.to_currency == fp.to_currency,
@@ -334,9 +360,56 @@ async def scrape_fx_rates(
             pairs.append(fp.name)
         db.commit()
 
-        return {"scraped": scraped + frankfurter_scraped, "synced": synced, "pairs": pairs}
+        return {"scraped": scraped + frankfurter_scraped, "daily_rows": daily_rows,
+                "synced": synced, "pairs": pairs}
     finally:
         bypass_rls_var.set(False)
+
+
+@router.get("/daily", response_model=list[FxDailyRateOut])
+def get_daily_history(
+    from_currency: str = Query(...),
+    to_currency: str = Query(...),
+    limit: int = Query(400, le=3000),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Daily FX history for one pair, newest-first (for the History tab)."""
+    from app.models.fx_daily_rate import FxDailyRate
+
+    return (
+        db.query(FxDailyRate)
+        .filter(
+            FxDailyRate.from_currency == from_currency.upper(),
+            FxDailyRate.to_currency == to_currency.upper(),
+        )
+        .order_by(FxDailyRate.date.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+@router.get("/public-daily", response_model=list[FxDailyRateOut])
+def get_public_daily_history(
+    from_currency: str = Query(...),
+    to_currency: str = Query(...),
+    limit: int = Query(2000, le=3000),
+    db: Session = Depends(get_db),
+):
+    """Public (no-auth) daily FX series for the marketing landing page, oldest-first.
+    Platform-level ECB reference data with no tenant scope — safe to expose."""
+    from app.models.fx_daily_rate import FxDailyRate
+
+    return (
+        db.query(FxDailyRate)
+        .filter(
+            FxDailyRate.from_currency == from_currency.upper(),
+            FxDailyRate.to_currency == to_currency.upper(),
+        )
+        .order_by(FxDailyRate.date.asc())
+        .limit(limit)
+        .all()
+    )
 
 
 @router.post("/upload")

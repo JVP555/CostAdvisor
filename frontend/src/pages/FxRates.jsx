@@ -3,8 +3,14 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../components/Toast';
 import FileUpload from '../components/FileUpload';
+import PriceChart from '../components/PriceChart';
 import api from '../api';
 import exportCsv from '../utils/exportCsv';
+
+// Trailing-window day counts for the daily-detail range selector
+const FX_RANGES = [
+  ['1M', 30], ['3M', 90], ['6M', 180], ['1Y', 365], ['5Y', 1825], ['All', Infinity],
+];
 
 const _now = new Date();
 const LIVE_YEAR = _now.getFullYear();
@@ -453,8 +459,8 @@ function CustomEditModal({ pair, period, current, liveRate, availableQuarters, t
         </div>
         <div className="ca-modal-body">
           <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-            <button style={modeStyle('fixed')} onClick={() => setMode('fixed')}>Fixed value</button>
-            <button style={modeStyle('live')} onClick={() => setMode('live')}>Use Live Rate</button>
+            <button style={modeStyle('fixed')} onClick={() => setMode('fixed')}>Custom rate</button>
+            <button style={modeStyle('live')} onClick={() => setMode('live')}>Latest daily rate</button>
             <button style={modeStyle('quarter_ref')} onClick={() => setMode('quarter_ref')}>Platform Quarter</button>
           </div>
 
@@ -470,14 +476,14 @@ function CustomEditModal({ pair, period, current, liveRate, availableQuarters, t
           {mode === 'live' && (
             <div style={{ background: 'var(--surface-hover)', borderRadius: 8, padding: 14 }}>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Always resolves to the current live (daily) scraped rate for this pair.
+                Always resolves to the latest daily scraped rate for this pair (refreshed once per day).
               </div>
               {liveRate != null
                 ? <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 700, color: 'var(--accent2)' }}>
-                    Current live: {Number(liveRate).toFixed(4)}
+                    Latest daily: {Number(liveRate).toFixed(4)}
                     <span style={{ fontSize: 10, color: 'var(--text-secondary)', marginLeft: 8 }}>refreshed daily</span>
                   </div>
-                : <div style={{ color: 'var(--muted)', fontSize: 12 }}>No live rate available yet. Scrape live first.</div>}
+                : <div style={{ color: 'var(--muted)', fontSize: 12 }}>No daily rate available yet. Scrape live first.</div>}
             </div>
           )}
 
@@ -779,8 +785,8 @@ function RateGrid({ periods, rows, onCellClick, canEdit, scrollRef, liveRateMap 
             <th style={{ whiteSpace: 'nowrap', ...STICKY_TH }}>Pair</th>
             {showLive && (
               <th className="center" style={{ minWidth: 80 }}>
-                Live
-                <div style={{ fontSize: 8, color: 'var(--accent2)', fontWeight: 800, letterSpacing: 1, marginTop: 1, lineHeight: 1 }}>REALTIME</div>
+                Latest
+                <div style={{ fontSize: 8, color: 'var(--accent2)', fontWeight: 800, letterSpacing: 1, marginTop: 1, lineHeight: 1 }}>DAILY</div>
               </th>
             )}
             {periods.map(p => {
@@ -828,7 +834,7 @@ function RateGrid({ periods, rows, onCellClick, canEdit, scrollRef, liveRateMap 
                     }}
                     onClick={() => canEdit && onCellClick(row, p, cell)}>
                     {isCustom && cell?.value_type === 'live' ? (
-                      <span style={{ fontSize: 9, color: 'var(--accent2)', letterSpacing: 0.3 }}>LIVE↑</span>
+                      <span style={{ fontSize: 9, color: 'var(--accent2)', letterSpacing: 0.3 }}>DAILY</span>
                     ) : isCustom && cell?.value_type === 'quarter_ref' ? (
                       <span style={{ fontSize: 9, color: 'var(--accent3)', letterSpacing: 0.3 }}>Q-REF</span>
                     ) : displayV === null ? (
@@ -976,6 +982,43 @@ function DefaultTab({ user, canManage, defaultRates, loading, onRefresh, periods
 function HistoryTab({ defaultRates, pairs, periods, loading }) {
   const scrollRef = useRef(null);
 
+  // ── Daily detail (per-pair time series from fx_daily_rate) ──
+  const pairNames = useMemo(() => pairs.map(p => p.name).sort(), [pairs]);
+  const [dailyPair, setDailyPair] = useState('');
+  const [daily, setDaily] = useState([]);       // newest-first [{date, rate}]
+  const [dailyLoading, setDailyLoading] = useState(false);
+  const [range, setRange] = useState('3M');
+
+  useEffect(() => {
+    if (!dailyPair && pairNames.length) setDailyPair(pairNames[0]);
+  }, [pairNames, dailyPair]);
+
+  useEffect(() => {
+    if (!dailyPair) return;
+    const [from, to] = dailyPair.split('/');
+    setDailyLoading(true);
+    // Pull the full series so the range buttons reslice client-side
+    api.get('/api/fx-rates/daily', { params: { from_currency: from, to_currency: to, limit: 3000 } })
+      .then(({ data }) => setDaily(data))
+      .catch(() => setDaily([]))
+      .finally(() => setDailyLoading(false));
+  }, [dailyPair]);
+
+  // Ascending series sliced to the selected trailing window
+  const windowed = useMemo(() => {
+    const asc = [...daily].reverse();
+    const days = (FX_RANGES.find(r => r[0] === range) || [, Infinity])[1];
+    return days === Infinity ? asc : asc.slice(Math.max(0, asc.length - days));
+  }, [daily, range]);
+
+  // Headline: latest rate + change over the selected window
+  const headline = useMemo(() => {
+    if (windowed.length < 2) return null;
+    const first = Number(windowed[0].rate), last = Number(windowed[windowed.length - 1].rate);
+    const delta = last - first;
+    return { last, delta, pct: (delta / first) * 100, up: delta >= 0 };
+  }, [windowed]);
+
   const liveRateMap = useMemo(() => {
     const m = {};
     pairs.forEach(p => { if (p.live_rate != null) m[p.name] = p.live_rate; });
@@ -1027,15 +1070,89 @@ function HistoryTab({ defaultRates, pairs, periods, loading }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div>
           <p className="ca-subtitle" style={{ margin: 0 }}>
-            All configured pairs — daily live rate and full quarterly history in one view.
+            Daily history per pair, plus the quarterly + latest-daily overview.
           </p>
           <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--muted)' }}>
-            Live rate is refreshed daily. Use FX Pairs → Scrape All Live for an on-demand update.
+            Daily rates are saved each day. Run Default → Scrape Quarterly to backfill the full daily series.
           </p>
         </div>
         <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() =>
           exportCsv('fx_rates_history.csv', ['Pair', 'Type', 'Year', 'Quarter', 'Rate'], exportData)
         }>Export CSV</button>
+      </div>
+
+      {/* Per-pair daily detail */}
+      <div className="ca-card" style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>Daily detail</span>
+              <select className="ca-select" style={{ width: 'auto', minWidth: 130 }}
+                value={dailyPair} onChange={e => setDailyPair(e.target.value)}>
+                {pairNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
+            {daily.length > 0 && (
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() =>
+                exportCsv(`fx_daily_${dailyPair.replace('/', '-')}.csv`, ['Date', 'Rate'],
+                  daily.map(d => [d.date, d.rate]))
+              }>Export CSV</button>
+            )}
+          </div>
+
+          {headline && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 30, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>{headline.last.toFixed(4)}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", color: headline.up ? 'var(--accent2)' : 'var(--danger)' }}>
+                {headline.up ? '▲' : '▼'} {Math.abs(headline.delta).toFixed(4)} ({headline.pct >= 0 ? '+' : ''}{headline.pct.toFixed(2)}%)
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: "'JetBrains Mono', monospace" }}>{range}</span>
+            </div>
+          )}
+
+          {daily.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+              {FX_RANGES.map(([label]) => (
+                <button key={label} onClick={() => setRange(label)}
+                  style={{
+                    padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: range === label ? 700 : 500,
+                    border: `1px solid ${range === label ? 'var(--accent1)' : 'var(--border)'}`,
+                    background: range === label ? 'var(--accent1-dim)' : 'transparent',
+                    color: range === label ? 'var(--accent1)' : 'var(--text-secondary)',
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {dailyLoading ? (
+          <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
+        ) : daily.length === 0 ? (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
+            No daily history for {dailyPair || 'this pair'} yet. Run Default → Scrape Quarterly to backfill.
+          </div>
+        ) : (
+          <>
+            <PriceChart key={`${dailyPair}|${range}`} series={windowed} />
+            <div className="ca-scroll-x" style={{ maxHeight: 260, marginTop: 12 }}>
+              <table className="ca-table">
+                <thead><tr><th style={STICKY_TH}>Date</th><th className="right">Rate</th></tr></thead>
+                <tbody>
+                  {daily.map(d => (
+                    <tr key={d.date}>
+                      <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, ...STICKY_TD }}>{d.date}</td>
+                      <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{Number(d.rate).toFixed(4)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {loading ? (
@@ -1219,7 +1336,7 @@ function CustomTab({ teamId, canEdit, defaultRates, pairs }) {
           />
           <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)' }}>
             <span style={{ color: 'var(--accent4)', marginRight: 4 }}>■</span> Team override (fixed) &nbsp;
-            <span style={{ color: 'var(--accent2)', marginRight: 4 }}>■</span> Live rate override &nbsp;
+            <span style={{ color: 'var(--accent2)', marginRight: 4 }}>■</span> Latest daily override &nbsp;
             <span style={{ color: 'var(--accent3)', marginRight: 4 }}>■</span> Quarter reference override &nbsp;
             <span style={{ color: 'var(--text)', marginRight: 4 }}>■</span> Platform default &nbsp;
             <span style={{ color: 'var(--muted)', marginRight: 4 }}>—</span> No data

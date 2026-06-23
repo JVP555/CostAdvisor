@@ -277,20 +277,26 @@ def stop_impersonate(
         except (JWTError, KeyError, ValueError):
             pass
 
-    # Bypass RLS so the audit log insert can succeed without a user context set
+    # Bypass RLS so the audit log insert can succeed: this endpoint has no
+    # get_current_user dependency (it runs off the raw cookies), so no user
+    # context is established. Reset in finally so the bypass never outlives
+    # this block, matching the pattern used elsewhere.
     bypass_rls_var.set(True)
-    if admin_user_id and impersonated_user_id:
-        admin_user = db.query(User).filter(User.id == admin_user_id).first()
-        impersonated_user = db.query(User).filter(User.id == impersonated_user_id).first()
-        team_id = _first_team_id(db, impersonated_user_id) or _first_team_id(db, admin_user_id)
-        if team_id:
-            log_event(db, team_id, admin_user_id, "admin_impersonate_stop", "user",
-                      str(impersonated_user_id),
-                      new_value={
-                          "by": admin_user.email if admin_user else None,
-                          "target_email": impersonated_user.email if impersonated_user else str(impersonated_user_id),
-                      })
-        db.commit()
+    try:
+        if admin_user_id and impersonated_user_id:
+            admin_user = db.query(User).filter(User.id == admin_user_id).first()
+            impersonated_user = db.query(User).filter(User.id == impersonated_user_id).first()
+            team_id = _first_team_id(db, impersonated_user_id) or _first_team_id(db, admin_user_id)
+            if team_id:
+                log_event(db, team_id, admin_user_id, "admin_impersonate_stop", "user",
+                          str(impersonated_user_id),
+                          new_value={
+                              "by": admin_user.email if admin_user else None,
+                              "target_email": impersonated_user.email if impersonated_user else str(impersonated_user_id),
+                          })
+            db.commit()
+    finally:
+        bypass_rls_var.set(False)
 
     is_prod = settings.environment != "development"
     samesite = "none" if is_prod else "lax"
