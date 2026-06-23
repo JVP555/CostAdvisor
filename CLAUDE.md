@@ -193,6 +193,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Chemist and FX Manager are default/protected platform roles — show "default" badge in Admin → Settings → Roles, cannot be deleted
   - 🟢 FX Manager platform role seeded with `fx_rates.view/edit/delete` permissions; added to Dream Plan and SuperAdmin role
   - 🟢 Platform role chips (accent3) visible on Team page member rows alongside team-scoped role chips; `GET /api/teams/{id}/members` includes `platform_role_names`
+  - 🟢 Tests: `tests/test_rbac.py` (7) — `has_permission` order (super-admin → plan ceiling → custom roles → membership fallback), plan ceiling caps even owner, custom role replaces fallback, member view/export-only, API plan-ceiling validation on role creation (400), platform-permission resolution
 
 - 🔴 **Scrum 9** — Hardened authentication on OAuth 2.0
   - 🔴 PKCE `code_verifier`/`code_challenge` used on every OAuth flow
