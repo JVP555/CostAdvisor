@@ -3,8 +3,14 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../components/Toast';
 import FileUpload from '../components/FileUpload';
+import PriceChart from '../components/PriceChart';
 import api from '../api';
 import exportCsv from '../utils/exportCsv';
+
+// Trailing-window day counts for the daily-detail range selector
+const FX_RANGES = [
+  ['1M', 30], ['3M', 90], ['6M', 180], ['1Y', 365], ['5Y', 1825], ['All', Infinity],
+];
 
 const _now = new Date();
 const LIVE_YEAR = _now.getFullYear();
@@ -981,6 +987,7 @@ function HistoryTab({ defaultRates, pairs, periods, loading }) {
   const [dailyPair, setDailyPair] = useState('');
   const [daily, setDaily] = useState([]);       // newest-first [{date, rate}]
   const [dailyLoading, setDailyLoading] = useState(false);
+  const [range, setRange] = useState('3M');
 
   useEffect(() => {
     if (!dailyPair && pairNames.length) setDailyPair(pairNames[0]);
@@ -990,27 +997,27 @@ function HistoryTab({ defaultRates, pairs, periods, loading }) {
     if (!dailyPair) return;
     const [from, to] = dailyPair.split('/');
     setDailyLoading(true);
-    api.get('/api/fx-rates/daily', { params: { from_currency: from, to_currency: to, limit: 400 } })
+    // Pull the full series so the range buttons reslice client-side
+    api.get('/api/fx-rates/daily', { params: { from_currency: from, to_currency: to, limit: 3000 } })
       .then(({ data }) => setDaily(data))
       .catch(() => setDaily([]))
       .finally(() => setDailyLoading(false));
   }, [dailyPair]);
 
-  // Chart wants oldest→newest; build a simple SVG polyline scaled to the range
-  const sparkPath = useMemo(() => {
-    if (daily.length < 2) return null;
+  // Ascending series sliced to the selected trailing window
+  const windowed = useMemo(() => {
     const asc = [...daily].reverse();
-    const vals = asc.map(d => Number(d.rate));
-    const min = Math.min(...vals), max = Math.max(...vals);
-    const span = max - min || 1;
-    const W = 760, H = 160;
-    const pts = asc.map((d, i) => {
-      const x = (i / (asc.length - 1)) * W;
-      const y = H - ((Number(d.rate) - min) / span) * (H - 12) - 6;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-    return { line: pts.join(' '), min, max, W, H, first: asc[0], last: asc[asc.length - 1] };
-  }, [daily]);
+    const days = (FX_RANGES.find(r => r[0] === range) || [, Infinity])[1];
+    return days === Infinity ? asc : asc.slice(Math.max(0, asc.length - days));
+  }, [daily, range]);
+
+  // Headline: latest rate + change over the selected window
+  const headline = useMemo(() => {
+    if (windowed.length < 2) return null;
+    const first = Number(windowed[0].rate), last = Number(windowed[windowed.length - 1].rate);
+    const delta = last - first;
+    return { last, delta, pct: (delta / first) * 100, up: delta >= 0 };
+  }, [windowed]);
 
   const liveRateMap = useMemo(() => {
     const m = {};
@@ -1076,22 +1083,49 @@ function HistoryTab({ defaultRates, pairs, periods, loading }) {
 
       {/* Per-pair daily detail */}
       <div className="ca-card" style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontWeight: 600, fontSize: 13 }}>Daily detail</span>
-            <select className="ca-select" style={{ width: 'auto', minWidth: 130 }}
-              value={dailyPair} onChange={e => setDailyPair(e.target.value)}>
-              {pairNames.map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>Daily detail</span>
+              <select className="ca-select" style={{ width: 'auto', minWidth: 130 }}
+                value={dailyPair} onChange={e => setDailyPair(e.target.value)}>
+                {pairNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </div>
             {daily.length > 0 && (
-              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{daily.length} days</span>
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() =>
+                exportCsv(`fx_daily_${dailyPair.replace('/', '-')}.csv`, ['Date', 'Rate'],
+                  daily.map(d => [d.date, d.rate]))
+              }>Export CSV</button>
             )}
           </div>
+
+          {headline && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 30, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>{headline.last.toFixed(4)}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", color: headline.up ? 'var(--accent2)' : 'var(--danger)' }}>
+                {headline.up ? '▲' : '▼'} {Math.abs(headline.delta).toFixed(4)} ({headline.pct >= 0 ? '+' : ''}{headline.pct.toFixed(2)}%)
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: "'JetBrains Mono', monospace" }}>{range}</span>
+            </div>
+          )}
+
           {daily.length > 0 && (
-            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() =>
-              exportCsv(`fx_daily_${dailyPair.replace('/', '-')}.csv`, ['Date', 'Rate'],
-                daily.map(d => [d.date, d.rate]))
-            }>Export CSV</button>
+            <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+              {FX_RANGES.map(([label]) => (
+                <button key={label} onClick={() => setRange(label)}
+                  style={{
+                    padding: '5px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: range === label ? 700 : 500,
+                    border: `1px solid ${range === label ? 'var(--accent1)' : 'var(--border)'}`,
+                    background: range === label ? 'var(--accent1-dim)' : 'transparent',
+                    color: range === label ? 'var(--accent1)' : 'var(--text-secondary)',
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -1103,19 +1137,7 @@ function HistoryTab({ defaultRates, pairs, periods, loading }) {
           </div>
         ) : (
           <>
-            {sparkPath && (
-              <div style={{ overflowX: 'auto' }}>
-                <svg viewBox={`0 0 ${sparkPath.W} ${sparkPath.H}`} preserveAspectRatio="none"
-                  style={{ width: '100%', height: 160, display: 'block' }}>
-                  <polyline points={sparkPath.line} fill="none" stroke="var(--accent2)" strokeWidth="1.5" />
-                </svg>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)', fontFamily: "'JetBrains Mono', monospace" }}>
-                  <span>{sparkPath.first.date} · {Number(sparkPath.first.rate).toFixed(4)}</span>
-                  <span>range {Number(sparkPath.min).toFixed(4)}–{Number(sparkPath.max).toFixed(4)}</span>
-                  <span>{sparkPath.last.date} · {Number(sparkPath.last.rate).toFixed(4)}</span>
-                </div>
-              </div>
-            )}
+            <PriceChart series={windowed} />
             <div className="ca-scroll-x" style={{ maxHeight: 260, marginTop: 12 }}>
               <table className="ca-table">
                 <thead><tr><th style={STICKY_TH}>Date</th><th className="right">Rate</th></tr></thead>
