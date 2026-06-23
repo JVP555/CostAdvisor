@@ -389,6 +389,29 @@ def get_daily_history(
     )
 
 
+@router.get("/public-daily", response_model=list[FxDailyRateOut])
+def get_public_daily_history(
+    from_currency: str = Query(...),
+    to_currency: str = Query(...),
+    limit: int = Query(2000, le=3000),
+    db: Session = Depends(get_db),
+):
+    """Public (no-auth) daily FX series for the marketing landing page, oldest-first.
+    Platform-level ECB reference data with no tenant scope — safe to expose."""
+    from app.models.fx_daily_rate import FxDailyRate
+
+    return (
+        db.query(FxDailyRate)
+        .filter(
+            FxDailyRate.from_currency == from_currency.upper(),
+            FxDailyRate.to_currency == to_currency.upper(),
+        )
+        .order_by(FxDailyRate.date.asc())
+        .limit(limit)
+        .all()
+    )
+
+
 @router.post("/upload")
 async def upload_fx_rates(
     file: UploadFile = File(...),

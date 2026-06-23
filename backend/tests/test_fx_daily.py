@@ -35,6 +35,23 @@ def test_daily_requires_auth(client):
     assert r.status_code == 401, r.text
 
 
+def test_public_daily_no_auth_ascending(client):
+    cleanup = _seed_daily([
+        ("XPA", "XPB", date(2026, 2, 1), 2.0),
+        ("XPA", "XPB", date(2026, 2, 2), 2.1),
+    ])
+    try:
+        # No auth cookie — public endpoint must still serve
+        r = client.get("/api/fx-rates/public-daily?from_currency=XPA&to_currency=XPB")
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert len(data) == 2
+        assert data[0]["date"] == "2026-02-01"   # oldest-first
+        assert data[-1]["date"] == "2026-02-02"
+    finally:
+        cleanup()
+
+
 def test_daily_returns_series_newest_first(client_as, user_factory):
     user = user_factory()
     cleanup = _seed_daily([

@@ -1275,35 +1275,48 @@ const FX_DATA = {
   'USD/JPY':{ from:'USD', to:'JPY', color:'#0EA5E9', data:[105,109,110,113,115,120,136,143,140,134,133,145,148,150,155,148,152,158,155,150] },
 };
 
-// Fetch ~5 years of daily rates from Frankfurter (public, ECB-backed, CORS-OK)
-// so the range buttons have data. On any failure the static quarterly fallback
-// above is kept, so the chart always renders.
+// Load ~5y of daily rates per pair. Tries our backend first (same data the app
+// uses — reliable), then Frankfurter direct, then keeps the static fallback.
+// Returns an ascending [{date, rate}] series or null.
+async function fetchDailySeries(d){
+  // 1) our backend public endpoint
+  try{
+    const r=await fetch(`${API_URL}/api/fx-rates/public-daily?from_currency=${d.from}&to_currency=${d.to}&limit=2000`);
+    if(r.ok){
+      const rows=await r.json();
+      if(Array.isArray(rows)&&rows.length>1) return rows.map(x=>({date:x.date,rate:Number(x.rate)}));
+    }
+  }catch{}
+  // 2) Frankfurter direct (works in prod / other networks)
+  try{
+    const today=new Date(), start=new Date(); start.setFullYear(start.getFullYear()-5);
+    const iso=x=>x.toISOString().slice(0,10);
+    const r=await fetch(`https://api.frankfurter.app/${iso(start)}..${iso(today)}?from=${d.from}&to=${d.to}`);
+    if(r.ok){
+      const j=await r.json(), dts=Object.keys(j.rates||{}).sort();
+      const rows=dts.map(dt=>({date:dt,rate:j.rates[dt][d.to]})).filter(x=>x.rate!=null);
+      if(rows.length>1) return rows;
+    }
+  }catch{}
+  return null;
+}
+
 async function loadDailyFx(){
-  const today=new Date();
-  const start=new Date(today); start.setFullYear(start.getFullYear()-5);
-  const iso=d=>d.toISOString().slice(0,10);
   try{
     const pairs=Object.keys(FX_DATA);
-    const results=await Promise.all(pairs.map(p=>{
-      const d=FX_DATA[p];
-      return fetch(`https://api.frankfurter.app/${iso(start)}..${iso(today)}?from=${d.from}&to=${d.to}`)
-        .then(r=>r.ok?r.json():null).catch(()=>null);
-    }));
+    const results=await Promise.all(pairs.map(p=>fetchDailySeries(FX_DATA[p])));
     let labels=null;
     pairs.forEach((p,i)=>{
-      const res=results[i];
-      if(!res||!res.rates)return;
-      const dates=Object.keys(res.rates).sort();
-      const to=FX_DATA[p].to;
-      const series=dates.map(dt=>res.rates[dt][to]).filter(v=>v!=null);
-      if(series.length<2)return;
-      FX_DATA[p].data=series;
-      if(!labels||dates.length>labels.length)labels=dates;
+      const rows=results[i];
+      if(!rows)return;
+      FX_DATA[p].data=rows.map(x=>x.rate);
+      const dts=rows.map(x=>x.date);
+      if(!labels||dts.length>labels.length)labels=dts;
     });
-    if(!labels)return; // all failed → keep fallback
+    if(!labels)return; // all sources failed → keep static fallback
     FX_LABELS=labels; fxIsDaily=true;
     buildFxCurrentGrid();
-    buildFxRangeRow();           // ranges only meaningful once daily data is in
+    buildFxRangeRow();
     switchFxPair(activeFxPair);  // applies the default range window
   }catch{ /* keep static fallback */ }
 }
@@ -1397,6 +1410,7 @@ function buildFxTabs() {
   const tabs=document.getElementById('fxTabs');
   if(!tabs)return;
   tabs.innerHTML=Object.keys(FX_DATA).map(p=>`<button class="fx-tab${p===activeFxPair?' active':''}" onclick="switchFxPair('${p}')">${p}</button>`).join('');
+  buildFxRangeRow();   // show range buttons immediately; they become active once daily data loads
   buildFxCurrentGrid();
 }
 
