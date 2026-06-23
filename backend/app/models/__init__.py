@@ -9,6 +9,7 @@ from app.models.price_data import ActualPrice
 from app.models.actual_volume import ActualVolume
 from app.models.fx_rate import FxRate
 from app.models.custom_fx_rate import CustomFxRate
+from app.models.fx_daily_rate import FxDailyRate
 from app.models.scenario import CostScenario
 from app.models.audit_log import AuditLog
 from app.models.invite import TeamInvite
@@ -35,6 +36,7 @@ __all__ = [
     "ActualVolume",
     "FxRate",
     "CustomFxRate",
+    "FxDailyRate",
     "CostScenario",
     "AuditLog",
     "TeamInvite",

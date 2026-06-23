@@ -143,7 +143,7 @@ body, #root {
 .ca-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
 /* Layout */
-.ca-page { padding: 36px 40px; max-width: 1380px; margin: 0 auto; }
+.ca-page { padding: 36px 40px; max-width: 1380px; margin: 0 auto; min-width: 0; }
 @media (max-width: 900px) { .ca-page { padding: 24px 16px; } }
 
 /* Typography */
@@ -294,7 +294,7 @@ body, #root {
 .ca-sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
 /* Scroll */
-.ca-scroll-x { overflow-x: auto; overflow-y: auto; max-height: 440px; }
+.ca-scroll-x { overflow-x: auto; overflow-y: auto; max-height: 440px; max-width: 100%; }
 
 /* Range input */
 input[type=range] { padding: 0; cursor: pointer; accent-color: var(--accent); }

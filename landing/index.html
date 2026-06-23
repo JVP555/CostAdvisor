@@ -662,7 +662,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <section id="fx">
   <div class="container">
     <h2 class="section-title">Every currency you buy in. Daily live rates.</h2>
-    <p class="section-sub">Quarterly historical averages back to 2020, refreshed daily from ECB-backed data — across every currency pair you trade in. Your costing engine always uses the right rate.</p>
+    <p class="section-sub">Live daily rates from ECB-backed data — across every currency pair you trade in. Quarterly averages and full history feed your costing engine, so it always uses the right rate.</p>
     <div class="fx-inner reveal">
       <div class="fx-pair-tabs" id="fxTabs"></div>
       <div>
@@ -1253,18 +1253,55 @@ const COMMODITIES = [
     data:[480,430,510,640,850,1100,1150,900,950,870,700,620,650,660,600,580,700,680,620,580,610,590,600,590] },
 ];
 
-const FX_LABELS_20 = [
+// Labels start as a quarterly fallback; replaced with daily dates once the
+// live Frankfurter fetch (loadDailyFx) succeeds. fxIsDaily flips the headline
+// change window/label accordingly.
+let FX_LABELS = [
   'Q1-21','Q2-21','Q3-21','Q4-21','Q1-22','Q2-22','Q3-22','Q4-22',
   'Q1-23','Q2-23','Q3-23','Q4-23','Q1-24','Q2-24','Q3-24','Q4-24',
   'Q1-25','Q2-25','Q3-25','Q4-25',
 ];
+let fxIsDaily = false;
 const FX_DATA = {
-  'EUR/USD':{ data:[1.21,1.20,1.18,1.14,1.13,1.05,1.01,1.07,1.08,1.09,1.07,1.08,1.03,1.00,1.06,1.12,1.08,1.10,1.17,1.16], color:'#3B82F6' },
-  'GBP/EUR':{ data:[0.87,0.86,0.86,0.85,0.84,0.83,0.85,0.86,0.88,0.87,0.87,0.86,0.83,0.84,0.84,0.84,0.85,0.86,0.87,0.88], color:'#10B981' },
-  'CNY/EUR':{ data:[7.8,7.8,7.7,7.4,7.2,6.9,7.0,7.1,7.3,7.6,7.8,7.8,7.9,8.1,7.8,8.0,8.2,8.4,8.3,8.1], color:'#F59E0B' },
-  'JPY/EUR':{ data:[128,132,130,130,131,138,139,138,142,144,163,162,160,159,157,149,161,168,163,179], color:'#8B5CF6' },
-  'USD/JPY':{ data:[105,109,110,113,115,120,136,143,140,134,133,145,148,150,155,148,152,158,155,150], color:'#0EA5E9' },
+  'EUR/USD':{ from:'EUR', to:'USD', color:'#3B82F6', data:[1.21,1.20,1.18,1.14,1.13,1.05,1.01,1.07,1.08,1.09,1.07,1.08,1.03,1.00,1.06,1.12,1.08,1.10,1.17,1.16] },
+  'GBP/EUR':{ from:'GBP', to:'EUR', color:'#10B981', data:[0.87,0.86,0.86,0.85,0.84,0.83,0.85,0.86,0.88,0.87,0.87,0.86,0.83,0.84,0.84,0.84,0.85,0.86,0.87,0.88] },
+  'CNY/EUR':{ from:'CNY', to:'EUR', color:'#F59E0B', data:[7.8,7.8,7.7,7.4,7.2,6.9,7.0,7.1,7.3,7.6,7.8,7.8,7.9,8.1,7.8,8.0,8.2,8.4,8.3,8.1] },
+  'JPY/EUR':{ from:'JPY', to:'EUR', color:'#8B5CF6', data:[128,132,130,130,131,138,139,138,142,144,163,162,160,159,157,149,161,168,163,179] },
+  'USD/JPY':{ from:'USD', to:'JPY', color:'#0EA5E9', data:[105,109,110,113,115,120,136,143,140,134,133,145,148,150,155,148,152,158,155,150] },
 };
+
+// Fetch ~1 year of daily rates from Frankfurter (public, ECB-backed, CORS-OK).
+// On any failure the static quarterly fallback above is kept, so the chart
+// always renders.
+async function loadDailyFx(){
+  const today=new Date();
+  const start=new Date(today); start.setFullYear(start.getFullYear()-1);
+  const iso=d=>d.toISOString().slice(0,10);
+  try{
+    const pairs=Object.keys(FX_DATA);
+    const results=await Promise.all(pairs.map(p=>{
+      const d=FX_DATA[p];
+      return fetch(`https://api.frankfurter.app/${iso(start)}..${iso(today)}?from=${d.from}&to=${d.to}`)
+        .then(r=>r.ok?r.json():null).catch(()=>null);
+    }));
+    let labels=null;
+    pairs.forEach((p,i)=>{
+      const res=results[i];
+      if(!res||!res.rates)return;
+      const dates=Object.keys(res.rates).sort();
+      const to=FX_DATA[p].to;
+      const series=dates.map(dt=>res.rates[dt][to]).filter(v=>v!=null);
+      if(series.length<2)return;
+      FX_DATA[p].data=series;
+      if(!labels||dates.length>labels.length)labels=dates;
+    });
+    if(!labels)return; // all failed → keep fallback
+    FX_LABELS=labels; fxIsDaily=true;
+    buildFxCurrentGrid();
+    if(fxChartInst){ fxChartInst.data.labels=FX_LABELS; }
+    switchFxPair(activeFxPair);
+  }catch{ /* keep static fallback */ }
+}
 
 
 // ── Ticker ───────────────────────────────────────────────────
@@ -1354,13 +1391,16 @@ function switchFxPair(pair) {
   activeFxPair=pair;
   document.querySelectorAll('.fx-tab').forEach(t=>t.classList.toggle('active',t.textContent===pair));
   const d=FX_DATA[pair];
-  const last=d.data[d.data.length-1], prev=d.data[d.data.length-2];
+  // Headline change window: ~1 month (22 trading days) for daily data, else 1 quarter
+  const win=fxIsDaily?22:1, period=fxIsDaily?'30D':'QoQ';
+  const last=d.data[d.data.length-1];
+  const prev=d.data[Math.max(0, d.data.length-1-win)];
   const chg=((last-prev)/prev*100).toFixed(2), up=chg>=0;
   const doUpdate=()=>{
     document.getElementById('fxChartLabel').textContent=pair.replace('/',' / ');
     document.getElementById('fxChartVal').textContent=last.toFixed(4);
     document.getElementById('fxChartChg').innerHTML=
-      `<span style="font-size:13px;font-family:var(--font-mono);color:${up?'var(--green)':'var(--red)'};padding:4px 10px;border-radius:6px;background:${up?'rgba(16,185,129,.12)':'rgba(239,68,68,.12)'}">${up?'▲':'▼'} ${Math.abs(chg)}% QoQ</span>`;
+      `<span style="font-size:13px;font-family:var(--font-mono);color:${up?'var(--green)':'var(--red)'};padding:4px 10px;border-radius:6px;background:${up?'rgba(16,185,129,.12)':'rgba(239,68,68,.12)'}">${up?'▲':'▼'} ${Math.abs(chg)}% ${period}</span>`;
   };
   if(fxChartInst){
     const ids=['fxChartLabel','fxChartVal','fxChartChg'];
@@ -1388,10 +1428,10 @@ function initFxChart() {
   Chart.defaults.color='#666666';
   fxChartInst=new Chart(canvas,{
     type:'line',
-    data:{labels:FX_LABELS_20,datasets:[{data:d.data,borderColor:d.color,backgroundColor:grad,fill:true,tension:0.4,pointRadius:3,pointBackgroundColor:d.color,borderWidth:2.5}]},
+    data:{labels:FX_LABELS,datasets:[{data:d.data,borderColor:d.color,backgroundColor:grad,fill:true,tension:0.25,pointRadius:0,pointHoverRadius:4,pointBackgroundColor:d.color,borderWidth:2}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>`${activeFxPair}: ${c.raw.toFixed(4)}`}}},
-      scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},maxTicksLimit:8}},
+      scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},maxTicksLimit:8,autoSkip:true}},
               y:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10}}}}}
   });
   // set initial values
@@ -1844,6 +1884,7 @@ function boot(){
   initSliderFills();
   initDemoChart();
   initFxChart();
+  loadDailyFx();   // swap quarterly fallback for live daily series (Frankfurter)
   initEvoChart();
   // sparklines + tilt need cards in DOM — slight delay to ensure they've rendered
   setTimeout(()=>{initSparklines();initTilt();observeReveal();},250);

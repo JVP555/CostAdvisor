@@ -453,8 +453,8 @@ function CustomEditModal({ pair, period, current, liveRate, availableQuarters, t
         </div>
         <div className="ca-modal-body">
           <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-            <button style={modeStyle('fixed')} onClick={() => setMode('fixed')}>Fixed value</button>
-            <button style={modeStyle('live')} onClick={() => setMode('live')}>Use Live Rate</button>
+            <button style={modeStyle('fixed')} onClick={() => setMode('fixed')}>Custom rate</button>
+            <button style={modeStyle('live')} onClick={() => setMode('live')}>Latest daily rate</button>
             <button style={modeStyle('quarter_ref')} onClick={() => setMode('quarter_ref')}>Platform Quarter</button>
           </div>
 
@@ -470,14 +470,14 @@ function CustomEditModal({ pair, period, current, liveRate, availableQuarters, t
           {mode === 'live' && (
             <div style={{ background: 'var(--surface-hover)', borderRadius: 8, padding: 14 }}>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Always resolves to the current live (daily) scraped rate for this pair.
+                Always resolves to the latest daily scraped rate for this pair (refreshed once per day).
               </div>
               {liveRate != null
                 ? <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 18, fontWeight: 700, color: 'var(--accent2)' }}>
-                    Current live: {Number(liveRate).toFixed(4)}
+                    Latest daily: {Number(liveRate).toFixed(4)}
                     <span style={{ fontSize: 10, color: 'var(--text-secondary)', marginLeft: 8 }}>refreshed daily</span>
                   </div>
-                : <div style={{ color: 'var(--muted)', fontSize: 12 }}>No live rate available yet. Scrape live first.</div>}
+                : <div style={{ color: 'var(--muted)', fontSize: 12 }}>No daily rate available yet. Scrape live first.</div>}
             </div>
           )}
 
@@ -779,8 +779,8 @@ function RateGrid({ periods, rows, onCellClick, canEdit, scrollRef, liveRateMap 
             <th style={{ whiteSpace: 'nowrap', ...STICKY_TH }}>Pair</th>
             {showLive && (
               <th className="center" style={{ minWidth: 80 }}>
-                Live
-                <div style={{ fontSize: 8, color: 'var(--accent2)', fontWeight: 800, letterSpacing: 1, marginTop: 1, lineHeight: 1 }}>REALTIME</div>
+                Latest
+                <div style={{ fontSize: 8, color: 'var(--accent2)', fontWeight: 800, letterSpacing: 1, marginTop: 1, lineHeight: 1 }}>DAILY</div>
               </th>
             )}
             {periods.map(p => {
@@ -828,7 +828,7 @@ function RateGrid({ periods, rows, onCellClick, canEdit, scrollRef, liveRateMap 
                     }}
                     onClick={() => canEdit && onCellClick(row, p, cell)}>
                     {isCustom && cell?.value_type === 'live' ? (
-                      <span style={{ fontSize: 9, color: 'var(--accent2)', letterSpacing: 0.3 }}>LIVE↑</span>
+                      <span style={{ fontSize: 9, color: 'var(--accent2)', letterSpacing: 0.3 }}>DAILY</span>
                     ) : isCustom && cell?.value_type === 'quarter_ref' ? (
                       <span style={{ fontSize: 9, color: 'var(--accent3)', letterSpacing: 0.3 }}>Q-REF</span>
                     ) : displayV === null ? (
@@ -976,6 +976,42 @@ function DefaultTab({ user, canManage, defaultRates, loading, onRefresh, periods
 function HistoryTab({ defaultRates, pairs, periods, loading }) {
   const scrollRef = useRef(null);
 
+  // ── Daily detail (per-pair time series from fx_daily_rate) ──
+  const pairNames = useMemo(() => pairs.map(p => p.name).sort(), [pairs]);
+  const [dailyPair, setDailyPair] = useState('');
+  const [daily, setDaily] = useState([]);       // newest-first [{date, rate}]
+  const [dailyLoading, setDailyLoading] = useState(false);
+
+  useEffect(() => {
+    if (!dailyPair && pairNames.length) setDailyPair(pairNames[0]);
+  }, [pairNames, dailyPair]);
+
+  useEffect(() => {
+    if (!dailyPair) return;
+    const [from, to] = dailyPair.split('/');
+    setDailyLoading(true);
+    api.get('/api/fx-rates/daily', { params: { from_currency: from, to_currency: to, limit: 400 } })
+      .then(({ data }) => setDaily(data))
+      .catch(() => setDaily([]))
+      .finally(() => setDailyLoading(false));
+  }, [dailyPair]);
+
+  // Chart wants oldest→newest; build a simple SVG polyline scaled to the range
+  const sparkPath = useMemo(() => {
+    if (daily.length < 2) return null;
+    const asc = [...daily].reverse();
+    const vals = asc.map(d => Number(d.rate));
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const span = max - min || 1;
+    const W = 760, H = 160;
+    const pts = asc.map((d, i) => {
+      const x = (i / (asc.length - 1)) * W;
+      const y = H - ((Number(d.rate) - min) / span) * (H - 12) - 6;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    return { line: pts.join(' '), min, max, W, H, first: asc[0], last: asc[asc.length - 1] };
+  }, [daily]);
+
   const liveRateMap = useMemo(() => {
     const m = {};
     pairs.forEach(p => { if (p.live_rate != null) m[p.name] = p.live_rate; });
@@ -1027,15 +1063,74 @@ function HistoryTab({ defaultRates, pairs, periods, loading }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div>
           <p className="ca-subtitle" style={{ margin: 0 }}>
-            All configured pairs — daily live rate and full quarterly history in one view.
+            Daily history per pair, plus the quarterly + latest-daily overview.
           </p>
           <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--muted)' }}>
-            Live rate is refreshed daily. Use FX Pairs → Scrape All Live for an on-demand update.
+            Daily rates are saved each day. Run Default → Scrape Quarterly to backfill the full daily series.
           </p>
         </div>
         <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() =>
           exportCsv('fx_rates_history.csv', ['Pair', 'Type', 'Year', 'Quarter', 'Rate'], exportData)
         }>Export CSV</button>
+      </div>
+
+      {/* Per-pair daily detail */}
+      <div className="ca-card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>Daily detail</span>
+            <select className="ca-select" style={{ width: 'auto', minWidth: 130 }}
+              value={dailyPair} onChange={e => setDailyPair(e.target.value)}>
+              {pairNames.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            {daily.length > 0 && (
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>{daily.length} days</span>
+            )}
+          </div>
+          {daily.length > 0 && (
+            <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() =>
+              exportCsv(`fx_daily_${dailyPair.replace('/', '-')}.csv`, ['Date', 'Rate'],
+                daily.map(d => [d.date, d.rate]))
+            }>Export CSV</button>
+          )}
+        </div>
+
+        {dailyLoading ? (
+          <div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
+        ) : daily.length === 0 ? (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
+            No daily history for {dailyPair || 'this pair'} yet. Run Default → Scrape Quarterly to backfill.
+          </div>
+        ) : (
+          <>
+            {sparkPath && (
+              <div style={{ overflowX: 'auto' }}>
+                <svg viewBox={`0 0 ${sparkPath.W} ${sparkPath.H}`} preserveAspectRatio="none"
+                  style={{ width: '100%', height: 160, display: 'block' }}>
+                  <polyline points={sparkPath.line} fill="none" stroke="var(--accent2)" strokeWidth="1.5" />
+                </svg>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <span>{sparkPath.first.date} · {Number(sparkPath.first.rate).toFixed(4)}</span>
+                  <span>range {Number(sparkPath.min).toFixed(4)}–{Number(sparkPath.max).toFixed(4)}</span>
+                  <span>{sparkPath.last.date} · {Number(sparkPath.last.rate).toFixed(4)}</span>
+                </div>
+              </div>
+            )}
+            <div className="ca-scroll-x" style={{ maxHeight: 260, marginTop: 12 }}>
+              <table className="ca-table">
+                <thead><tr><th style={STICKY_TH}>Date</th><th className="right">Rate</th></tr></thead>
+                <tbody>
+                  {daily.map(d => (
+                    <tr key={d.date}>
+                      <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, ...STICKY_TD }}>{d.date}</td>
+                      <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{Number(d.rate).toFixed(4)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {loading ? (
@@ -1219,7 +1314,7 @@ function CustomTab({ teamId, canEdit, defaultRates, pairs }) {
           />
           <div style={{ marginTop: 10, fontSize: 11, color: 'var(--muted)' }}>
             <span style={{ color: 'var(--accent4)', marginRight: 4 }}>■</span> Team override (fixed) &nbsp;
-            <span style={{ color: 'var(--accent2)', marginRight: 4 }}>■</span> Live rate override &nbsp;
+            <span style={{ color: 'var(--accent2)', marginRight: 4 }}>■</span> Latest daily override &nbsp;
             <span style={{ color: 'var(--accent3)', marginRight: 4 }}>■</span> Quarter reference override &nbsp;
             <span style={{ color: 'var(--text)', marginRight: 4 }}>■</span> Platform default &nbsp;
             <span style={{ color: 'var(--muted)', marginRight: 4 }}>—</span> No data
