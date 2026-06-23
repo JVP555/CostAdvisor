@@ -77,7 +77,7 @@ export default function PriceChart({ series, color }) {
   const tipLeftPct = hover != null ? Math.max(4, Math.min(96, (hx / W) * 100)) : 0;
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', width: '100%' }}>
+    <div ref={wrapRef} className="ca-fade-in" style={{ position: 'relative', width: '100%' }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', width: '100%', height: 'auto' }}
         onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
         {gridLines.map((v, i) => (

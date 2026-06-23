@@ -1383,6 +1383,7 @@ function initSparklines() {
 
 // ── FX Chart ─────────────────────────────────────────────────
 let fxChartInst=null, activeFxPair='EUR/USD', activeRange='3M';
+const FX_UP='#10B981', FX_DN='#d64545';   // trend colours — match the app's History chart
 const FX_RANGE_DAYS={'1M':30,'3M':90,'6M':180,'1Y':365,'5Y':1825,'All':Infinity};
 const FX_RANGE_LABELS=['1M','3M','6M','1Y','5Y','All'];
 
@@ -1448,12 +1449,14 @@ function switchFxPair(pair) {
     const ids=['fxChartLabel','fxChartVal','fxChartChg'];
     ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.add('fx-val-fade')});
     setTimeout(()=>{doUpdate();ids.forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('fx-val-fade')})},140);
+    const col=up?FX_UP:FX_DN;                 // colour by selected-range trend
     fxChartInst.data.labels=w.labels;
     fxChartInst.data.datasets[0].data=arr;
-    fxChartInst.data.datasets[0].borderColor=d.color;
+    fxChartInst.data.datasets[0].borderColor=col;
+    fxChartInst.data.datasets[0].pointBackgroundColor=col;
     const ctx=fxChartInst.canvas.getContext('2d');
     const grad=ctx.createLinearGradient(0,0,0,200);
-    grad.addColorStop(0,d.color+'30');grad.addColorStop(1,d.color+'00');
+    grad.addColorStop(0,col+'30');grad.addColorStop(1,col+'00');
     fxChartInst.data.datasets[0].backgroundColor=grad;
     fxChartInst.update();
   }else{doUpdate()}
@@ -1464,9 +1467,10 @@ function initFxChart() {
   const canvas=document.getElementById('fxChart');
   if(!canvas)return;
   const ctx=canvas.getContext('2d');
-  const d=FX_DATA[activeFxPair];
+  const w0=fxWindow(activeFxPair);
+  const col0=(w0.data[w0.data.length-1]>=w0.data[0])?FX_UP:FX_DN;
   const grad=ctx.createLinearGradient(0,0,0,200);
-  grad.addColorStop(0,d.color+'30');grad.addColorStop(1,d.color+'00');
+  grad.addColorStop(0,col0+'30');grad.addColorStop(1,col0+'00');
   Chart.defaults.font.family="'JetBrains Mono',monospace";
   Chart.defaults.color='#666666';
   // Dashed vertical crosshair at the hovered point
@@ -1481,7 +1485,7 @@ function initFxChart() {
   fxChartInst=new Chart(canvas,{
     type:'line',
     plugins:[fxCrosshair],
-    data:{labels:w.labels,datasets:[{data:w.data,borderColor:d.color,backgroundColor:grad,fill:true,tension:0.25,pointRadius:0,pointHoverRadius:4,pointBackgroundColor:d.color,borderWidth:2}]},
+    data:{labels:w.labels,datasets:[{data:w.data,borderColor:col0,backgroundColor:grad,fill:true,tension:0.25,pointRadius:0,pointHoverRadius:4,pointBackgroundColor:col0,borderWidth:2}]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
         title:items=>items.length?items[0].label:'',

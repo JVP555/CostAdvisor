@@ -1137,7 +1137,7 @@ function HistoryTab({ defaultRates, pairs, periods, loading }) {
           </div>
         ) : (
           <>
-            <PriceChart series={windowed} />
+            <PriceChart key={`${dailyPair}|${range}`} series={windowed} />
             <div className="ca-scroll-x" style={{ maxHeight: 260, marginTop: 12 }}>
               <table className="ca-table">
                 <thead><tr><th style={STICKY_TH}>Date</th><th className="right">Rate</th></tr></thead>
