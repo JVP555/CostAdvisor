@@ -164,6 +164,16 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Super admin: full team management (view members, change role, remove member, delete team) via admin console
   - 🟢 Team ownership is a single-owner transfer — setting a new owner auto-demotes the old owner to admin
   - 🟢 Owner role manageable by team owner (transfer, role change, remove) from Team page
+  - 🟢 Fixed: `/stop-impersonate` now resets `bypass_rls_var` in a `finally` (was set without reset — defensive gap, not an exploitable leak given per-request context isolation)
+  - **Verification (audited `routers/admin.py` + impersonation flow; tests in `backend/tests/test_admin.py`: 9 tests, full suite 29 passed):**
+    - 🟢 Function works — ~32 admin endpoints (users, teams, plans, access requests, platform roles, audit logs, demo hosts); impersonation start swaps `ca_token`→target + stashes `ca_admin_token`, stop restores admin token and deletes impersonation cookies
+    - 🟢 Authentication — every `/api/admin/*` route depends on `require_super_admin` → `get_current_user` (cookie-JWT); unauthenticated → 401 (`test_unauthenticated_gets_401`)
+    - 🟢 Authorization — `require_super_admin` raises 403 for any non-super-admin (`test_non_super_admin_gets_403`); nested impersonation blocked (token swap makes you non-admin → 403)
+    - 🟢 RLS — `bypass_rls_var` set/reset around cross-team reads; super-admin bypass is set in `get_current_user` (gated by app-layer `require_super_admin`); `/stop-impersonate` bypass now reset in `finally`
+    - 🟢 Audit — 17 `admin_*` events written via `log_event`; impersonation start/stop attributed to the acting admin's `user_id` (`test_impersonate_sets_cookies_and_audits`, `test_stop_impersonate_restores_and_audits`); actions during impersonation tagged `_impersonated_by`
+    - 🟢 Transit/cookies — impersonation cookies `HttpOnly`+`Secure`(prod)+`SameSite`; `ca_impersonating` intentionally non-HttpOnly (UI flag); delete uses matching attributes so browsers honour it
+    - 🟢 Self-protection — signed-in super-admin excluded from own user list (`User.id != current_user.id`, `test_super_admin_excluded_from_own_list`); cannot impersonate a super-admin or deleted user (`test_cannot_impersonate_super_admin`)
+    - 🟢 Comments — non-obvious *why* commented (non-HttpOnly flag, cookie-delete attribute matching, bypass rationale + new finally); fixed a conftest teardown gap (cross-team audit rows blocked user deletes)
 
 - 🟢 **Scrum 8b** — RBAC + Plans (granular permissions, subscription tiers, team-scoped roles)
   - 🟢 38 permissions seeded across 11 categories (products, cost_models, suppliers, indexes, prices, volumes, fx_rates, costing, evolution, briefs, squeeze, scenarios)
