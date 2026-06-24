@@ -158,6 +158,24 @@ def test_brief_is_deterministic(client_as, tenant_a, brief_model):
     assert a["total_impact"] == pytest.approx(390.0)
 
 
+def test_evolution_is_deterministic(client_as, tenant_a, brief_model):
+    """Scrum 11 — repeated evolution calls return identical output."""
+    c = client_as(tenant_a)
+    a = c.post("/api/costing/evolution", json={"cost_model_id": str(brief_model.id)})
+    b = c.post("/api/costing/evolution", json={"cost_model_id": str(brief_model.id)})
+    assert a.status_code == 200 and b.status_code == 200, a.text
+    assert a.json() == b.json()
+
+
+def test_squeeze_is_deterministic(client_as, tenant_a, brief_model):
+    """Scrum 11 — repeated squeeze calls return identical output."""
+    c = client_as(tenant_a)
+    a = c.post("/api/costing/squeeze", json={"cost_model_id": str(brief_model.id)})
+    b = c.post("/api/costing/squeeze", json={"cost_model_id": str(brief_model.id)})
+    assert a.status_code == 200 and b.status_code == 200, a.text
+    assert a.json() == b.json()
+
+
 def test_brief_drivers_ranked(client_as, tenant_a, brief_model):
     """Drivers are ranked by absolute cost contribution, each with the right
     direction and index change — the 'ranked drivers' deliverable."""

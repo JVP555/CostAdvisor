@@ -216,7 +216,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Sentry capturing errors in production
   - 🔴 Uptime monitoring with alerting configured
   - 🔴 Branch protection on `main` enforced
-  - 🟡 Costing engine has determinism regression tests (`test_brief.py::test_brief_is_deterministic` — repeated brief calls identical + exact numeric anchors; should-cost/evolution paths also anchored by exact-value tests. Could extend to squeeze/evolution endpoints)
+  - 🟢 Costing engine has determinism regression tests — `test_brief.py` covers brief / evolution / squeeze (repeated calls return identical output) + exact numeric anchors on the brief
   - 🔴 Incident response plan written
   - 🔴 Vendor DPA list complete
   - 🔴 All items from Scrum 10 completed (prerequisite)
@@ -371,7 +371,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
     - 🟢 Comments — `Brief.jsx` + engine comment only the non-obvious *why* (null-passthrough, active-formula choice); no redundant comments
 
 - 🔴 **Scrum 16** — Self-serve onboarding (empty states, example data, guidance to first should-cost vs actual gap)
-  - 🟡 Every list/chart page has a non-empty empty state with a clear next action (Dashboard + Pricing covered; others incomplete)
+  - 🟡 Every list/chart page has a non-empty empty state with a clear next action (Dashboard, Pricing, Products, FX Rates covered; Suppliers now has a "+ Add your first supplier" CTA; Indexes / Formulas / Scenarios still to do)
   - 🔴 "Load example data" works for a brand-new team and produces a runnable should-cost
   - 🔴 Onboarding checklist tracks real progress and disappears when done
   - 🔴 A new user can reach a gap insight without external guidance

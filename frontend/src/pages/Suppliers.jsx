@@ -98,7 +98,10 @@ export default function Suppliers() {
         <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
       ) : suppliers.length === 0 ? (
         <div className="ca-card" style={{ textAlign: 'center', padding: 48 }}>
-          <div style={{ color: 'var(--text-secondary)' }}>No suppliers yet.</div>
+          <div style={{ color: 'var(--text-secondary)', marginBottom: 14 }}>
+            No suppliers yet — add the companies you buy from to track their price against your should-cost.
+          </div>
+          <button className="ca-btn ca-btn-primary" onClick={() => setShowForm(true)}>+ Add your first supplier</button>
         </div>
       ) : (
         <div className="ca-card">
