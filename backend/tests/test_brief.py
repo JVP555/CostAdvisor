@@ -124,6 +124,22 @@ def test_brief_happy_path(client_as, tenant_a, brief_model):
     assert isinstance(b["narrative"], str) and b["narrative"].strip()
 
 
+def test_brief_is_deterministic(client_as, tenant_a, brief_model):
+    """Scrum 11 — the costing engine must produce identical output for identical
+    input on repeated runs (no nondeterminism in the calc path). Compare two
+    fresh calls field-by-field, excluding only the AI narrative (Ollama text)."""
+    c = client_as(tenant_a)
+    a = c.post("/api/costing/brief", json={"cost_model_id": str(brief_model.id)}).json()
+    b = c.post("/api/costing/brief", json={"cost_model_id": str(brief_model.id)}).json()
+    a.pop("narrative", None)
+    b.pop("narrative", None)
+    assert a == b
+    # And the numeric anchors are exactly what the inputs imply (regression guard)
+    assert a["current_should_cost"] == pytest.approx(111.0)
+    assert a["gap"] == pytest.approx(39.0)
+    assert a["total_impact"] == pytest.approx(390.0)
+
+
 def test_brief_drivers_ranked(client_as, tenant_a, brief_model):
     """Drivers are ranked by absolute cost contribution, each with the right
     direction and index change — the 'ranked drivers' deliverable."""

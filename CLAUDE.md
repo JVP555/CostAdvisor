@@ -216,7 +216,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Sentry capturing errors in production
   - 🔴 Uptime monitoring with alerting configured
   - 🔴 Branch protection on `main` enforced
-  - 🔴 Costing engine has determinism regression tests
+  - 🟡 Costing engine has determinism regression tests (`test_brief.py::test_brief_is_deterministic` — repeated brief calls identical + exact numeric anchors; should-cost/evolution paths also anchored by exact-value tests. Could extend to squeeze/evolution endpoints)
   - 🔴 Incident response plan written
   - 🔴 Vendor DPA list complete
   - 🔴 All items from Scrum 10 completed (prerequisite)
