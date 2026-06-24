@@ -375,7 +375,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 "Load example data" works for a brand-new team and produces a runnable should-cost
   - 🔴 Onboarding checklist tracks real progress and disappears when done
   - 🔴 A new user can reach a gap insight without external guidance
-  - 🔴 Fix dead ends (from cost-model-split analysis): route the built-but-unrouted `Squeeze` page in `App.jsx` (`/api/costing/squeeze` already works); add `Products` to the `Navbar` (routed at `/products` but not discoverable)
+  - 🟢 Fixed dead ends (from cost-model-split analysis): routed the `Squeeze` page (`/cost-models/:id/squeeze`) + linked it from the CostModelBuilder / Evolution / Brief nav rows; added `Products` to the `Navbar`
 
 - 🔴 **Scrum 17** — Inspectable numbers (show how a should-cost was built: index values, weights, FX/unit/Incoterm conversions)
   - 🔴 Every should-cost figure has an accessible breakdown

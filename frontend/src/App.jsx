@@ -7,6 +7,7 @@ import { ToastProvider } from './components/Toast';
 import Login from './pages/Login';
 import CostModelBuilder from './pages/CostModelBuilder';
 import Evolution from './pages/Evolution';
+import Squeeze from './pages/Squeeze';
 
 import Brief from './pages/Brief';
 import Pricing from './pages/Pricing';
@@ -44,6 +45,7 @@ export default function App() {
 
             <Route path="/cost-models/:costModelId/brief" element={<Brief />} />
             <Route path="/cost-models/:costModelId/pricing" element={<Pricing />} />
+            <Route path="/cost-models/:costModelId/squeeze" element={<Squeeze />} />
             <Route path="/indexes" element={<Indexes />} />
             <Route path="/products" element={<Products />} />
             <Route path="/dashboard" element={<Dashboard />} />

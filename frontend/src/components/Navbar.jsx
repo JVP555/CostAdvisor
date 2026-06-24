@@ -30,6 +30,7 @@ export default function Navbar() {
     { path: '/indexes', label: 'Indexes' },
     { path: '/fx-rates', label: 'FX Rates' },
     { path: '/formulas', label: 'Formulas' },
+    { path: '/products', label: 'Products' },
     { path: '/suppliers', label: 'Suppliers' },
     { path: '/team', label: 'Team', badge: pendingInviteCount || 0 },
     ...(user?.is_super_admin ? [{ path: '/admin', label: 'Admin' }] : []),
