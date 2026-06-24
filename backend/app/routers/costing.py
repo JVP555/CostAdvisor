@@ -20,6 +20,7 @@ from app.services.costing_engine import (
     calculate_price_change,
 )
 from app.services.permissions import require_permission
+from app.services.audit import log_event
 
 router = APIRouter()
 
@@ -107,6 +108,13 @@ async def brief(
         period_label=result.period_label,
         num_periods=len(result.evolution),
     )
+
+    # Audit: assembling a negotiation brief surfaces sensitive cost intelligence
+    # (the exportable deliverable) — a security-relevant event per SOC 2 rules.
+    log_event(db, cm.team_id, current_user.id, "brief_generated", "cost_model", str(cm.id),
+              new_value={"gap": result.gap, "gap_pct": result.gap_pct})
+    db.commit()
+
     return result
 
 

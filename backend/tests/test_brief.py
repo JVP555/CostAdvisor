@@ -124,6 +124,24 @@ def test_brief_happy_path(client_as, tenant_a, brief_model):
     assert isinstance(b["narrative"], str) and b["narrative"].strip()
 
 
+def test_brief_generation_is_audited(client_as, tenant_a, brief_model, db):
+    """Scrum 10 — assembling the negotiation brief (the exportable deliverable)
+    writes a security-relevant audit event attributed to the acting user."""
+    from app.models.audit_log import AuditLog
+    r = client_as(tenant_a).post("/api/costing/brief", json={"cost_model_id": str(brief_model.id)})
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    evt = (
+        db.query(AuditLog)
+        .filter(AuditLog.team_id == tenant_a["team_id"],
+                AuditLog.event_type == "brief_generated",
+                AuditLog.entity_id == str(brief_model.id))
+        .first()
+    )
+    assert evt is not None
+    assert evt.user_id == tenant_a["user_id"]
+
+
 def test_brief_is_deterministic(client_as, tenant_a, brief_model):
     """Scrum 11 — the costing engine must produce identical output for identical
     input on repeated runs (no nondeterminism in the calc path). Compare two

@@ -206,7 +206,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
 
 - 🔴 **Scrum 10** — Defined data-security story for buyer IT (TLS, encryption at rest, tenant isolation, audit, secrets, EU residency, backup/retention policy)
   - 🟡 RLS test covers tenant-scoped tables (`test_rls.py`: products, suppliers, custom_fx_rates, formula_templates incl. platform `team_id IS NULL` visible-to-all). **Gap found:** `roles`, `team_member_roles`, `team_memberships`, `team_invites` have a `team_id` but NO RLS policy — app-layer gated only; add `tenant_isolation` for defense-in-depth (`team_memberships` is intentionally exempt — it's the RLS bootstrap table)
-  - 🔴 Audit log covers login, logout, failed login, export, impersonation
+  - 🟡 Audit log covers export + impersonation (brief generation now logged — `costing.py` `brief_generated`, test in `test_brief.py`; impersonation start/stop already logged). Login/logout/failed-login still 🔴 — blocked by `audit_logs.team_id`/`user_id` being NOT NULL while login is platform-level and new users have no team; needs a nullable-team_id migration or a separate auth-events log
   - 🔴 Written confirmation of TLS in transit and encryption at rest
   - 🔴 EU data residency confirmed or migration plan documented
   - 🔴 Backup/retention policy written and tested (restore drill)
