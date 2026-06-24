@@ -375,6 +375,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 "Load example data" works for a brand-new team and produces a runnable should-cost
   - 🔴 Onboarding checklist tracks real progress and disappears when done
   - 🔴 A new user can reach a gap insight without external guidance
+  - 🔴 Fix dead ends (from cost-model-split analysis): route the built-but-unrouted `Squeeze` page in `App.jsx` (`/api/costing/squeeze` already works); add `Products` to the `Navbar` (routed at `/products` but not discoverable)
 
 - 🔴 **Scrum 17** — Inspectable numbers (show how a should-cost was built: index values, weights, FX/unit/Incoterm conversions)
   - 🔴 Every should-cost figure has an accessible breakdown
@@ -382,6 +383,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Breakdown shows: indexed cost, margin, FX rate used, unit conversion, Incoterm adjustment
   - 🔴 Index source is shown (scraped / team override / fixed)
   - 🔴 Numbers in the breakdown sum to the displayed should-cost exactly
+  - 🟢 Scoping note: this breakdown IS the Wave-1 form of the mockup's Negotiate "itemized FOB→landed" view. The full 5-area workspace (Monitor/Forecast/Negotiate/Portfolio/Indexes) is a **Wave 2** reorg of the existing cost model (~55% already built), NOT Wave 1 — see `jvpdocs/cost_model_split_roadmap.md`, `cost_model_split_steps.md`, `cost_model_split_vs_wave1.md`. Wave 1 priority stays: Scrum 16 + 17, with 9/10/11/12 as the real finish-line blockers.
 
 - 🟢 **Scrum 18** — Data import & export — Wave 1: forgiving import of core data, export of anything on screen; consolidate existing CSV/Excel
   - 🟢 Every upload shows a row-count preview before committing (FileUpload component two-step dry_run preview; Pricing page inline preview)
