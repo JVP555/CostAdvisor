@@ -265,6 +265,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Team-invite bypass users receive welcome email on first sign-in (account creation)
   - 🟢 CORS updated for `www.costadvisor.org`; router registered in `main.py`
   - 🟢 Landing page CTA form submits email to API via `fetch POST` (replaced mailto fallback)
+  - 🟢 OAuth callback account-linking: a pre-provisioned account (seeded/created before first login) is bound to its Google identity by Google-verified unique email on first sign-in, so it bypasses the signup gate instead of colliding on the unique-email constraint
 
 - 🟢 **Scrum 51** — Demo scheduling (landing page book-a-demo flow + admin management)
   - 🟢 `DemoHost`, `DemoBlockedSlot`, `DemoRequest` models + Alembic migration (`dem0_1a2b3c4d5e`)

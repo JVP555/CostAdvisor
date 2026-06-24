@@ -136,6 +136,22 @@ async def callback(request: Request, db: Session = Depends(get_db)):
     # RLS bypass: no user identity is established yet during the OAuth callback.
     bypass_rls_var.set(True)
     user = db.query(User).filter(User.google_id == google_id).first()
+
+    # Account linking: bind a pre-provisioned account (seeded or otherwise
+    # created ahead of first login, matched by its Google-verified, unique
+    # email) to this Google identity on first sign-in. Without this the row
+    # would never match by google_id and a new-signup insert would collide on
+    # the unique email. A linked user then flows through the returning-user
+    # path below (no signup gate, since it was provisioned deliberately).
+    if user is None:
+        prelinked = db.query(User).filter(
+            User.email == email,
+            User.deleted_at == None,  # noqa: E711
+        ).first()
+        if prelinked is not None:
+            prelinked.google_id = google_id
+            user = prelinked
+
     if user is None:
         if not settings.allow_signup:
             bypass_rls_var.set(False)
