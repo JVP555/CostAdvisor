@@ -24,6 +24,11 @@ import Privacy from './pages/Privacy';
 import Profile from './pages/Profile';
 import Terms from './pages/Terms';
 import NotFound from './pages/NotFound';
+import NewIndexes from './pages/NewIndexes';
+import NewPortfolio from './pages/NewPortfolio';
+import NewMonitor from './pages/NewMonitor';
+import NewForecast from './pages/NewForecast';
+import NewNegotiate from './pages/NewNegotiate';
 import { useAuth } from './AuthContext';
 
 export default function App() {
@@ -56,6 +61,11 @@ export default function App() {
             <Route path="/admin" element={<Admin />} />
             <Route path="/formulas" element={<Formulas />} />
             <Route path="/fx-rates" element={<FxRates />} />
+            <Route path="/new-indexes" element={<NewIndexes />} />
+            <Route path="/new-portfolio" element={<NewPortfolio />} />
+            <Route path="/new-monitor" element={<NewMonitor />} />
+            <Route path="/new-forecast" element={<NewForecast />} />
+            <Route path="/new-negotiate" element={<NewNegotiate />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

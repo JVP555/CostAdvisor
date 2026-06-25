@@ -32,6 +32,11 @@ export default function Navbar() {
     { path: '/formulas', label: 'Formulas' },
     { path: '/products', label: 'Products' },
     { path: '/suppliers', label: 'Suppliers' },
+    { path: '/new-indexes', label: 'New Indexes' },
+    { path: '/new-portfolio', label: 'New Portfolio' },
+    { path: '/new-monitor', label: 'New Monitor' },
+    { path: '/new-forecast', label: 'New Forecast' },
+    { path: '/new-negotiate', label: 'New Negotiate' },
     { path: '/team', label: 'Team', badge: pendingInviteCount || 0 },
     ...(user?.is_super_admin ? [{ path: '/admin', label: 'Admin' }] : []),
   ];
