@@ -24,11 +24,11 @@ import Privacy from './pages/Privacy';
 import Profile from './pages/Profile';
 import Terms from './pages/Terms';
 import NotFound from './pages/NotFound';
-import NewIndexes from './pages/NewIndexes';
-import NewPortfolio from './pages/NewPortfolio';
-import NewMonitor from './pages/NewMonitor';
-import NewForecast from './pages/NewForecast';
-import NewNegotiate from './pages/NewNegotiate';
+import IndexLibraryArea from './pages/workspace/IndexLibraryArea';
+import PortfolioArea from './pages/workspace/PortfolioArea';
+import MonitorArea from './pages/workspace/MonitorArea';
+import ForecastArea from './pages/workspace/ForecastArea';
+import NegotiateArea from './pages/workspace/NegotiateArea';
 import { useAuth } from './AuthContext';
 
 export default function App() {
@@ -61,11 +61,11 @@ export default function App() {
             <Route path="/admin" element={<Admin />} />
             <Route path="/formulas" element={<Formulas />} />
             <Route path="/fx-rates" element={<FxRates />} />
-            <Route path="/new-indexes" element={<NewIndexes />} />
-            <Route path="/new-portfolio" element={<NewPortfolio />} />
-            <Route path="/new-monitor" element={<NewMonitor />} />
-            <Route path="/new-forecast" element={<NewForecast />} />
-            <Route path="/new-negotiate" element={<NewNegotiate />} />
+            <Route path="/index-library" element={<IndexLibraryArea />} />
+            <Route path="/portfolio" element={<PortfolioArea />} />
+            <Route path="/monitor" element={<MonitorArea />} />
+            <Route path="/forecast" element={<ForecastArea />} />
+            <Route path="/negotiate" element={<NegotiateArea />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
