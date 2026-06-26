@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../../api';
 import { useAuth } from '../../AuthContext';
 import IndexPopupModal from '../../components/IndexPopupModal';
+import AddIndexModal from '../../components/AddIndexModal';
 import { Sparkline, GroupHeader, useOpenSet } from './wsCharts';
 
 /* Index Library — mockup layout, REAL data. Mirrors the fetch/reshape of
@@ -31,6 +32,7 @@ export default function IndexLibraryArea() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [regionFilter, setRegionFilter] = useState('all');
   const [popupRow, setPopupRow] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [collapsed, toggleCollapsed] = useOpenSet([]); // keys present = collapsed group
 
   const fetchData = async () => {
@@ -112,12 +114,17 @@ export default function IndexLibraryArea() {
       <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>Select a team to view indices.</div></div>;
   }
 
-  const colCount = 8 + periodsDesc.length;
+  const colCount = 9 + periodsDesc.length;
 
   return (
     <div className="ca-page ca-fade-in">
-      <div className="ca-h1">Index library</div>
-      <p className="ca-subtitle">Every tracked index linked to your portfolio formulas — live values, provider, frequency and a 2-yr trend. Click a row for the full chart and portfolio impact.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div className="ca-h1">Index library</div>
+          <p className="ca-subtitle">Every tracked index linked to your portfolio formulas — live values, provider, frequency and a 2-yr trend. Click a row for the full chart and portfolio impact.</p>
+        </div>
+        <button className="ca-btn ca-btn-primary" onClick={() => setShowAddModal(true)}>+ Add Index</button>
+      </div>
 
       <div style={{ display: 'flex', gap: 16, margin: '16px 0', flexWrap: 'wrap' }}>
         {categories.map(c => (
@@ -151,12 +158,11 @@ export default function IndexLibraryArea() {
             <table className="ca-table">
               <thead>
                 <tr>
-                  <th>Index</th><th>Type</th><th>Provider</th><th>Region</th><th>Freq.</th>
-                  <th className="right">vs base</th><th style={{ minWidth: 90 }}>2-yr trend</th>
+                  <th>In use</th><th>Index</th><th>Type</th><th>Provider</th><th>Region</th><th>Freq.</th>
+                  <th className="right">Latest price</th><th className="right">vs base</th><th style={{ minWidth: 90 }}>2-yr trend</th>
                   {periodsDesc.map((p, i) => (
                     <th key={p.label} className="right" style={i === 0 ? { background: 'var(--info-bg)', color: 'var(--accent4)' } : undefined}>{p.label}</th>
                   ))}
-                  <th>In use</th>
                 </tr>
               </thead>
               <tbody>
@@ -176,11 +182,13 @@ export default function IndexLibraryArea() {
                         const inUse = findSource(r.commodity_id, r.reg) ? 'Yes' : '—';
                         return (
                           <tr key={`${r.commodity_id}-${r.reg}`} style={{ cursor: 'pointer' }} onClick={() => setPopupRow(r)}>
+                            <td><span className="ca-badge" style={{ background: inUse === 'Yes' ? 'var(--success-bg)' : 'var(--neutral-bg)', color: inUse === 'Yes' ? 'var(--accent)' : 'var(--muted)' }}>{inUse}</span></td>
                             <td style={{ fontWeight: 600, color: 'var(--accent4)' }}>{r.mat}</td>
                             <td><span className="ca-badge" style={{ background: 'var(--neutral-bg)', color: CAT_COLOR[r.meta.category] || 'var(--text-secondary)' }}>{r.meta.category || '—'}</span></td>
                             <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.meta.provider || '—'}</td>
                             <td style={{ fontSize: 12 }}>{r.reg}</td>
                             <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.meta.frequency || '—'}</td>
+                            <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: 'var(--text)' }}>{fmtVal(r.latest, r.meta.unit)}</td>
                             <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", color: r.delta == null ? 'var(--muted)' : up ? 'var(--accent2)' : 'var(--accent)' }}>
                               {r.delta == null ? '—' : `${up ? '+' : ''}${r.delta.toFixed(1)}%`}
                             </td>
@@ -189,7 +197,6 @@ export default function IndexLibraryArea() {
                               const cell = r.valMap[p.label];
                               return <td key={p.label} className="right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: i === 0 ? 700 : 400 }}>{fmtVal(cell?.value, r.meta.unit)}</td>;
                             })}
-                            <td><span className="ca-badge" style={{ background: inUse === 'Yes' ? 'var(--success-bg)' : 'var(--neutral-bg)', color: inUse === 'Yes' ? 'var(--accent)' : 'var(--muted)' }}>{inUse}</span></td>
                           </tr>
                         );
                       })}
@@ -216,6 +223,14 @@ export default function IndexLibraryArea() {
         globalScraper={popupRow ? getGlobalScraperInfo(popupRow.commodity_id) : null}
         onSourceChanged={fetchData}
         onRemoved={() => { setPopupRow(null); fetchData(); }}
+      />
+
+      <AddIndexModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        commodities={commodities}
+        teamId={activeTeamId}
+        onAdded={fetchData}
       />
     </div>
   );
