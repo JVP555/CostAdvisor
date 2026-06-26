@@ -322,6 +322,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 `/formulas` page: Default Formulas + Team Formulas sections; full CRUD gated by permission
   - 🟢 CostModelBuilder advanced mode: "Load Template" dropdown pre-fills expression + variables
   - 🟢 CostModelBuilder advanced mode: "Save as Template" scope toggle respects `canEditPlatform && canEditTeam`; Chemist-only users default to platform scope with no toggle
+  - 🟢 Seeded the platform Default Formula library from `sample_idea/full_shadow_formula_library.html`: 42 product formula templates across 10 chemical families + 29 referenced commodity indexes (free sources where available, manual/proxy for paywalled specialist ones). Idempotent `backend/seed_shadow_library.py`; templates use the base-anchored weighted index-ratio convention (`P0*(Σ wi*Vi/ViB + wFlat)`, evaluates to P0 at base)
 
 - 🟢 **Scrum 14d** — FX Rates page + team custom overrides
   - 🟢 `/fx-rates` nav page with two tabs: Default (platform rates, read-only) and Custom (team overrides, editable)
