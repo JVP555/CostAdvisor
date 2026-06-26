@@ -18,6 +18,8 @@ class CommodityIndex(Base):
     unit: Mapped[str | None] = mapped_column(String(32))
     currency: Mapped[str | None] = mapped_column(String(3))
     category: Mapped[str | None] = mapped_column(String(32))
+    provider: Mapped[str | None] = mapped_column(String(64))      # e.g. ECB, EIA, Eurostat, FRED, World Bank
+    frequency: Mapped[str | None] = mapped_column(String(16))     # e.g. Daily, Weekly, Monthly, Quarterly
     source_url: Mapped[str | None] = mapped_column(String(512))
     scrape_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     quoted_incoterm: Mapped[str | None] = mapped_column(String(8), nullable=True)

@@ -1,307 +1,222 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import api from '../../api';
+import { useAuth } from '../../AuthContext';
+import IndexPopupModal from '../../components/IndexPopupModal';
 import { Sparkline, GroupHeader, useOpenSet } from './wsCharts';
 
-/*
- * Index library — workspace re-skin of the mockup's "Indexes" view.
- * Demo data transcribed verbatim from sample_idea/costadvisor_mockup.html (#view-indexes).
- *
- * `history` is ordered oldest → newest (Q3 2024 … Q2 2026) so it feeds the Sparkline
- * directly; the table renders Q2 2026 (latest, bold) first then walks back to Q3 2024,
- * matching the mockup's column order.
- */
+/* Index Library — mockup layout, REAL data. Mirrors the fetch/reshape of
+ * pages/Indexes.jsx and opens IndexPopupModal (trend graph + AI + portfolio
+ * impact + source) on row click. Theme-safe: colours via var(--…) only. */
 
-const HIST_QUARTERS = ['Q2 2026', 'Q1 2026', 'Q4 2025', 'Q3 2025', 'Q2 2025', 'Q1 2025', 'Q4 2024', 'Q3 2024'];
+const CAT_COLOR = {
+  Metal: 'var(--cat-metal)', Energy: 'var(--cat-energy)', Chemical: 'var(--cat-chemical)',
+  Labor: 'var(--cat-labor)', PPI: 'var(--cat-ppi)', Freight: 'var(--cat-freight)', FX: 'var(--cat-fx)',
+};
 
-// Type group metadata (label + count + sub-caption) in mockup order.
-const GROUPS = [
-  { key: 'commodity', label: 'Commodity indexes', count: 7, sub: 'feedstocks & chemicals', badgeLabel: 'Commodity', badgeClass: 'b-blue' },
-  { key: 'energy', label: 'Energy indexes', count: 3, sub: 'gas, electricity, industrial', badgeLabel: 'Energy', badgeClass: 'b-amber' },
-  { key: 'macro', label: 'CPI / Macro', count: 2, sub: 'inflation, labour', badgeLabel: 'CPI / Macro', badgeClass: 'b-green' },
-  { key: 'logistics', label: 'Logistics indexes', count: 2, sub: 'ocean freight, road', badgeLabel: 'Logistics', badgeClass: 'b-gray' },
-];
-
-// values[] are the displayed cell strings newest→oldest (Q2 2026 … Q3 2024).
-// history[] are the numeric series oldest→newest for the sparkline.
-const INDEXES = [
-  // ── Commodity ──
-  {
-    name: 'Benzene', type: 'commodity', provider: 'ICIS', region: 'eu', regionLabel: 'Europe', freq: 'Weekly',
-    delta: -6.2, inUse: 'Yes',
-    values: ['€892/t', '€904/t', '€918/t', '€931/t', '€944/t', '€956/t', '€1,020/t', '€1,050/t'],
-    history: [1050, 1020, 956, 944, 931, 918, 904, 892],
-  },
-  {
-    name: 'Naphtha', type: 'commodity', provider: 'Platts', region: 'eu', regionLabel: 'Europe', freq: 'Daily',
-    delta: -3.1, inUse: 'Yes',
-    values: ['€624/t', '€632/t', '€638/t', '€645/t', '€648/t', '€651/t', '€638/t', '€630/t'],
-    history: [630, 638, 651, 648, 645, 638, 632, 624],
-  },
-  {
-    name: 'Ethylene', type: 'commodity', provider: 'ICIS', region: 'eu', regionLabel: 'Europe', freq: 'Monthly',
-    delta: 2.4, inUse: 'Yes',
-    values: ['€1,124/t', '€1,108/t', '€1,096/t', '€1,084/t', '€1,072/t', '€1,060/t', '€1,048/t', '€1,096/t'],
-    history: [1096, 1048, 1060, 1072, 1084, 1096, 1108, 1124],
-  },
-  {
-    name: 'Sulphur', type: 'commodity', provider: 'Platts', region: 'eu', regionLabel: 'Europe', freq: 'Monthly',
-    delta: -4.8, inUse: 'Yes',
-    values: ['€148/t', '€152/t', '€156/t', '€158/t', '€160/t', '€162/t', '€154/t', '€155/t'],
-    history: [155, 154, 162, 160, 158, 156, 152, 148],
-  },
-  {
-    name: 'Crude palm oil (CPO)', type: 'commodity', provider: 'MPOB', region: 'global', regionLabel: 'Global', freq: 'Daily',
-    delta: -8.1, inUse: 'Draft',
-    values: ['$842/t', '$864/t', '$882/t', '$894/t', '$906/t', '$918/t', '$910/t', '$915/t'],
-    history: [915, 910, 918, 906, 894, 882, 864, 842],
-  },
-  {
-    name: 'Palm kernel oil (PKO)', type: 'commodity', provider: 'MPOB', region: 'global', regionLabel: 'Global', freq: 'Daily',
-    delta: -5.3, inUse: 'Draft',
-    values: ['$1,024/t', '$1,042/t', '$1,058/t', '$1,072/t', '$1,084/t', '$1,096/t', '$1,080/t', '$1,082/t'],
-    history: [1082, 1080, 1096, 1084, 1072, 1058, 1042, 1024],
-  },
-  {
-    name: 'Benzene (US)', type: 'commodity', provider: 'ICIS', region: 'us', regionLabel: 'North America', freq: 'Weekly',
-    delta: -4.1, inUse: 'No',
-    values: ['$724/t', '$738/t', '$745/t', '$752/t', '$758/t', '$762/t', '$812/t', '$755/t'],
-    history: [755, 812, 762, 758, 752, 745, 738, 724],
-  },
-  // ── Energy ──
-  {
-    name: 'Industrial energy', type: 'energy', provider: 'Eurostat', region: 'eu', regionLabel: 'Europe', freq: 'Quarterly',
-    delta: -3.8, inUse: 'Yes',
-    values: ['96.2', '97.4', '98.8', '99.2', '99.8', '100.1', '106.2', '100.0'],
-    history: [100.0, 106.2, 100.1, 99.8, 99.2, 98.8, 97.4, 96.2],
-  },
-  {
-    name: 'Natural gas (TTF)', type: 'energy', provider: 'ICE', region: 'eu', regionLabel: 'Europe', freq: 'Daily',
-    delta: 12.4, inUse: 'No',
-    values: ['€38/MWh', '€36/MWh', '€34/MWh', '€32/MWh', '€30/MWh', '€28/MWh', '€62/MWh', '€33/MWh'],
-    history: [33, 62, 28, 30, 32, 34, 36, 38],
-  },
-  {
-    name: 'Natural gas (Henry Hub)', type: 'energy', provider: 'NYMEX', region: 'us', regionLabel: 'North America', freq: 'Daily',
-    delta: -18.2, inUse: 'No',
-    values: ['$2.84/MMBtu', '$2.92', '$3.04', '$3.12', '$3.18', '$3.22', '$2.98', '$3.38'],
-    history: [3.38, 2.98, 3.22, 3.18, 3.12, 3.04, 2.92, 2.84],
-  },
-  // ── CPI / Macro ──
-  {
-    name: 'EU CPI', type: 'macro', provider: 'ECB', region: 'eu', regionLabel: 'Europe', freq: 'Monthly',
-    delta: 5.4, inUse: 'Yes',
-    values: ['105.4', '104.8', '104.2', '103.6', '103.0', '102.4', '101.8', '101.2'],
-    history: [101.2, 101.8, 102.4, 103.0, 103.6, 104.2, 104.8, 105.4],
-  },
-  {
-    name: 'US CPI', type: 'macro', provider: 'BLS', region: 'us', regionLabel: 'North America', freq: 'Monthly',
-    delta: 6.1, inUse: 'No',
-    values: ['314.2', '312.1', '310.4', '308.2', '306.0', '303.8', '301.4', '299.0'],
-    history: [299.0, 301.4, 303.8, 306.0, 308.2, 310.4, 312.1, 314.2],
-  },
-  // ── Logistics ──
-  {
-    name: 'Freightos Baltic (FBX)', type: 'logistics', provider: 'Freightos', region: 'global', regionLabel: 'Global', freq: 'Weekly',
-    delta: -22.1, inUse: 'Draft',
-    values: ['$2,840/FEU', '$2,920', '$3,040', '$3,180', '$3,380', '$3,620', '$4,820', '$3,650'],
-    history: [3650, 4820, 3620, 3380, 3180, 3040, 2920, 2840],
-  },
-  {
-    name: 'Road freight (EU)', type: 'logistics', provider: 'Transporeon', region: 'eu', regionLabel: 'Europe', freq: 'Monthly',
-    delta: -1.6, inUse: 'Yes',
-    values: ['98.4', '98.8', '99.1', '99.4', '99.6', '99.8', '100.0', '100.0'],
-    history: [100.0, 100.0, 99.8, 99.6, 99.4, 99.1, 98.8, 98.4],
-  },
-];
-
-const STAT_TILES = [
-  { label: 'Commodity indexes', value: '7', sub: 'Linked to portfolio formulas' },
-  { label: 'Energy indexes', value: '3', sub: 'Linked to portfolio formulas' },
-  { label: 'CPI / Macro', value: '2', sub: 'Linked to portfolio formulas' },
-  { label: 'Logistics', value: '2', sub: 'Linked to portfolio formulas' },
-];
-
-const TYPE_FILTERS = [
-  { key: 'all', label: 'All types' },
-  { key: 'commodity', label: 'Commodity' },
-  { key: 'energy', label: 'Energy' },
-  { key: 'macro', label: 'CPI / Macro' },
-  { key: 'logistics', label: 'Logistics' },
-];
-
-const REGION_FILTERS = [
-  { key: 'all', label: 'All regions' },
-  { key: 'eu', label: 'Europe' },
-  { key: 'us', label: 'North America' },
-  { key: 'global', label: 'Global' },
-];
-
-// In-use badge → CostAdvisor badge tone.
-function inUseBadge(status) {
-  if (status === 'Yes') return { cls: 'ca-badge', style: { background: 'var(--success-bg)', color: 'var(--accent)' } };
-  if (status === 'Draft') return { cls: 'ca-badge', style: { background: 'var(--warn-bg)', color: 'var(--accent3)' } };
-  return { cls: 'ca-badge', style: { background: 'var(--neutral-bg)', color: 'var(--muted)' } };
-}
-
-// Type badge tone per group.
-function typeBadgeStyle(badgeClass) {
-  switch (badgeClass) {
-    case 'b-blue': return { background: 'var(--info-bg)', color: 'var(--accent4)' };
-    case 'b-amber': return { background: 'var(--warn-bg)', color: 'var(--accent3)' };
-    case 'b-green': return { background: 'var(--success-bg)', color: 'var(--accent)' };
-    default: return { background: 'var(--neutral-bg)', color: 'var(--muted)' };
-  }
-}
-
-function fmtDelta(d) {
-  const sign = d > 0 ? '+' : '−'; // unicode minus for negatives
-  return `${sign}${Math.abs(d).toFixed(1)}%`;
+function fmtVal(v, unit) {
+  if (v == null) return '—';
+  const n = Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2);
+  return unit ? `${n}/${unit}` : `${n}`;
 }
 
 export default function IndexLibraryArea() {
+  const { activeTeamId } = useAuth();
+  const [data, setData] = useState([]);
+  const [commodities, setCommodities] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [regionsOpt, setRegionsOpt] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [regionFilter, setRegionFilter] = useState('all');
-  // All type groups open by default (matches the mockup's expanded state).
-  const [openSet, toggleGroup] = useOpenSet(GROUPS.map(g => g.key));
+  const [popupRow, setPopupRow] = useState(null);
+  const [collapsed, toggleCollapsed] = useOpenSet([]); // keys present = collapsed group
 
-  const q = search.trim().toLowerCase();
-  const matches = idx =>
-    (typeFilter === 'all' || idx.type === typeFilter) &&
-    (regionFilter === 'all' || idx.region === regionFilter) &&
-    (!q || idx.name.toLowerCase().includes(q) || idx.provider.toLowerCase().includes(q));
+  const fetchData = async () => {
+    if (!activeTeamId) return;
+    setLoading(true);
+    try {
+      const now = new Date();
+      const toY = now.getFullYear(), toQ = Math.ceil((now.getMonth() + 1) / 3);
+      const params = { team_id: activeTeamId, from_year: toY - 2, from_quarter: toQ, to_year: toY, to_quarter: toQ };
+      const [valRes, comRes, srcRes] = await Promise.all([
+        api.get('/api/indexes/values', { params }),
+        api.get('/api/indexes'),
+        api.get('/api/indexes/sources', { params: { team_id: activeTeamId } }),
+      ]);
+      setData(valRes.data); setCommodities(comRes.data); setSources(srcRes.data);
+      try {
+        const f = await api.get('/api/indexes/filter-options', { params: { team_id: activeTeamId } });
+        setRegionsOpt(f.data.regions || []);
+      } catch { /* non-critical */ }
+    } catch (err) {
+      console.error('Failed to load indexes:', err);
+    } finally { setLoading(false); }
+  };
 
-  const cellStyle = { fontSize: 11, color: 'var(--muted)' };
+  useEffect(() => { fetchData(); }, [activeTeamId]);
+
+  const commodityMap = useMemo(() => {
+    const m = new Map();
+    commodities.forEach(c => m.set(c.id, c));
+    return m;
+  }, [commodities]);
+
+  const periods = useMemo(() => {
+    const set = new Set();
+    data.forEach(d => set.add(`${d.year}-${d.quarter}`));
+    return [...set].map(p => { const [y, q] = p.split('-'); return { year: +y, quarter: +q }; })
+      .sort((a, b) => a.year - b.year || a.quarter - b.quarter)
+      .map(p => ({ ...p, label: `Q${p.quarter}-${String(p.year).slice(2)}` }));
+  }, [data]);
+  const periodsDesc = useMemo(() => [...periods].reverse(), [periods]);
+
+  const findSource = (cid, region) => sources.find(s => s.commodity_id === cid && s.region === region) || null;
+  const getGlobalScraperInfo = (cid) => {
+    const cell = data.find(d => d.commodity_id === cid && d.global_scraper);
+    return cell ? { scraper: cell.global_scraper, scrape_at: cell.global_scrape_at } : null;
+  };
+
+  const rows = useMemo(() => {
+    const grouped = {};
+    data.forEach(d => {
+      const key = `${d.commodity_name}__${d.region}`;
+      if (!grouped[key]) grouped[key] = { mat: d.commodity_name, reg: d.region, commodity_id: d.commodity_id, valMap: {} };
+      grouped[key].valMap[`Q${d.quarter}-${String(d.year).slice(2)}`] = d;
+    });
+    return Object.values(grouped).map(r => {
+      const cells = periods.map(p => r.valMap[p.label] || null);
+      const nums = cells.map(c => c?.value).filter(v => v != null);
+      const base = nums[0] ?? null;
+      const latest = nums[nums.length - 1] ?? null;
+      const meta = commodityMap.get(r.commodity_id) || {};
+      const delta = (base != null && latest != null && base !== 0) ? (latest / base - 1) * 100 : null;
+      return { ...r, cells, base, latest, meta, delta, hist: nums };
+    }).sort((a, b) => a.mat.localeCompare(b.mat));
+  }, [data, periods, commodityMap]);
+
+  const categories = useMemo(() => {
+    const counts = {};
+    rows.forEach(r => { const c = r.meta.category || 'Other'; counts[c] = (counts[c] || 0) + 1; });
+    return Object.entries(counts).map(([key, count]) => ({ key, count })).sort((a, b) => a.key.localeCompare(b.key));
+  }, [rows]);
+  const regionList = useMemo(() => regionsOpt.length ? regionsOpt : [...new Set(rows.map(r => r.reg))].sort(), [regionsOpt, rows]);
+
+  const matches = (r) =>
+    (regionFilter === 'all' || r.reg === regionFilter) &&
+    (!search || `${r.mat} ${r.meta.provider || ''}`.toLowerCase().includes(search.toLowerCase()));
+
+  if (!activeTeamId) {
+    return <div className="ca-page ca-fade-in"><div className="ca-h1">Index library</div>
+      <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>Select a team to view indices.</div></div>;
+  }
+
+  const colCount = 8 + periodsDesc.length;
 
   return (
     <div className="ca-page ca-fade-in">
       <div className="ca-h1">Index library</div>
-      <p className="ca-subtitle">
-        Indexes linked to products in your portfolio &middot; Managed in formula builder &middot; Sparklines: Q3 2024 &rarr; Q2 2026
-      </p>
+      <p className="ca-subtitle">Every tracked index linked to your portfolio formulas — live values, provider, frequency and a 2-yr trend. Click a row for the full chart and portfolio impact.</p>
 
-      {/* Filter bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        <input
-          className="ca-input"
-          style={{ width: 180 }}
-          placeholder="Search indexes..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <div style={{ display: 'flex', gap: 4 }}>
-          {TYPE_FILTERS.map(f => (
-            <button
-              key={f.key}
-              className={`ca-btn ca-btn-sm ${typeFilter === f.key ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
-              onClick={() => setTypeFilter(f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ width: 1, height: 24, background: 'var(--border)' }} />
-        <div style={{ display: 'flex', gap: 4 }}>
-          {REGION_FILTERS.map(f => (
-            <button
-              key={f.key}
-              className={`ca-btn ca-btn-sm ${regionFilter === f.key ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
-              onClick={() => setRegionFilter(f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Stat tiles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 14 }}>
-        {STAT_TILES.map(t => (
-          <div key={t.label} className="ca-metric">
-            <div className="ca-metric-lbl">{t.label}</div>
-            <div className="ca-metric-val">{t.value}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{t.sub}</div>
+      <div style={{ display: 'flex', gap: 16, margin: '16px 0', flexWrap: 'wrap' }}>
+        {categories.map(c => (
+          <div key={c.key} className="ca-card ca-metric" style={{ flex: '1 1 150px' }}>
+            <div className="ca-metric-val" style={{ color: CAT_COLOR[c.key] || 'var(--accent)' }}>{c.count}</div>
+            <div className="ca-metric-lbl">{c.key} indexes</div>
           </div>
         ))}
       </div>
 
-      {/* Big table, collapsible by type */}
-      <div className="ca-card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="ca-scroll-x">
-          <table className="ca-table" style={{ width: '100%' }}>
-            <thead>
-              <tr>
-                <th>Index</th>
-                <th>Type</th>
-                <th>Provider</th>
-                <th>Region</th>
-                <th>Freq.</th>
-                <th>vs Q1 2024</th>
-                <th style={{ minWidth: 90 }}>2-yr trend</th>
-                <th style={{ background: 'var(--info-bg)', color: 'var(--accent4)' }}>Q2 2026</th>
-                {HIST_QUARTERS.slice(1).map(qt => <th key={qt}>{qt}</th>)}
-                <th>In use</th>
-              </tr>
-            </thead>
-            <tbody>
-              {GROUPS.map(group => {
-                const rows = INDEXES.filter(idx => idx.type === group.key && matches(idx));
-                const open = openSet.has(group.key);
-                // Hide an entire group header when active filters exclude its type.
-                if (typeFilter !== 'all' && typeFilter !== group.key) return null;
-                return (
-                  <GroupSection key={group.key} group={group} open={open} onToggle={() => toggleGroup(group.key)}>
-                    {open && rows.map(idx => {
-                      const badge = inUseBadge(idx.inUse);
-                      const deltaColor = idx.delta > 0 ? 'var(--accent2)' : 'var(--accent)';
-                      return (
-                        <tr key={idx.name}>
-                          <td style={{ fontWeight: 500 }}>{idx.name}</td>
-                          <td>
-                            <span className="ca-badge" style={typeBadgeStyle(group.badgeClass)}>{group.badgeLabel}</span>
-                          </td>
-                          <td style={cellStyle}>{idx.provider}</td>
-                          <td style={cellStyle}>{idx.regionLabel}</td>
-                          <td style={cellStyle}>{idx.freq}</td>
-                          <td style={{ fontWeight: 500, color: deltaColor }}>{fmtDelta(idx.delta)}</td>
-                          <td><Sparkline data={idx.history} /></td>
-                          <td style={{ fontSize: 12, fontWeight: 600, background: 'var(--info-bg)' }}>{idx.values[0]}</td>
-                          {idx.values.slice(1).map((v, i) => (
-                            <td key={i} style={cellStyle}>{v}</td>
-                          ))}
-                          <td><span className={badge.cls} style={badge.style}>{idx.inUse}</span></td>
-                        </tr>
-                      );
-                    })}
-                  </GroupSection>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+        <input className="ca-input" style={{ maxWidth: 220 }} placeholder="Search index or provider…" value={search} onChange={e => setSearch(e.target.value)} />
+        <button className={`ca-btn ca-btn-sm ${typeFilter === 'all' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setTypeFilter('all')}>All types</button>
+        {categories.map(c => (
+          <button key={c.key} className={`ca-btn ca-btn-sm ${typeFilter === c.key ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setTypeFilter(c.key)}>{c.key}</button>
+        ))}
+        <span style={{ width: 1, height: 20, background: 'var(--border)' }} />
+        <button className={`ca-btn ca-btn-sm ${regionFilter === 'all' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setRegionFilter('all')}>All regions</button>
+        {regionList.map(rg => (
+          <button key={rg} className={`ca-btn ca-btn-sm ${regionFilter === rg ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setRegionFilter(rg)}>{rg}</button>
+        ))}
       </div>
-    </div>
-  );
-}
 
-/*
- * A collapsible type group: a full-width header row that toggles open/closed,
- * followed by its index rows (passed as children). Kept as a component so the
- * GroupHeader (a div) can live inside a table cell spanning all columns.
- */
-function GroupSection({ group, open, onToggle, children }) {
-  return (
-    <>
-      <tr>
-        <td colSpan={16} style={{ background: 'var(--surface2)', padding: '7px 14px' }}>
-          <GroupHeader
-            label={group.label}
-            count={`${group.count} · ${group.sub}`}
-            open={open}
-            onToggle={onToggle}
-          />
-        </td>
-      </tr>
-      {children}
-    </>
+      {loading ? (
+        <div className="ca-card" style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
+      ) : rows.length === 0 ? (
+        <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>No index data for this team yet. Add sources or scrape from the Indexes page.</div>
+      ) : (
+        <div className="ca-card">
+          <div className="ca-scroll-x">
+            <table className="ca-table">
+              <thead>
+                <tr>
+                  <th>Index</th><th>Type</th><th>Provider</th><th>Region</th><th>Freq.</th>
+                  <th className="right">vs base</th><th style={{ minWidth: 90 }}>2-yr trend</th>
+                  {periodsDesc.map((p, i) => (
+                    <th key={p.label} className="right" style={i === 0 ? { background: 'var(--info-bg)', color: 'var(--accent4)' } : undefined}>{p.label}</th>
+                  ))}
+                  <th>In use</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map(cat => {
+                  if (typeFilter !== 'all' && typeFilter !== cat.key) return null;
+                  const catRows = rows.filter(r => (r.meta.category || 'Other') === cat.key && matches(r));
+                  if (!catRows.length) return null;
+                  const open = !collapsed.has(cat.key);
+                  return (
+                    <>
+                      <tr key={cat.key}><td colSpan={colCount} style={{ padding: 0 }}>
+                        <GroupHeader label={`${cat.key} indexes`} count={catRows.length} open={open} onToggle={() => toggleCollapsed(cat.key)} />
+                      </td></tr>
+                      {open && catRows.map(r => {
+                        const up = r.delta != null && r.delta >= 0;
+                        // In use — MOCK placeholder for now (TODO: wire to /api/indexes/{id}/impact)
+                        const inUse = findSource(r.commodity_id, r.reg) ? 'Yes' : '—';
+                        return (
+                          <tr key={`${r.commodity_id}-${r.reg}`} style={{ cursor: 'pointer' }} onClick={() => setPopupRow(r)}>
+                            <td style={{ fontWeight: 600, color: 'var(--accent4)' }}>{r.mat}</td>
+                            <td><span className="ca-badge" style={{ background: 'var(--neutral-bg)', color: CAT_COLOR[r.meta.category] || 'var(--text-secondary)' }}>{r.meta.category || '—'}</span></td>
+                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.meta.provider || '—'}</td>
+                            <td style={{ fontSize: 12 }}>{r.reg}</td>
+                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.meta.frequency || '—'}</td>
+                            <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", color: r.delta == null ? 'var(--muted)' : up ? 'var(--accent2)' : 'var(--accent)' }}>
+                              {r.delta == null ? '—' : `${up ? '+' : ''}${r.delta.toFixed(1)}%`}
+                            </td>
+                            <td><Sparkline data={r.hist} /></td>
+                            {periodsDesc.map((p, i) => {
+                              const cell = r.valMap[p.label];
+                              return <td key={p.label} className="right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: i === 0 ? 700 : 400 }}>{fmtVal(cell?.value, r.meta.unit)}</td>;
+                            })}
+                            <td><span className="ca-badge" style={{ background: inUse === 'Yes' ? 'var(--success-bg)' : 'var(--neutral-bg)', color: inUse === 'Yes' ? 'var(--accent)' : 'var(--muted)' }}>{inUse}</span></td>
+                          </tr>
+                        );
+                      })}
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <IndexPopupModal
+        isOpen={!!popupRow}
+        onClose={() => setPopupRow(null)}
+        commodityId={popupRow?.commodity_id}
+        commodityName={popupRow?.mat}
+        region={popupRow?.reg}
+        teamId={activeTeamId}
+        commodity={popupRow ? commodityMap.get(popupRow.commodity_id) : null}
+        periods={periods}
+        cellData={popupRow?.cells || []}
+        source={popupRow ? findSource(popupRow.commodity_id, popupRow.reg) : null}
+        globalScraper={popupRow ? getGlobalScraperInfo(popupRow.commodity_id) : null}
+        onSourceChanged={fetchData}
+        onRemoved={() => { setPopupRow(null); fetchData(); }}
+      />
+    </div>
   );
 }

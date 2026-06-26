@@ -11,6 +11,8 @@ class CommodityIndexOut(BaseModel):
     unit: str | None
     currency: str | None = None
     category: str | None = None
+    provider: str | None = None
+    frequency: str | None = None
     source_url: str | None = None
     scrape_enabled: bool
 
