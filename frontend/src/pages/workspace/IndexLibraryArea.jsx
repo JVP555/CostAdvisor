@@ -3,6 +3,8 @@ import api from '../../api';
 import { useAuth } from '../../AuthContext';
 import IndexPopupModal from '../../components/IndexPopupModal';
 import AddIndexModal from '../../components/AddIndexModal';
+import FxRates from '../FxRates';
+import exportCsv from '../../utils/exportCsv';
 import { Sparkline, GroupHeader, useOpenSet } from './wsCharts';
 
 /* Index Library — mockup layout, REAL data. Mirrors the fetch/reshape of
@@ -33,6 +35,7 @@ export default function IndexLibraryArea() {
   const [regionFilter, setRegionFilter] = useState('all');
   const [popupRow, setPopupRow] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [tab, setTab] = useState('indexes'); // 'indexes' | 'fx'
   const [collapsed, toggleCollapsed] = useOpenSet([]); // keys present = collapsed group
 
   const fetchData = async () => {
@@ -109,6 +112,29 @@ export default function IndexLibraryArea() {
     (regionFilter === 'all' || r.reg === regionFilter) &&
     (!search || `${r.mat} ${r.meta.provider || ''}`.toLowerCase().includes(search.toLowerCase()));
 
+  // Export the currently-visible rows (respects type/region/search filters), in display order.
+  const handleExport = () => {
+    const headers = ['In use', 'Index', 'Type', 'Provider', 'Region', 'Frequency', 'Latest price', 'vs base %', ...periodsDesc.map(p => p.label)];
+    const out = [];
+    categories.forEach(cat => {
+      if (typeFilter !== 'all' && typeFilter !== cat.key) return;
+      rows.filter(r => (r.meta.category || 'Other') === cat.key && matches(r)).forEach(r => {
+        out.push([
+          findSource(r.commodity_id, r.reg) ? 'Yes' : 'No',
+          r.mat,
+          r.meta.category || '',
+          r.meta.provider || '',
+          r.reg,
+          r.meta.frequency || '',
+          r.latest != null ? r.latest : '',
+          r.delta != null ? `${r.delta.toFixed(1)}%` : '',
+          ...periodsDesc.map(p => { const c = r.valMap[p.label]; return c?.value != null ? c.value : ''; }),
+        ]);
+      });
+    });
+    exportCsv('index-library.csv', headers, out);
+  };
+
   if (!activeTeamId) {
     return <div className="ca-page ca-fade-in"><div className="ca-h1">Index library</div>
       <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>Select a team to view indices.</div></div>;
@@ -118,14 +144,24 @@ export default function IndexLibraryArea() {
 
   return (
     <div className="ca-page ca-fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <div className="ca-h1">Index library</div>
-          <p className="ca-subtitle">Every tracked index linked to your portfolio formulas — live values, provider, frequency and a 2-yr trend. Click a row for the full chart and portfolio impact.</p>
-        </div>
-        <button className="ca-btn ca-btn-primary" onClick={() => setShowAddModal(true)}>+ Add Index</button>
+      <div>
+        <div className="ca-h1">Index library</div>
+        <p className="ca-subtitle">Every tracked index linked to your portfolio formulas — live values, provider, frequency and a 2-yr trend. Click a row for the full chart and portfolio impact. Switch to FX Rates to manage currency conversion.</p>
       </div>
 
+      <div style={{ display: 'flex', gap: 8, margin: '16px 0' }}>
+        {[{ id: 'indexes', label: 'Indexes' }, { id: 'fx', label: 'FX Rates' }].map(t => (
+          <button key={t.id}
+            className={`ca-btn ca-btn-sm ${tab === t.id ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+            onClick={() => setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'fx' && <FxRates embedded />}
+
+      {tab === 'indexes' && (<>
       <div style={{ display: 'flex', gap: 16, margin: '16px 0', flexWrap: 'wrap' }}>
         {categories.map(c => (
           <div key={c.key} className="ca-card ca-metric" style={{ flex: '1 1 150px' }}>
@@ -146,6 +182,10 @@ export default function IndexLibraryArea() {
         {regionList.map(rg => (
           <button key={rg} className={`ca-btn ca-btn-sm ${regionFilter === rg ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setRegionFilter(rg)}>{rg}</button>
         ))}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleExport} disabled={!rows.length}>Export CSV</button>
+          <button className="ca-btn ca-btn-sm ca-btn-primary" onClick={() => setShowAddModal(true)}>+ Add Index</button>
+        </div>
       </div>
 
       {loading ? (
@@ -208,6 +248,7 @@ export default function IndexLibraryArea() {
           </div>
         </div>
       )}
+      </>)}
 
       <IndexPopupModal
         isOpen={!!popupRow}

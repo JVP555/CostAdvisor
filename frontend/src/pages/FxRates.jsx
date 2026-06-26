@@ -1350,7 +1350,7 @@ function CustomTab({ teamId, canEdit, defaultRates, pairs }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function FxRates() {
+export default function FxRates({ embedded = false }) {
   const { user, activeTeamId } = useAuth();
   const [tab, setTab] = useState('pairs');
   const [canEdit, setCanEdit] = useState(false);
@@ -1401,8 +1401,8 @@ export default function FxRates() {
 
   if (!activeTeamId) {
     return (
-      <div className="ca-page ca-fade-in">
-        <div className="ca-h1">FX Rates</div>
+      <div className={embedded ? 'ca-fade-in' : 'ca-page ca-fade-in'}>
+        {!embedded && <div className="ca-h1">FX Rates</div>}
         <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>
           Select a team to view FX rates.
         </div>
@@ -1411,11 +1411,13 @@ export default function FxRates() {
   }
 
   return (
-    <div className="ca-page ca-fade-in">
-      <div style={{ marginBottom: 4 }}>
-        <div className="ca-h1">FX Rates</div>
-        <p className="ca-subtitle">Exchange rates used for currency conversion in costing calculations.</p>
-      </div>
+    <div className={embedded ? 'ca-fade-in' : 'ca-page ca-fade-in'}>
+      {!embedded && (
+        <div style={{ marginBottom: 4 }}>
+          <div className="ca-h1">FX Rates</div>
+          <p className="ca-subtitle">Exchange rates used for currency conversion in costing calculations.</p>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {TABS.map(t => (
