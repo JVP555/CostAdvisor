@@ -92,7 +92,9 @@ export function AuthProvider({ children }) {
     setUser(null);
     setTeams([]);
     setActiveTeamId(null);
-    window.location.href = 'http://localhost:3333';
+    // Landing page URL — set VITE_LANDING_URL per environment (e.g. localhost:3333 locally);
+    // defaults to the public landing site on deploy.
+    window.location.href = import.meta.env.VITE_LANDING_URL || 'https://www.costadvisor.org';
   };
 
   return (
