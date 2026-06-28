@@ -3,6 +3,8 @@ import api from '../../api';
 import { useAuth } from '../../AuthContext';
 import IndexPopupModal from '../../components/IndexPopupModal';
 import AddIndexModal from '../../components/AddIndexModal';
+import EditCellModal from '../../components/EditCellModal';
+import FxCustomEditModal from '../../components/FxCustomEditModal';
 import exportCsv from '../../utils/exportCsv';
 import { Sparkline, GroupHeader, useOpenSet } from './wsCharts';
 
@@ -36,6 +38,10 @@ export default function IndexLibraryArea() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [collapsed, toggleCollapsed] = useOpenSet([]); // keys present = collapsed group
   const [pairsLive, setPairsLive] = useState({}); // FX pair name -> live daily rate
+  const [fxCustomAll, setFxCustomAll] = useState([]);   // team FX custom overrides
+  const [fxPlatformAll, setFxPlatformAll] = useState([]); // platform quarterly FX rates
+  const [editCell, setEditCell] = useState(null);  // non-FX cell being overridden
+  const [fxEdit, setFxEdit] = useState(null);       // FX cell override context
 
   const fetchData = async () => {
     if (!activeTeamId) return;
@@ -55,11 +61,17 @@ export default function IndexLibraryArea() {
         setRegionsOpt(f.data.regions || []);
       } catch { /* non-critical */ }
       try {
-        // FX pairs carry a live daily rate; map by pair name (e.g. "EUR/USD") for the Latest column.
-        const pr = await api.get('/api/fx-rates/pairs');
+        // FX: live rate per pair (Latest column) + team custom overrides + platform quarterly (for the 3-mode editor).
+        const [pr, cu, pl] = await Promise.all([
+          api.get('/api/fx-rates/pairs'),
+          api.get('/api/fx-rates/custom', { params: { team_id: activeTeamId } }),
+          api.get('/api/fx-rates/'),
+        ]);
         const m = {};
         (pr.data || []).forEach(p => { if (p.live_rate != null) m[p.name] = Number(p.live_rate); });
         setPairsLive(m);
+        setFxCustomAll(cu.data || []);
+        setFxPlatformAll(pl.data || []);
       } catch { /* non-critical */ }
     } catch (err) {
       console.error('Failed to load indexes:', err);
@@ -87,6 +99,21 @@ export default function IndexLibraryArea() {
   const getGlobalScraperInfo = (cid) => {
     const cell = data.find(d => d.commodity_id === cid && d.global_scraper);
     return cell ? { scraper: cell.global_scraper, scrape_at: cell.global_scrape_at } : null;
+  };
+
+  // Click a quarter cell in a row → edit its team override (FX = 3-mode editor, else fixed value).
+  const openCellEdit = (e, r, p, cell) => {
+    e.stopPropagation(); // don't open the view popup
+    if (r.meta.category === 'FX') {
+      const [from, to] = r.mat.split('/');
+      const current = fxCustomAll.find(c => c.from_currency === from && c.to_currency === to && c.year === p.year && c.quarter === p.quarter) || null;
+      const availableQuarters = fxPlatformAll
+        .filter(x => x.from_currency === from && x.to_currency === to)
+        .map(x => ({ year: x.year, quarter: x.quarter, rate: x.rate }));
+      setFxEdit({ pair: { from, to }, period: { year: p.year, quarter: p.quarter, label: p.label }, current, availableQuarters, liveRate: pairsLive[r.mat] ?? null });
+    } else {
+      setEditCell(cell || { commodity_id: r.commodity_id, region: r.reg, year: p.year, quarter: p.quarter, value: null, source: 'scraped' });
+    }
   };
 
   const rows = useMemo(() => {
@@ -229,7 +256,9 @@ export default function IndexLibraryArea() {
                             {periodsDesc.map((p, i) => {
                               const cell = r.valMap[p.label];
                               const ov = cell?.source === 'team_override';
-                              return <td key={p.label} className="right" title={ov ? 'Team override' : undefined} style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: i === 0 ? 700 : 400, color: ov ? 'var(--accent4)' : undefined }}>{fmtVal(cell?.value, r.meta.unit)}{ov ? ' •' : ''}</td>;
+                              return <td key={p.label} className="right" title="Click to set a team override"
+                                onClick={(e) => openCellEdit(e, r, p, cell)}
+                                style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: i === 0 ? 700 : 400, color: ov ? 'var(--accent4)' : undefined, cursor: 'cell' }}>{fmtVal(cell?.value, r.meta.unit)}{ov ? ' •' : ''}</td>;
                             })}
                           </tr>
                         );
@@ -266,6 +295,29 @@ export default function IndexLibraryArea() {
         teamId={activeTeamId}
         onAdded={fetchData}
       />
+
+      <EditCellModal
+        isOpen={!!editCell}
+        onClose={() => setEditCell(null)}
+        cell={editCell}
+        teamId={activeTeamId}
+        teamSource={editCell ? findSource(editCell.commodity_id, editCell.region) : null}
+        periods={periods}
+        onSaved={() => fetchData()}
+      />
+
+      {fxEdit && (
+        <FxCustomEditModal
+          pair={fxEdit.pair}
+          period={fxEdit.period}
+          current={fxEdit.current}
+          liveRate={fxEdit.liveRate}
+          availableQuarters={fxEdit.availableQuarters}
+          teamId={activeTeamId}
+          onSaved={() => fetchData()}
+          onClose={() => setFxEdit(null)}
+        />
+      )}
     </div>
   );
 }
