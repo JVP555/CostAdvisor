@@ -4,6 +4,8 @@ import SeriesChart from './SeriesChart';
 import { computeStats } from '../utils/seriesStats';
 import IndexDetailPanel from './IndexDetailPanel';
 import EditCellModal from './EditCellModal';
+import FxCustomEditModal from './FxCustomEditModal';
+import exportCsv from '../utils/exportCsv';
 
 /**
  * Full-screen modal showing index details: trend chart, AI summary,
@@ -31,17 +33,36 @@ export default function IndexPopupModal({
   const [daily, setDaily] = useState([]);          // FX daily series (FX rows only)
   const [statsSlice, setStatsSlice] = useState(null); // current chart selection/window, for stats
   const [editCell, setEditCell] = useState(null);  // period cell being overridden
+  const [graphMode, setGraphMode] = useState('default'); // 'default' | 'custom'
+  const [fxCustom, setFxCustom] = useState([]);    // team FX overrides for this pair
+  const [fxPlatform, setFxPlatform] = useState([]); // platform quarterly FX rates for this pair
+  const [fxEdit, setFxEdit] = useState(null);      // FX quarter being overridden
 
   const isFx = commodity?.category === 'FX';
+  const [fxFrom, fxTo] = isFx && commodityName ? commodityName.split('/') : [null, null];
 
   // FX rows: fetch the daily rate series (name "FROM/TO" → fx-rates/daily).
   useEffect(() => {
     if (!isOpen || !isFx || !commodityName) { setDaily([]); return; }
-    const [from, to] = commodityName.split('/');
-    api.get('/api/fx-rates/daily', { params: { from_currency: from, to_currency: to, limit: 3000 } })
+    api.get('/api/fx-rates/daily', { params: { from_currency: fxFrom, to_currency: fxTo, limit: 3000 } })
       .then(res => setDaily(res.data || []))
       .catch(() => setDaily([]));
-  }, [isOpen, isFx, commodityName]);
+  }, [isOpen, isFx, commodityName, fxFrom, fxTo]);
+
+  // FX rows: team custom overrides + platform quarterly rates (for the 3-mode editor).
+  const loadFx = () => {
+    if (!isFx || !commodityName || !teamId) return;
+    api.get('/api/fx-rates/custom', { params: { team_id: teamId } })
+      .then(res => setFxCustom((res.data || []).filter(r => r.from_currency === fxFrom && r.to_currency === fxTo)))
+      .catch(() => setFxCustom([]));
+    api.get('/api/fx-rates/', { params: { from_currency: fxFrom, to_currency: fxTo } })
+      .then(res => setFxPlatform(res.data || []))
+      .catch(() => setFxPlatform([]));
+  };
+  useEffect(() => {
+    if (isOpen && isFx) loadFx();
+    else { setFxCustom([]); setFxPlatform([]); }
+  }, [isOpen, isFx, commodityName, teamId, fxFrom, fxTo]);
 
   useEffect(() => {
     if (!isOpen || !commodityId || !teamId) return;
@@ -82,19 +103,41 @@ export default function IndexPopupModal({
 
   if (!isOpen) return null;
 
-  // Chart points: FX → daily series (newest-first from API → ascending);
-  // non-FX → the quarterly cells. SeriesChart handles range windowing + selection.
-  const points = isFx
+  const cellAt = (p) => cellData?.find(c => c?.year === p.year && c?.quarter === p.quarter);
+
+  // Two series: Default = platform/scraped data; Custom = team overrides applied.
+  // FX uses its daily series for the default high-res view (custom-graph is Phase 2).
+  const defaultPoints = isFx
     ? [...daily].reverse().map(d => ({ label: d.date, value: Number(d.rate), date: d.date }))
-    : periods.map((p) => {
-        const cell = cellData?.find(c => c?.year === p.year && c?.quarter === p.quarter);
-        return { label: p.label, value: cell?.value ?? null };
-      });
+    : periods.map((p) => { const c = cellAt(p); return { label: p.label, value: c?.scraped_value ?? c?.value ?? null }; });
+  const customPoints = isFx
+    ? defaultPoints
+    : periods.map((p) => { const c = cellAt(p); return { label: p.label, value: c?.value ?? null }; });
+  const hasOverride = !isFx && periods.some(p => cellAt(p)?.source === 'team_override');
+
+  const points = (graphMode === 'custom' && hasOverride) ? customPoints : defaultPoints;
   const rangeOptions = isFx
     ? [['1M', 30], ['3M', 90], ['6M', 180], ['1Y', 365], ['5Y', 1825], ['All', Infinity]]
     : [['1Y', 4], ['2Y', 8], ['3Y', 12], ['5Y', 20], ['All', Infinity]];
   const stats = computeStats(statsSlice && statsSlice.length ? statsSlice : points);
   const fmtStat = v => (v == null ? '—' : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(isFx ? 4 : 2));
+
+  // Three prices for the header: live (latest), quarterly (current quarter, platform), overridden (if any).
+  const lastP = periods[periods.length - 1];
+  const lastCell = lastP ? cellAt(lastP) : null;
+  const livePrice = isFx
+    ? (defaultPoints.length ? defaultPoints[defaultPoints.length - 1].value : null)
+    : (customPoints.map(p => p.value).filter(v => v != null).pop() ?? null);
+  const quarterlyPrice = lastCell ? (lastCell.scraped_value ?? lastCell.value ?? null) : null;
+  const overrideCell = !isFx ? [...periods].reverse().map(cellAt).find(c => c?.source === 'team_override') : null;
+  const overriddenPrice = overrideCell ? overrideCell.value : null;
+
+  // FX override helpers
+  const fxLive = daily.length ? Number(daily[0].rate) : null; // daily is newest-first
+  const fxAvailableQuarters = fxPlatform.map(r => ({ year: r.year, quarter: r.quarter, rate: r.rate }));
+  const fxCustomFor = (p) => fxCustom.find(c => c.year === p.year && c.quarter === p.quarter) || null;
+  const exportDaily = () => exportCsv(`${(commodityName || 'fx').replace('/', '-')}-daily.csv`, ['Date', 'Rate'],
+    [...daily].reverse().map(d => [d.date, d.rate]));
 
   const categoryColors = {
     Metal: 'var(--cat-metal)', Energy: 'var(--cat-energy)', Chemical: 'var(--cat-chemical)',
@@ -144,8 +187,40 @@ export default function IndexPopupModal({
         <div className="ca-modal-body">
         {/* Trend Chart */}
         <div className="ca-card" style={{ marginBottom: 16, padding: '12px 8px' }}>
-          <div className="ca-card-title" style={{ marginBottom: 8 }}>Price Trend</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8, padding: '0 4px' }}>
+            <div className="ca-card-title" style={{ margin: 0 }}>Price Trend</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {hasOverride && ['default', 'custom'].map(m => (
+                <button key={m}
+                  className={`ca-btn ca-btn-sm ${graphMode === m ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+                  onClick={() => setGraphMode(m)}>
+                  {m === 'default' ? 'Default data' : 'Custom data'}
+                </button>
+              ))}
+              {isFx && daily.length > 0 && (
+                <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={exportDaily}>Export CSV</button>
+              )}
+            </div>
+          </div>
+
+          {/* Three prices: live / quarterly / overridden */}
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', padding: '0 4px 10px' }}>
+            {[
+              { lbl: isFx ? 'Live (daily)' : 'Live (latest)', val: livePrice, color: 'var(--text)' },
+              { lbl: 'Quarterly', val: quarterlyPrice, color: 'var(--text-secondary)' },
+              ...(overriddenPrice != null ? [{ lbl: 'Overridden', val: overriddenPrice, color: 'var(--accent4)' }] : []),
+            ].map(s => (
+              <div key={s.lbl}>
+                <div style={{ fontSize: 9, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.lbl}</div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 15, color: s.color }}>
+                  {s.val == null ? '—' : `${fmtStat(s.val)}${commodity?.unit ? `/${commodity.unit}` : ''}`}
+                </div>
+              </div>
+            ))}
+          </div>
+
           <SeriesChart
+            key={graphMode}
             points={points}
             rangeOptions={rangeOptions}
             valueDecimals={isFx ? 4 : undefined}
@@ -253,9 +328,23 @@ export default function IndexPopupModal({
         <div className="ca-card" style={{ marginBottom: 16 }}>
           <div className="ca-card-title" style={{ marginBottom: 8 }}>Team Override</div>
           {isFx ? (
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-              FX rates are managed on the <strong>FX Rates</strong> page (fixed / latest-daily / quarter-reference modes). An override set here would affect this view only, not currency conversion in costing.
-            </div>
+            <>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
+                Click a quarter to set a team FX override — <strong>fixed</strong>, <strong>latest-daily</strong>, or <strong>quarter-reference</strong>. Overridden quarters are marked •.
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {periods.map((p) => {
+                  const cur = fxCustomFor(p);
+                  return (
+                    <button key={p.label} className="ca-btn ca-btn-sm ca-btn-ghost"
+                      style={cur ? { borderColor: 'var(--accent4)', color: 'var(--accent4)' } : undefined}
+                      onClick={() => setFxEdit(p)}>
+                      {p.label}{cur ? ' •' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           ) : (
             <>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
@@ -304,6 +393,19 @@ export default function IndexPopupModal({
         periods={periods}
         onSaved={() => { onSourceChanged?.(); }}
       />
+
+      {fxEdit && (
+        <FxCustomEditModal
+          pair={{ from: fxFrom, to: fxTo }}
+          period={fxEdit}
+          current={fxCustomFor(fxEdit)}
+          liveRate={fxLive}
+          availableQuarters={fxAvailableQuarters}
+          teamId={teamId}
+          onSaved={() => { loadFx(); onSourceChanged?.(); }}
+          onClose={() => setFxEdit(null)}
+        />
+      )}
     </div>
   );
 }

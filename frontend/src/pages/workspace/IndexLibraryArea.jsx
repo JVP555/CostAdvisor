@@ -35,6 +35,7 @@ export default function IndexLibraryArea() {
   const [popupRow, setPopupRow] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [collapsed, toggleCollapsed] = useOpenSet([]); // keys present = collapsed group
+  const [pairsLive, setPairsLive] = useState({}); // FX pair name -> live daily rate
 
   const fetchData = async () => {
     if (!activeTeamId) return;
@@ -52,6 +53,13 @@ export default function IndexLibraryArea() {
       try {
         const f = await api.get('/api/indexes/filter-options', { params: { team_id: activeTeamId } });
         setRegionsOpt(f.data.regions || []);
+      } catch { /* non-critical */ }
+      try {
+        // FX pairs carry a live daily rate; map by pair name (e.g. "EUR/USD") for the Latest column.
+        const pr = await api.get('/api/fx-rates/pairs');
+        const m = {};
+        (pr.data || []).forEach(p => { if (p.live_rate != null) m[p.name] = Number(p.live_rate); });
+        setPairsLive(m);
       } catch { /* non-critical */ }
     } catch (err) {
       console.error('Failed to load indexes:', err);
@@ -213,14 +221,15 @@ export default function IndexLibraryArea() {
                             <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.meta.provider || '—'}</td>
                             <td style={{ fontSize: 12 }}>{r.reg}</td>
                             <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.meta.frequency || '—'}</td>
-                            <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: 'var(--text)' }}>{fmtVal(r.latest, r.meta.unit)}</td>
+                            <td className="right" title={r.meta.category === 'FX' && pairsLive[r.mat] != null ? 'Live daily rate' : undefined} style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: 'var(--text)' }}>{fmtVal(r.meta.category === 'FX' && pairsLive[r.mat] != null ? pairsLive[r.mat] : r.latest, r.meta.unit)}</td>
                             <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", color: r.delta == null ? 'var(--muted)' : up ? 'var(--accent2)' : 'var(--accent)' }}>
                               {r.delta == null ? '—' : `${up ? '+' : ''}${r.delta.toFixed(1)}%`}
                             </td>
                             <td><Sparkline data={r.hist} /></td>
                             {periodsDesc.map((p, i) => {
                               const cell = r.valMap[p.label];
-                              return <td key={p.label} className="right" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: i === 0 ? 700 : 400 }}>{fmtVal(cell?.value, r.meta.unit)}</td>;
+                              const ov = cell?.source === 'team_override';
+                              return <td key={p.label} className="right" title={ov ? 'Team override' : undefined} style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: i === 0 ? 700 : 400, color: ov ? 'var(--accent4)' : undefined }}>{fmtVal(cell?.value, r.meta.unit)}{ov ? ' •' : ''}</td>;
                             })}
                           </tr>
                         );
