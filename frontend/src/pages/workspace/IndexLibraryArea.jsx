@@ -3,7 +3,6 @@ import api from '../../api';
 import { useAuth } from '../../AuthContext';
 import IndexPopupModal from '../../components/IndexPopupModal';
 import AddIndexModal from '../../components/AddIndexModal';
-import FxRates from '../FxRates';
 import exportCsv from '../../utils/exportCsv';
 import { Sparkline, GroupHeader, useOpenSet } from './wsCharts';
 
@@ -35,7 +34,6 @@ export default function IndexLibraryArea() {
   const [regionFilter, setRegionFilter] = useState('all');
   const [popupRow, setPopupRow] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [tab, setTab] = useState('indexes'); // 'indexes' | 'fx'
   const [collapsed, toggleCollapsed] = useOpenSet([]); // keys present = collapsed group
 
   const fetchData = async () => {
@@ -146,22 +144,9 @@ export default function IndexLibraryArea() {
     <div className="ca-page ca-fade-in">
       <div>
         <div className="ca-h1">Index library</div>
-        <p className="ca-subtitle">Every tracked index linked to your portfolio formulas — live values, provider, frequency and a 2-yr trend. Click a row for the full chart and portfolio impact. Switch to FX Rates to manage currency conversion.</p>
+        <p className="ca-subtitle">Every tracked index linked to your portfolio formulas — live values, provider, frequency and a 2-yr trend. FX pairs are included; click any row for its chart, statistics and portfolio impact.</p>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, margin: '16px 0' }}>
-        {[{ id: 'indexes', label: 'Indexes' }, { id: 'fx', label: 'FX Rates' }].map(t => (
-          <button key={t.id}
-            className={`ca-btn ca-btn-sm ${tab === t.id ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
-            onClick={() => setTab(t.id)}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'fx' && <FxRates embedded />}
-
-      {tab === 'indexes' && (<>
       <div style={{ display: 'flex', gap: 16, margin: '16px 0', flexWrap: 'wrap' }}>
         {categories.map(c => (
           <div key={c.key} className="ca-card ca-metric" style={{ flex: '1 1 150px' }}>
@@ -248,7 +233,6 @@ export default function IndexLibraryArea() {
           </div>
         </div>
       )}
-      </>)}
 
       <IndexPopupModal
         isOpen={!!popupRow}

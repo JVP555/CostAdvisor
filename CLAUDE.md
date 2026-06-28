@@ -385,6 +385,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Index source is shown (scraped / team override / fixed)
   - 🔴 Numbers in the breakdown sum to the displayed should-cost exactly
   - 🟢 Scoping note: this breakdown IS the Wave-1 form of the mockup's Negotiate "itemized FOB→landed" view. The full 5-area workspace (Monitor/Forecast/Negotiate/Portfolio/Indexes) is a **Wave 2** reorg of the existing cost model (~55% already built), NOT Wave 1 — see `jvpdocs/cost_model_split_roadmap.md`, `cost_model_split_steps.md`, `cost_model_split_vs_wave1.md`. Wave 1 priority stays: Scrum 16 + 17, with 9/10/11/12 as the real finish-line blockers.
+  - 🟢 Wave-2 Index Library (`pages/workspace/IndexLibraryArea.jsx`): single table (tabs removed) with FX pairs shown as rows; drill-in (`IndexPopupModal`) uses one interactive `SeriesChart` (hover crosshair + range selector + two-point selection) for both FX (daily, from `/api/fx-rates/daily`) and quarterly indexes; a computed Statistics card (`utils/seriesStats.js`, deterministic) sits alongside the kept AI Analysis card; team overrides surfaced in the modal via `EditCellModal` (existing `/api/indexes/overrides/*`, non-FX). Live scraping deferred to a worker.
 
 - 🟢 **Scrum 18** — Data import & export — Wave 1: forgiving import of core data, export of anything on screen; consolidate existing CSV/Excel
   - 🟢 Every upload shows a row-count preview before committing (FileUpload component two-step dry_run preview; Pricing page inline preview)
