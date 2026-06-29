@@ -37,7 +37,7 @@ export default function IndexPopupModal({
   const [loadingAi, setLoadingAi] = useState(false);
   const [daily, setDaily] = useState([]);          // FX daily series (FX rows only)
   const [statsSlice, setStatsSlice] = useState(null); // current chart selection/window, for stats
-  const [graphMode, setGraphMode] = useState('default'); // 'default' | 'custom'
+  const [chartMode, setChartMode] = useState('default'); // 'default' | 'custom' | 'compare'
   const [showEditPair, setShowEditPair] = useState(false);
   const [pairBusy, setPairBusy] = useState(false);
 
@@ -103,7 +103,8 @@ export default function IndexPopupModal({
     : periods.map((p) => { const c = cellAt(p); return { label: p.label, value: c?.value ?? null }; });
   const hasOverride = !isFx && periods.some(p => cellAt(p)?.source === 'team_override');
 
-  const points = (graphMode === 'custom' && hasOverride) ? customPoints : defaultPoints;
+  const points = (chartMode === 'custom' && hasOverride) ? customPoints : defaultPoints;
+  const comparePoints = (chartMode === 'compare' && hasOverride) ? customPoints : null;
   const rangeOptions = isFx
     ? [['1M', 30], ['3M', 90], ['6M', 180], ['1Y', 365], ['5Y', 1825], ['All', Infinity]]
     : [['1Y', 4], ['2Y', 8], ['3Y', 12], ['5Y', 20], ['All', Infinity]];
@@ -128,8 +129,36 @@ export default function IndexPopupModal({
   });
   const anyCustom = histRows.some(r => r.cust != null);
 
-  const exportDaily = () => exportCsv(`${(commodityName || 'fx').replace('/', '-')}-daily.csv`, ['Date', 'Rate'],
-    [...daily].reverse().map(d => [d.date, d.rate]));
+  const exportHist = () => exportCsv(
+    `${(commodityName || 'index').replace('/', '-')}-history.csv`,
+    anyCustom ? ['Period', 'Default', 'Custom'] : ['Period', 'Default'],
+    histRows.map(r => (anyCustom ? [r.label, r.def, r.cust] : [r.label, r.def])),
+  );
+  const printPopup = () => window.print();
+
+  // Compare-mode diff stats: Default vs Custom over the selected window.
+  const customByLabel = {};
+  customPoints.forEach(p => { if (p.value != null) customByLabel[p.label] = p.value; });
+  const compareStats = (() => {
+    if (chartMode !== 'compare') return null;
+    const base = (statsSlice && statsSlice.length ? statsSlice : defaultPoints);
+    const diffs = [];
+    base.forEach(p => {
+      const c = customByLabel[p.label];
+      if (p.value != null && c != null && Math.abs(c - p.value) > 1e-9) {
+        diffs.push({ diff: c - p.value, pct: p.value !== 0 ? (c / p.value - 1) * 100 : null });
+      }
+    });
+    if (!diffs.length) return null;
+    const avgDiff = diffs.reduce((a, x) => a + x.diff, 0) / diffs.length;
+    const pcts = diffs.filter(x => x.pct != null).map(x => x.pct);
+    return {
+      count: diffs.length,
+      avgDiff,
+      avgPct: pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null,
+      maxAbs: Math.max(...diffs.map(x => Math.abs(x.diff))),
+    };
+  })();
 
   // FX pair admin actions (FX-manager only)
   const scrapeLive = async () => {
@@ -196,34 +225,46 @@ export default function IndexPopupModal({
               </a>
             )}
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none', border: 'none', color: 'var(--muted)',
-              cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4,
-            }}
-          >
-            &times;
-          </button>
+          <div className="ca-noprint" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={exportHist} disabled={!histRows.length}>Export CSV</button>
+            <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={printPopup}>Print</button>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none', border: 'none', color: 'var(--muted)',
+                cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 4,
+              }}
+            >
+              &times;
+            </button>
+          </div>
         </div>
+
+        {/* Print: show only this modal, drop the dark backdrop and interactive chrome. */}
+        <style>{`@media print {
+          body * { visibility: hidden !important; }
+          .ca-modal-backdrop, .ca-modal-backdrop * { visibility: visible !important; }
+          .ca-modal-backdrop { position: absolute !important; inset: 0 !important; background: #fff !important; display: block !important; padding: 0 !important; }
+          .ca-modal { max-width: 100% !important; width: 100% !important; box-shadow: none !important; max-height: none !important; overflow: visible !important; }
+          .ca-noprint { display: none !important; }
+        }`}</style>
 
         <div className="ca-modal-body">
         {/* Trend Chart */}
         <div className="ca-card" style={{ marginBottom: 16, padding: '12px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8, padding: '0 4px' }}>
             <div className="ca-card-title" style={{ margin: 0 }}>Price Trend</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {hasOverride && ['default', 'custom'].map(m => (
-                <button key={m}
-                  className={`ca-btn ca-btn-sm ${graphMode === m ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
-                  onClick={() => setGraphMode(m)}>
-                  {m === 'default' ? 'Default data' : 'Custom data'}
-                </button>
-              ))}
-              {isFx && daily.length > 0 && (
-                <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={exportDaily}>Export CSV</button>
-              )}
-            </div>
+            {hasOverride && (
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[['default', 'Default'], ['custom', 'Custom'], ['compare', 'Compare']].map(([m, label]) => (
+                  <button key={m}
+                    className={`ca-btn ca-btn-sm ${chartMode === m ? 'ca-btn-primary' : 'ca-btn-ghost'}`}
+                    onClick={() => setChartMode(m)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Three prices: live / quarterly / overridden */}
@@ -243,8 +284,9 @@ export default function IndexPopupModal({
           </div>
 
           <SeriesChart
-            key={graphMode}
+            key={chartMode}
             points={points}
+            comparePoints={comparePoints}
             rangeOptions={rangeOptions}
             valueDecimals={isFx ? 4 : undefined}
             unit={commodity?.unit}
@@ -276,6 +318,24 @@ export default function IndexPopupModal({
                   <div className="ca-metric-lbl">{s.lbl}</div>
                 </div>
               ))}
+            </div>
+          )}
+          {compareStats && (
+            <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+              <div className="ca-card-title" style={{ marginBottom: 8, fontSize: 11 }}>Default vs Custom (selected span)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 10 }}>
+                {[
+                  { lbl: 'Periods changed', val: String(compareStats.count), color: 'var(--accent4)' },
+                  { lbl: 'Avg Δ', val: `${compareStats.avgDiff >= 0 ? '+' : ''}${fmtStat(compareStats.avgDiff)}`, color: compareStats.avgDiff >= 0 ? 'var(--accent2)' : 'var(--danger)' },
+                  { lbl: 'Avg Δ%', val: compareStats.avgPct == null ? '—' : `${compareStats.avgPct >= 0 ? '+' : ''}${compareStats.avgPct.toFixed(1)}%`, color: compareStats.avgPct == null ? 'var(--text)' : compareStats.avgPct >= 0 ? 'var(--accent2)' : 'var(--danger)' },
+                  { lbl: 'Max |Δ|', val: fmtStat(compareStats.maxAbs), color: 'var(--text)' },
+                ].map(s => (
+                  <div key={s.lbl} className="ca-metric" style={{ padding: '8px 10px' }}>
+                    <div className="ca-metric-val" style={{ fontSize: 16, color: s.color, fontFamily: "'JetBrains Mono', monospace" }}>{s.val}</div>
+                    <div className="ca-metric-lbl">{s.lbl}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

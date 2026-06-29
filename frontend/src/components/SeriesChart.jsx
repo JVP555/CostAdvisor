@@ -19,7 +19,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
  *   onWindowChange: (slice) => void — called with the effective slice (the
  *                   selection if two points are picked, else the full window)
  */
-export default function SeriesChart({ points, rangeOptions, valueDecimals, unit, onWindowChange }) {
+export default function SeriesChart({ points, comparePoints, rangeOptions, valueDecimals, unit, onWindowChange }) {
   const opts = rangeOptions && rangeOptions.length ? rangeOptions : [['All', Infinity]];
   const [rangeIdx, setRangeIdx] = useState(opts.length - 1); // default 'All'
   const [hover, setHover] = useState(null);
@@ -61,10 +61,19 @@ export default function SeriesChart({ points, rangeOptions, valueDecimals, unit,
   const plotW = W - PAD.l - PAD.r;
   const plotH = H - PAD.t - PAD.b;
 
+  // Optional second series (Compare mode) — aligned to the primary by label.
+  const compareByLabel = useMemo(() => {
+    const m = {};
+    (comparePoints || []).forEach(p => { if (p && p.value != null) m[p.label] = Number(p.value); });
+    return m;
+  }, [comparePoints]);
+  const hasCompare = (comparePoints || []).length > 0;
+
   const N = windowed.length;
   const vals = windowed.map(d => Number(d.value));
-  const minRaw = N ? Math.min(...vals) : 0;
-  const maxRaw = N ? Math.max(...vals) : 1;
+  const cmpVals = hasCompare ? windowed.map(d => compareByLabel[d.label]).filter(v => v != null) : [];
+  const minRaw = N ? Math.min(...vals, ...cmpVals) : 0;
+  const maxRaw = N ? Math.max(...vals, ...cmpVals) : 1;
   const padV = (maxRaw - minRaw || maxRaw || 1) * 0.06;
   const minV = minRaw - padV, maxV = maxRaw + padV;
   const dec = valueDecimals != null ? valueDecimals : (maxRaw < 2 ? 4 : maxRaw < 100 ? 2 : 0);
@@ -118,6 +127,18 @@ export default function SeriesChart({ points, rangeOptions, valueDecimals, unit,
 
   const linePath = windowed.map((d, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(Number(d.value)).toFixed(1)}`).join(' ');
   const fillPath = `${linePath} L${xScale(N - 1).toFixed(1)},${(H - PAD.b).toFixed(1)} L${xScale(0).toFixed(1)},${(H - PAD.b).toFixed(1)} Z`;
+  // Compare line (Custom series), drawn over the primary (Default) when present.
+  const cmpStroke = 'var(--accent4)';
+  let comparePath = '';
+  if (hasCompare) {
+    let started = false;
+    windowed.forEach((d, i) => {
+      const v = compareByLabel[d.label];
+      if (v == null) { started = false; return; }
+      comparePath += `${started ? 'L' : 'M'}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)} `;
+      started = true;
+    });
+  }
   const labelStep = Math.max(1, Math.ceil(N / 6));
 
   const idxFromEvent = e => {
@@ -173,6 +194,9 @@ export default function SeriesChart({ points, rangeOptions, valueDecimals, unit,
 
           <path d={fillPath} fill={stroke} opacity={0.08} />
           <path d={linePath} fill="none" stroke={stroke} strokeWidth={1.6} />
+          {hasCompare && comparePath && (
+            <path d={comparePath} fill="none" stroke={cmpStroke} strokeWidth={1.6} strokeDasharray="5 3" />
+          )}
 
           {/* selection endpoint markers */}
           {selLo != null && [selLo, selHi].map((si, k) => (
@@ -214,6 +238,12 @@ export default function SeriesChart({ points, rangeOptions, valueDecimals, unit,
         )}
       </div>
 
+      {hasCompare && (
+        <div style={{ display: 'flex', gap: 14, fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+          <span><span style={{ display: 'inline-block', width: 14, height: 0, borderTop: `2px solid ${stroke}`, verticalAlign: 'middle', marginRight: 4 }} />Default</span>
+          <span><span style={{ display: 'inline-block', width: 14, height: 0, borderTop: `2px dashed ${cmpStroke}`, verticalAlign: 'middle', marginRight: 4 }} />Custom</span>
+        </div>
+      )}
       <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
         {selLo != null
           ? <>Selected {windowed[selLo].date || windowed[selLo].label} → {windowed[selHi].date || windowed[selHi].label} · <button className="ca-btn ca-btn-sm ca-btn-ghost" style={{ padding: '0 6px' }} onClick={() => { setSelA(null); setSelB(null); }}>clear</button></>
