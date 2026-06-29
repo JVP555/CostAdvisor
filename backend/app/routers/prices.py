@@ -1,27 +1,18 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
 from app.models.cost_model import CostModel
 from app.models.price_data import ActualPrice
-from app.models.team import TeamMembership
 from app.routers.auth import get_current_user
 from app.schemas.price_data import ActualPriceOut, ActualPriceCreate
 from app.services.file_parser import parse_price_upload
 from app.services.audit import log_event
+from app.services.permissions import require_permission
 
 router = APIRouter()
-
-
-def require_model_access(db: Session, user: User, cm: CostModel):
-    membership = db.query(TeamMembership).filter(
-        TeamMembership.user_id == user.id,
-        TeamMembership.team_id == cm.team_id,
-    ).first()
-    if not membership:
-        raise HTTPException(status_code=403, detail="Not a member of this team")
 
 
 @router.get("/{cost_model_id}", response_model=list[ActualPriceOut])
@@ -33,7 +24,7 @@ def get_actual_prices(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "prices.view")
     prices = (
         db.query(ActualPrice)
         .filter(ActualPrice.cost_model_id == cost_model_id)
@@ -47,17 +38,28 @@ def get_actual_prices(
 async def upload_prices(
     cost_model_id: uuid.UUID,
     file: UploadFile = File(...),
+    dry_run: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "prices.import")
 
     content = await file.read()
     filename = file.filename or "upload"
-    rows = parse_price_upload(content, filename)
+
+    try:
+        result = parse_price_upload(content, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    rows = result["rows"]
+    parse_errors = result["errors"]
+
+    if dry_run:
+        return {"rows_processed": len(rows), "errors": parse_errors, "dry_run": True, "filename": filename}
 
     count = 0
     for row in rows:
@@ -96,7 +98,12 @@ async def upload_prices(
     log_event(db, cm.team_id, current_user.id, "create", "price_data", str(cost_model_id),
               new_value={"rows_processed": count, "filename": filename})
     db.commit()
-    return {"status": "uploaded", "rows_processed": count, "filename": filename}
+    return {
+        "status": "uploaded",
+        "rows_processed": count,
+        "filename": filename,
+        "errors": parse_errors,
+    }
 
 
 @router.put("/{cost_model_id}/{year}/{quarter}", response_model=ActualPriceOut)
@@ -111,7 +118,7 @@ def update_price(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "prices.edit")
 
     existing = db.query(ActualPrice).filter(
         ActualPrice.cost_model_id == cost_model_id,
@@ -146,9 +153,10 @@ def update_price(
     log_event(db, cm.team_id, current_user.id, "update", "price_data", str(cost_model_id),
               previous_value={"year": year, "quarter": quarter, "price": previous} if previous is not None else None,
               new_value={"year": year, "quarter": quarter, "price": float(data.price)})
+    db.flush()
+    result = ActualPriceOut.model_validate(existing)
     db.commit()
-    db.refresh(existing)
-    return ActualPriceOut.model_validate(existing)
+    return result
 
 
 @router.delete("/{cost_model_id}/{year}/{quarter}")
@@ -162,7 +170,7 @@ def delete_price(
     cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "prices.delete")
 
     price = db.query(ActualPrice).filter(
         ActualPrice.cost_model_id == cost_model_id,

@@ -8,8 +8,15 @@ from app.models.index_data import CommodityIndex, IndexValue, IndexOverride, Tea
 from app.models.price_data import ActualPrice
 from app.models.actual_volume import ActualVolume
 from app.models.fx_rate import FxRate
+from app.models.custom_fx_rate import CustomFxRate
+from app.models.fx_daily_rate import FxDailyRate
 from app.models.scenario import CostScenario
 from app.models.audit_log import AuditLog
+from app.models.invite import TeamInvite
+from app.models.access_request import PlatformAccessRequest
+from app.models.rbac import Permission, Role, RolePermission, Plan, PlanPermission, TeamMemberRole, UserPlatformRole
+from app.models.formula_template import FormulaTemplate
+from app.models.demo import DemoHost, DemoBlockedSlot, DemoRequest
 
 __all__ = [
     "User",
@@ -28,6 +35,21 @@ __all__ = [
     "ActualPrice",
     "ActualVolume",
     "FxRate",
+    "CustomFxRate",
+    "FxDailyRate",
     "CostScenario",
     "AuditLog",
+    "TeamInvite",
+    "PlatformAccessRequest",
+    "Permission",
+    "Role",
+    "RolePermission",
+    "Plan",
+    "PlanPermission",
+    "TeamMemberRole",
+    "UserPlatformRole",
+    "FormulaTemplate",
+    "DemoHost",
+    "DemoBlockedSlot",
+    "DemoRequest",
 ]

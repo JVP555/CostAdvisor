@@ -8,24 +8,15 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.supplier import Supplier
-from app.models.team import TeamMembership
 from app.models.cost_model import CostModel
 from app.models.price_data import ActualPrice
 from app.models.actual_volume import ActualVolume
 from app.routers.auth import get_current_user
 from app.schemas.supplier import SupplierCreate, SupplierOut
 from app.services.audit import log_event
+from app.services.permissions import require_permission
 
 router = APIRouter()
-
-
-def require_team_access(db: Session, user: User, team_id: uuid.UUID):
-    membership = db.query(TeamMembership).filter(
-        TeamMembership.user_id == user.id,
-        TeamMembership.team_id == team_id,
-    ).first()
-    if not membership:
-        raise HTTPException(status_code=403, detail="Not a member of this team")
 
 
 @router.get("/", response_model=list[SupplierOut])
@@ -34,7 +25,7 @@ def list_suppliers(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_team_access(db, current_user, team_id)
+    require_permission(db, current_user, team_id, "suppliers.view")
     return db.query(Supplier).filter(Supplier.team_id == team_id).order_by(Supplier.name).all()
 
 
@@ -45,17 +36,18 @@ def create_supplier(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    require_team_access(db, current_user, team_id)
+    require_permission(db, current_user, team_id, "suppliers.edit")
     supplier = Supplier(
         team_id=team_id,
         name=data.name,
         country=data.country,
     )
     db.add(supplier)
+    db.flush()  # apply Python-side defaults so supplier.id is populated before log_event
     log_event(db, team_id, current_user.id, "create", "supplier", str(supplier.id),
               new_value={"name": data.name, "country": data.country})
+    db.expunge(supplier)
     db.commit()
-    db.refresh(supplier)
     return supplier
 
 
@@ -69,14 +61,15 @@ def update_supplier(
     supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
-    require_team_access(db, current_user, supplier.team_id)
+    require_permission(db, current_user, supplier.team_id, "suppliers.edit")
     prev = {"name": supplier.name, "country": supplier.country}
     supplier.name = data.name
     supplier.country = data.country
     log_event(db, supplier.team_id, current_user.id, "update", "supplier", str(supplier.id),
               previous_value=prev, new_value={"name": data.name, "country": data.country})
+    db.flush()
+    db.expunge(supplier)
     db.commit()
-    db.refresh(supplier)
     return supplier
 
 
@@ -89,7 +82,7 @@ def get_purchase_history(
     supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
-    require_team_access(db, current_user, supplier.team_id)
+    require_permission(db, current_user, supplier.team_id, "suppliers.view")
 
     models = (
         db.query(CostModel)
@@ -184,7 +177,7 @@ def export_supplier_excel(
     supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
-    require_team_access(db, current_user, supplier.team_id)
+    require_permission(db, current_user, supplier.team_id, "suppliers.export")
 
     models = db.query(CostModel).filter(CostModel.supplier_id == supplier_id).all()
     model_ids = [m.id for m in models]
@@ -427,7 +420,7 @@ def delete_supplier(
     supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
-    require_team_access(db, current_user, supplier.team_id)
+    require_permission(db, current_user, supplier.team_id, "suppliers.delete")
     log_event(db, supplier.team_id, current_user.id, "delete", "supplier", str(supplier.id),
               previous_value={"name": supplier.name, "country": supplier.country})
     db.delete(supplier)

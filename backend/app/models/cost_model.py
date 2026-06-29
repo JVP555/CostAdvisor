@@ -91,6 +91,9 @@ class FormulaVersion(Base):
     base_price: Mapped[float] = mapped_column(Numeric(12, 4), nullable=False)
     base_year: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     base_quarter: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    formula_type: Mapped[str] = mapped_column(String(10), default="simple", server_default="simple")
+    expression: Mapped[str | None] = mapped_column(Text, nullable=True)
+    variables: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     margin_type: Mapped[str] = mapped_column(String(10), default="pct")  # 'pct', 'fixed', 'unknown'
     margin_value: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
     incoterm: Mapped[str | None] = mapped_column(String(8), nullable=True)

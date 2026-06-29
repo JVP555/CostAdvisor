@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
 
+    # Google Calendar — Fernet key for encrypting per-host refresh tokens.
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    google_calendar_encryption_key: str = ""
+
     # JWT
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"
@@ -42,6 +46,14 @@ class Settings(BaseSettings):
     ecb_api_base: str = "https://data-api.ecb.europa.eu/service"
     eurostat_api_base: str = "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1"
     worldbank_api_base: str = "https://api.worldbank.org/v2"
+
+    # Email (SMTP — stdlib smtplib, no third-party SDK)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_tls: bool = True   # STARTTLS on 587; set False + port 465 for implicit SSL
+    email_from: str = "noreply@costadvisor.org"
 
     # Ollama (local LLM)
     ollama_url: str = "http://localhost:11434"

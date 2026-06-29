@@ -85,6 +85,60 @@ def scrape_team_sources():
         db.close()
 
 
+@celery_app.task(name="app.tasks.scrape_indexes.scrape_fx_live")
+def scrape_fx_live():
+    """Fetch today's live rate for all enabled FX pairs, store in fx_pairs.live_rate,
+    and append today's row to the fx_daily_rate history series."""
+    from datetime import date
+    from app.models.fx_pair import FxPair
+    from app.models.fx_daily_rate import FxDailyRate
+    from app.services.scrapers.ecb import ECBLiveScraper
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    bypass_rls_var.set(True)
+    db = SessionLocal()
+    try:
+        pairs = db.query(FxPair).filter(
+            FxPair.scrape_enabled == True,  # noqa: E712
+            FxPair.scrape_url != None,  # noqa: E711
+        ).all()
+
+        today = date.today()
+        results = {}
+        for pair in pairs:
+            try:
+                if pair.source_type == "ecb":
+                    live = asyncio.run(ECBLiveScraper(pair.name, pair.scrape_url).fetch_live())
+                elif pair.source_type in ("frankfurter", "google_finance"):
+                    from app.services.scrapers.frankfurter import FrankfurterScraper
+                    live = asyncio.run(FrankfurterScraper(pair.scrape_url).fetch_live())
+                else:
+                    live = None
+
+                if live is not None:
+                    pair.live_rate = live
+                    pair.live_scraped_at = datetime.now(timezone.utc)
+                    # Append to the daily history series (idempotent per day)
+                    stmt = pg_insert(FxDailyRate).values(
+                        from_currency=pair.from_currency, to_currency=pair.to_currency,
+                        date=today, rate=live,
+                    ).on_conflict_do_update(
+                        index_elements=["from_currency", "to_currency", "date"],
+                        set_={"rate": live},
+                    )
+                    db.execute(stmt)
+                    results[pair.name] = f"ok:{live}"
+                else:
+                    results[pair.name] = "no_data"
+            except Exception as exc:
+                results[pair.name] = f"error:{exc}"
+
+        db.commit()
+        return results
+    finally:
+        db.close()
+
+
 def _upsert_override(db, source: TeamIndexSource, value: float):
     """Write a scraped value into IndexOverride for the current quarter."""
     now = datetime.now(timezone.utc)

@@ -359,7 +359,29 @@ export default function Indexes() {
         {loading ? (
           <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
         ) : periods.length === 0 ? (
-          <div style={{ padding: 20, color: 'var(--muted)' }}>No index data available for the selected filters.</div>
+          <div style={{ padding: '32px 24px', textAlign: 'center' }}>
+            {productFilter !== 'all' || supplierFilter !== 'all' ? (
+              <>
+                <div style={{ color: 'var(--muted)', marginBottom: 12 }}>No index data matches the current filters.</div>
+                <button
+                  className="ca-btn ca-btn-ghost ca-btn-sm"
+                  onClick={() => { setProductFilter('all'); setSupplierFilter('all'); }}
+                >
+                  Clear filters
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ color: 'var(--muted)', marginBottom: 12 }}>No commodity indexes yet. Add one to start tracking index-linked costs.</div>
+                <button
+                  className="ca-btn ca-btn-primary ca-btn-sm"
+                  onClick={() => setShowAddModal(true)}
+                >
+                  + Add Index
+                </button>
+              </>
+            )}
+          </div>
         ) : (
           <div className="ca-scroll-x" ref={tableScrollRef}>
             <table className="ca-table">

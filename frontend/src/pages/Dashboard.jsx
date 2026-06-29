@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api';
+import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
 import exportCsv from '../utils/exportCsv';
+import { useConfirm, useAlert } from '../components/ConfirmDialog';
 
 export default function Dashboard() {
   const { activeTeamId } = useAuth();
@@ -24,13 +25,22 @@ export default function Dashboard() {
 
   useEffect(fetchPortfolio, [activeTeamId]);
 
+  const confirm = useConfirm();
+  const showAlert = useAlert();
+
   const handleDelete = async (id) => {
-    if (!confirm('Delete this cost model? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Delete this cost model?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/cost-models/${id}`);
       fetchPortfolio();
     } catch (err) {
-      alert('Error: ' + (err.response?.data?.detail || err.message));
+      showAlert({ title: 'Error', message: formatApiError(err) });
     }
   };
 

@@ -30,6 +30,8 @@ def resolve_index_values(
     Returns a flat list of values, with override values replacing scraped values where they exist.
     Enriched with scraped_value, override_id, override_by, override_at.
     """
+    # Alias to avoid shadowing by the override-query loop variable below
+    commodity_name_filter = commodity_name
     # Build set of commodity names that have built-in scrapers
     scraped_commodities = set(SCRAPER_REGISTRY.keys())
 
@@ -49,8 +51,8 @@ def resolve_index_values(
 
     if region:
         query = query.filter(IndexValue.region == region)
-    if commodity_name:
-        query = query.filter(CommodityIndex.name == commodity_name)
+    if commodity_name_filter:
+        query = query.filter(CommodityIndex.name == commodity_name_filter)
     if year:
         query = query.filter(IndexValue.year == year)
     if quarter:
@@ -76,10 +78,11 @@ def resolve_index_values(
 
     scraped = query.all()
 
-    # Build dict of overrides for this team, storing full objects + user display name
+    # Build dict of overrides for this team, storing full objects + user display name + commodity name
     override_query = (
-        db.query(IndexOverride, User.display_name)
+        db.query(IndexOverride, User.display_name, CommodityIndex.name.label("commodity_name"))
         .outerjoin(User, User.id == IndexOverride.uploaded_by)
+        .join(CommodityIndex, CommodityIndex.id == IndexOverride.commodity_id)
         .filter(IndexOverride.team_id == team_id)
     )
     if region:
@@ -90,14 +93,16 @@ def resolve_index_values(
         override_query = override_query.filter(IndexOverride.quarter == quarter)
 
     overrides = {}
-    for o, display_name in override_query.all():
+    for o, display_name, ovr_commodity_name in override_query.all():
         key = (o.commodity_id, o.region, o.year, o.quarter)
-        overrides[key] = (o, display_name)
+        overrides[key] = (o, display_name, ovr_commodity_name)
 
     # Merge: override wins
     results = []
+    seen_keys = set()
     for row in scraped:
         key = (row.commodity_id, row.region, row.year, row.quarter)
+        seen_keys.add(key)
         override_entry = overrides.get(key)
 
         # Determine global scraper info for this commodity
@@ -105,7 +110,7 @@ def resolve_index_values(
         gs_at = row.scraped_at.isoformat() if row.scraped_at else None
 
         if override_entry:
-            o, display_name = override_entry
+            o, display_name, _ = override_entry
             results.append(IndexValueOut(
                 commodity_id=row.commodity_id,
                 commodity_name=row.commodity_name,
@@ -134,6 +139,97 @@ def resolve_index_values(
                 global_scraper=gs,
                 global_scrape_at=gs_at,
             ))
+
+    # Include override-only rows — team-scraped data that has no matching global IndexValue.
+    # This happens when a commodity has no seed data and the nightly Celery scraper hasn't run yet.
+    for key, (o, display_name, ovr_commodity_name) in overrides.items():
+        if key in seen_keys:
+            continue  # already emitted above
+        if o.value is None:
+            continue  # intentional blank — nothing to show
+        commodity_id, ovr_region, ovr_year, ovr_quarter = key
+        # Apply the same filters that were applied to the global query
+        if region and ovr_region != region:
+            continue
+        if commodity_name_filter and ovr_commodity_name != commodity_name_filter:
+            continue
+        if commodity_ids is not None and commodity_id not in commodity_ids:
+            continue
+        if from_year is not None and from_quarter is not None:
+            if not (ovr_year > from_year or (ovr_year == from_year and ovr_quarter >= from_quarter)):
+                continue
+        if to_year is not None and to_quarter is not None:
+            if not (ovr_year < to_year or (ovr_year == to_year and ovr_quarter <= to_quarter)):
+                continue
+        gs = SCRAPER_SOURCE_LABELS.get(ovr_commodity_name) if ovr_commodity_name in scraped_commodities else None
+        results.append(IndexValueOut(
+            commodity_id=commodity_id,
+            commodity_name=ovr_commodity_name,
+            region=ovr_region,
+            year=ovr_year,
+            quarter=ovr_quarter,
+            value=float(o.value),
+            source="team_override",
+            scraped_value=None,
+            override_id=o.id,
+            override_by=display_name,
+            override_at=o.uploaded_at.isoformat() if o.uploaded_at else None,
+            global_scraper=gs,
+            global_scrape_at=None,
+        ))
+
+    # Generate placeholder rows for team sources that have no data yet.
+    # Fixed sources always show their constant value. Manual/upload sources show
+    # empty clickable cells so the user can enter values without a chicken-and-egg
+    # problem (you can't click a cell that doesn't exist).
+    covered_pairs = {(r.commodity_id, r.region) for r in results}
+
+    from datetime import datetime as _dt
+    _now = _dt.now()
+    _fy = from_year if from_year is not None else _now.year - 1
+    _fq = from_quarter if from_quarter is not None else 1
+    _ty = to_year if to_year is not None else _now.year + 1
+    _tq = to_quarter if to_quarter is not None else 4
+    # Clamp to single-period when a specific year/quarter was requested
+    if year is not None:
+        _fy, _ty = year, year
+        _fq = quarter if quarter is not None else 1
+        _tq = quarter if quarter is not None else 4
+
+    src_q = (
+        db.query(TeamIndexSource, CommodityIndex.name.label("src_cname"))
+        .join(CommodityIndex, CommodityIndex.id == TeamIndexSource.commodity_id)
+        .filter(TeamIndexSource.team_id == team_id)
+    )
+    if region:
+        src_q = src_q.filter(TeamIndexSource.region == region)
+    if commodity_name_filter:
+        src_q = src_q.filter(CommodityIndex.name == commodity_name_filter)
+    if commodity_ids is not None and commodity_ids:
+        src_q = src_q.filter(TeamIndexSource.commodity_id.in_(commodity_ids))
+
+    for src, src_cname in src_q.all():
+        pair = (src.commodity_id, src.region)
+        if pair in covered_pairs:
+            continue
+        covered_pairs.add(pair)
+        is_fixed = src.source_type == "fixed" and src.fixed_value is not None
+        y, q = _fy, _fq
+        while (y < _ty) or (y == _ty and q <= _tq):
+            results.append(IndexValueOut(
+                commodity_id=src.commodity_id,
+                commodity_name=src_cname,
+                region=src.region,
+                year=y,
+                quarter=q,
+                value=float(src.fixed_value) if is_fixed else None,
+                source="fixed" if is_fixed else "team_override",
+                scraped_value=None,
+            ))
+            q += 1
+            if q > 4:
+                q = 1
+                y += 1
 
     return results
 

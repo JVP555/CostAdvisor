@@ -24,6 +24,12 @@ export default function Pricing() {
   const [editPrice, setEditPrice] = useState('');
   const [editVolume, setEditVolume] = useState('');
 
+  // Upload feedback
+  const [uploadError, setUploadError] = useState(null);
+  const [uploadErrors, setUploadErrors] = useState([]); // per-row errors
+  const [uploadPreview, setUploadPreview] = useState(null); // { filename, rows_processed, errors }
+  const [pendingUploadFile, setPendingUploadFile] = useState(null);
+
   // Price change analyzer
   const [fromYear, setFromYear] = useState(2024);
   const [fromQuarter, setFromQuarter] = useState(1);
@@ -114,15 +120,47 @@ export default function Pricing() {
       .finally(() => setLoadingAnalysis(false));
   };
 
-  // Upload handler
+  // Upload handler — dry_run preview first
   const handleUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    setUploadError(null);
+    setUploadErrors([]);
+    setUploadPreview(null);
     const formData = new FormData();
     formData.append('file', file);
-    api.post(`/api/prices/${costModelId}/upload`, formData)
-      .then(() => fetchData());
+    api.post(`/api/prices/${costModelId}/upload?dry_run=true`, formData)
+      .then(({ data }) => {
+        setPendingUploadFile(file);
+        setUploadPreview({ filename: data.filename || file.name, rows_processed: data.rows_processed, errors: data.errors || [] });
+      })
+      .catch(err => {
+        const detail = err.response?.data?.detail;
+        setUploadError(typeof detail === 'string' ? detail : 'Upload failed. Check the file format and try again.');
+      });
     e.target.value = '';
+  };
+
+  const handleConfirmUpload = () => {
+    if (!pendingUploadFile) return;
+    const formData = new FormData();
+    formData.append('file', pendingUploadFile);
+    api.post(`/api/prices/${costModelId}/upload`, formData)
+      .then(({ data }) => {
+        fetchData();
+        if (data.errors?.length) setUploadErrors(data.errors);
+        setUploadPreview(null);
+        setPendingUploadFile(null);
+      })
+      .catch(err => {
+        const detail = err.response?.data?.detail;
+        setUploadError(typeof detail === 'string' ? detail : 'Import failed.');
+      });
+  };
+
+  const handleCancelUpload = () => {
+    setUploadPreview(null);
+    setPendingUploadFile(null);
   };
 
   const sym = model?.currency === 'EUR' ? '\u20AC' : '$';
@@ -148,6 +186,13 @@ export default function Pricing() {
 
   return (
     <div className="ca-page ca-fade-in">
+      <nav style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10, display: 'flex', gap: 6, alignItems: 'center' }}>
+        <button className="ca-btn-link" style={{ fontSize: 11 }} onClick={() => navigate('/dashboard')}>Dashboard</button>
+        <span>›</span>
+        <button className="ca-btn-link" style={{ fontSize: 11 }} onClick={() => navigate(`/cost-models/${costModelId}`)}>{model?.product_name ?? '…'}</button>
+        <span>›</span>
+        <span>Pricing</span>
+      </nav>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <div className="ca-h1">Pricing</div>
@@ -170,11 +215,72 @@ export default function Pricing() {
           <div className="ca-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div className="ca-card-title" style={{ margin: 0 }}>Pricing & Volume History</div>
-              <label className="ca-btn ca-btn-ghost ca-btn-sm" style={{ cursor: 'pointer' }}>
-                Upload CSV/Excel
-                <input type="file" accept=".csv,.xlsx" onChange={handleUpload} style={{ display: 'none' }} />
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <a
+                  href={`/api/volumes/${costModelId}/template`}
+                  download="volumes_template.csv"
+                  className="ca-btn ca-btn-ghost ca-btn-sm"
+                  style={{ fontSize: 11 }}
+                >
+                  Volume template
+                </a>
+                <a
+                  href="data:text/csv;charset=utf-8,period%2Cprice%2Cincoterm%0AQ1-2023%2C1050%2CCIF"
+                  download="prices_template.csv"
+                  className="ca-btn ca-btn-ghost ca-btn-sm"
+                  style={{ fontSize: 11 }}
+                >
+                  Price template
+                </a>
+                <label className="ca-btn ca-btn-ghost ca-btn-sm" style={{ cursor: 'pointer' }}>
+                  Upload Prices
+                  <input type="file" accept=".csv,.xlsx" onChange={handleUpload} style={{ display: 'none' }} />
+                </label>
+              </div>
             </div>
+            {uploadPreview && (
+              <div style={{ marginBottom: 10, padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-raised, var(--surface))', fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                      {uploadPreview.filename} &middot; {uploadPreview.rows_processed} row{uploadPreview.rows_processed !== 1 ? 's' : ''} ready
+                    </div>
+                    {uploadPreview.errors.length > 0 && (
+                      <div style={{ color: 'var(--warning, #92400e)' }}>
+                        <span style={{ fontWeight: 600 }}>{uploadPreview.errors.length} row{uploadPreview.errors.length !== 1 ? 's' : ''} will be skipped:</span>
+                        <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                          {uploadPreview.errors.slice(0, 5).map((e, i) => <li key={i}>Row {e.row}: {e.message}</li>)}
+                          {uploadPreview.errors.length > 5 && <li>…and {uploadPreview.errors.length - 5} more</li>}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={handleCancelUpload}>Cancel</button>
+                    <button
+                      className="ca-btn ca-btn-primary ca-btn-sm"
+                      onClick={handleConfirmUpload}
+                      disabled={uploadPreview.rows_processed === 0}
+                    >
+                      Import {uploadPreview.rows_processed} row{uploadPreview.rows_processed !== 1 ? 's' : ''}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {uploadError && (
+              <div style={{ fontSize: 12, color: 'var(--accent2)', background: 'var(--danger-bg, #fff1f0)', border: '1px solid var(--accent2)', borderRadius: 6, padding: '8px 12px', marginBottom: 10 }}>
+                {uploadError}
+              </div>
+            )}
+            {uploadErrors.length > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--warning, #92400e)', background: 'var(--warning-bg, #fffbea)', border: '1px solid var(--warning, #d97706)', borderRadius: 6, padding: '8px 12px', marginBottom: 10 }}>
+                <strong>{uploadErrors.length} row{uploadErrors.length > 1 ? 's' : ''} skipped:</strong>
+                <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                  {uploadErrors.map((e, i) => <li key={i}>Row {e.row}: {e.message}</li>)}
+                </ul>
+              </div>
+            )}
 
             {loadingPrices ? (
               <div style={{ color: 'var(--muted)', fontSize: 12 }}>Loading...</div>

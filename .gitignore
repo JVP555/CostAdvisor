@@ -45,3 +45,13 @@ Thumbs.db
 *.sqlite3
 
 /docs/
+
+# Local planning docs — never commit
+jvpdocs/
+
+# Impeccable design tool — local only
+PRODUCT.md
+DESIGN.md
+.impeccable/.claude/
+.claude/
+.impeccable/

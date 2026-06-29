@@ -56,6 +56,12 @@ class ComponentInfo(BaseModel):
     commodity_name: str | None
 
 
+class DataGap(BaseModel):
+    component_label: str
+    period: str  # e.g. 'Q1-23'
+    reason: str  # e.g. 'no index value found'
+
+
 class EvolutionResult(BaseModel):
     product_name: str
     supplier_name: str | None
@@ -72,6 +78,7 @@ class EvolutionResult(BaseModel):
     available_from_quarter: int | None = None
     available_to_year: int | None = None
     available_to_quarter: int | None = None
+    data_gaps: list[DataGap] = []
 
 
 class SqueezeRequest(BaseModel):
@@ -146,10 +153,12 @@ class BriefResult(BaseModel):
     gap: float | None
     gap_pct: float | None
     total_impact: float | None
+    volumes_missing: bool = False
     period_label: str
     evolution: list[EvolutionPeriod]
     narrative: str
     drivers: list[BriefDriver]
+    data_gaps: list[DataGap] = []
 
 
 # ── Price Change Analysis ─────────────────────────────────────

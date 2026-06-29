@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.cost_model import CostModel
-from app.models.team import TeamMembership
 from app.rate_limit import limiter
 from app.routers.auth import get_current_user
 from app.schemas.costing import (
@@ -20,17 +19,10 @@ from app.services.costing_engine import (
     calculate_squeeze, calculate_brief,
     calculate_price_change,
 )
+from app.services.permissions import require_permission
+from app.services.audit import log_event
 
 router = APIRouter()
-
-
-def require_model_access(db: Session, user: User, cm: CostModel):
-    membership = db.query(TeamMembership).filter(
-        TeamMembership.user_id == user.id,
-        TeamMembership.team_id == cm.team_id,
-    ).first()
-    if not membership:
-        raise HTTPException(status_code=403, detail="Not a member of this team")
 
 
 @router.post("/should-cost", response_model=ShouldCostResult)
@@ -42,7 +34,13 @@ def should_cost(
     cm = db.query(CostModel).filter(CostModel.id == data.cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "costing.view")
+
+    if not cm.current_formula:
+        raise HTTPException(
+            status_code=422,
+            detail="No formula defined for this cost model. Add components in the Cost Model Builder first.",
+        )
 
     return calculate_should_cost(
         db=db,
@@ -62,7 +60,7 @@ def evolution(
     cm = db.query(CostModel).filter(CostModel.id == data.cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "evolution.view")
 
     return calculate_evolution(db=db, cost_model=cm, request=data)
 
@@ -76,7 +74,7 @@ def squeeze(
     cm = db.query(CostModel).filter(CostModel.id == data.cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "squeeze.view")
 
     return calculate_squeeze(db=db, cost_model=cm, request=data)
 
@@ -92,7 +90,7 @@ async def brief(
     cm = db.query(CostModel).filter(CostModel.id == data.cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "briefs.view")
 
     result = calculate_brief(db=db, cost_model=cm, request=data)
 
@@ -110,6 +108,13 @@ async def brief(
         period_label=result.period_label,
         num_periods=len(result.evolution),
     )
+
+    # Audit: assembling a negotiation brief surfaces sensitive cost intelligence
+    # (the exportable deliverable) — a security-relevant event per SOC 2 rules.
+    log_event(db, cm.team_id, current_user.id, "brief_generated", "cost_model", str(cm.id),
+              new_value={"gap": result.gap, "gap_pct": result.gap_pct})
+    db.commit()
+
     return result
 
 
@@ -122,6 +127,6 @@ def price_change(
     cm = db.query(CostModel).filter(CostModel.id == data.cost_model_id).first()
     if not cm:
         raise HTTPException(status_code=404, detail="Cost model not found")
-    require_model_access(db, current_user, cm)
+    require_permission(db, current_user, cm.team_id, "costing.view")
 
     return calculate_price_change(db=db, cost_model=cm, request=data)

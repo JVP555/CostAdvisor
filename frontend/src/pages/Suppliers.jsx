@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../AuthContext';
+import { useConfirm } from '../components/ConfirmDialog';
 
 export default function Suppliers() {
   const { activeTeamId } = useAuth();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [suppliers, setSuppliers] = useState([]);
   const [portfolio, setPortfolio] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,11 +43,10 @@ export default function Suppliers() {
       .finally(() => setSaving(false));
   };
 
-  const handleDelete = (id) => {
-    if (!confirm('Delete this supplier?')) return;
-    api.delete(`/api/suppliers/${id}`)
-      .then(fetchData)
-      .catch(console.error);
+  const handleDelete = async (id) => {
+    const ok = await confirm({ title: 'Delete this supplier?', confirmLabel: 'Delete', danger: true });
+    if (!ok) return;
+    api.delete(`/api/suppliers/${id}`).then(fetchData).catch(console.error);
   };
 
   const handleExportExcel = (id, name) => {
@@ -97,7 +98,10 @@ export default function Suppliers() {
         <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
       ) : suppliers.length === 0 ? (
         <div className="ca-card" style={{ textAlign: 'center', padding: 48 }}>
-          <div style={{ color: 'var(--text-secondary)' }}>No suppliers yet.</div>
+          <div style={{ color: 'var(--text-secondary)', marginBottom: 14 }}>
+            No suppliers yet — add the companies you buy from to track their price against your should-cost.
+          </div>
+          <button className="ca-btn ca-btn-primary" onClick={() => setShowForm(true)}>+ Add your first supplier</button>
         </div>
       ) : (
         <div className="ca-card">
