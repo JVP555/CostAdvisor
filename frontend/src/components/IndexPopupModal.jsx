@@ -116,14 +116,11 @@ export default function IndexPopupModal({
   });
 
   const defaultPoints = isFx ? dailyPoints : qDefault;
-  // Custom = full default line with overrides applied; Compare overlays both.
-  let points = defaultPoints;
-  let comparePoints = null;
-  if (chartMode === 'custom' && hasOverride) points = isFx ? customDaily : qCustom;
-  else if (chartMode === 'compare' && hasOverride) {
-    points = defaultPoints;
-    comparePoints = isFx ? customDaily : qCustom;
-  }
+  // Custom = the default line itself, with overridden points flagged by a marker
+  // (line shape stays readable; the custom values show in Compare + the table).
+  // Compare = default line + the custom-values line overlaid.
+  const points = defaultPoints;
+  const comparePoints = (chartMode === 'compare' && hasOverride) ? (isFx ? customDaily : qCustom) : null;
 
   const rangeOptions = isFx
     ? [['1M', 30], ['3M', 90], ['6M', 180], ['1Y', 365], ['5Y', 1825], ['All', Infinity]]
