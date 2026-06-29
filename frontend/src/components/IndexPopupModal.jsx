@@ -93,19 +93,23 @@ export default function IndexPopupModal({
 
   const cellAt = (p) => cellData?.find(c => c?.year === p.year && c?.quarter === p.quarter);
 
-  // Two series: Default = platform/scraped data; Custom = team overrides applied.
-  // FX uses its daily series for the default high-res view (custom-graph is Phase 2).
-  const defaultPoints = isFx
-    ? [...daily].reverse().map(d => ({ label: d.date, value: Number(d.rate), date: d.date }))
-    : periods.map((p) => { const c = cellAt(p); return { label: p.label, value: c?.scraped_value ?? c?.value ?? null }; });
-  const customPoints = isFx
-    ? defaultPoints
-    : periods.map((p) => { const c = cellAt(p); return { label: p.label, value: c?.value ?? null }; });
-  const hasOverride = !isFx && periods.some(p => cellAt(p)?.source === 'team_override');
+  // Quarterly series from the row cells (works for FX and non-FX — both carry
+  // scraped_value + override-applied value + source). Overrides live here.
+  const qDefault = periods.map((p) => { const c = cellAt(p); return { label: p.label, value: c?.scraped_value ?? c?.value ?? null }; });
+  const qCustom = periods.map((p) => { const c = cellAt(p); return { label: p.label, value: c?.value ?? null }; });
+  const hasOverride = periods.some(p => cellAt(p)?.source === 'team_override');
+  // Default chart view: FX shows its high-res daily series; non-FX shows quarterly.
+  const dailyPoints = [...daily].reverse().map(d => ({ label: d.date, value: Number(d.rate), date: d.date }));
+  const defaultPoints = isFx ? dailyPoints : qDefault;
 
-  const points = (chartMode === 'custom' && hasOverride) ? customPoints : defaultPoints;
-  const comparePoints = (chartMode === 'compare' && hasOverride) ? customPoints : null;
-  const rangeOptions = isFx
+  // Custom/Compare operate on the quarterly series (where overrides apply), for both types.
+  let points = defaultPoints;
+  let comparePoints = null;
+  if (chartMode === 'custom' && hasOverride) points = qCustom;
+  else if (chartMode === 'compare' && hasOverride) { points = qDefault; comparePoints = qCustom; }
+
+  const usingDaily = isFx && points === defaultPoints; // daily only in the FX default view
+  const rangeOptions = usingDaily
     ? [['1M', 30], ['3M', 90], ['6M', 180], ['1Y', 365], ['5Y', 1825], ['All', Infinity]]
     : [['1Y', 4], ['2Y', 8], ['3Y', 12], ['5Y', 20], ['All', Infinity]];
   const stats = computeStats(statsSlice && statsSlice.length ? statsSlice : points);
@@ -115,8 +119,8 @@ export default function IndexPopupModal({
   const lastP = periods[periods.length - 1];
   const lastCell = lastP ? cellAt(lastP) : null;
   const livePrice = isFx
-    ? (defaultPoints.length ? defaultPoints[defaultPoints.length - 1].value : null)
-    : (customPoints.map(p => p.value).filter(v => v != null).pop() ?? null);
+    ? (dailyPoints.length ? dailyPoints[dailyPoints.length - 1].value : null)
+    : (qCustom.map(p => p.value).filter(v => v != null).pop() ?? null);
   const quarterlyPrice = lastCell ? (lastCell.scraped_value ?? lastCell.value ?? null) : null;
   const overrideCell = [...periods].reverse().map(cellAt).find(c => c?.source === 'team_override') || null;
   const overriddenPrice = overrideCell ? overrideCell.value : null;
@@ -138,10 +142,10 @@ export default function IndexPopupModal({
 
   // Compare-mode diff stats: Default vs Custom over the selected window.
   const customByLabel = {};
-  customPoints.forEach(p => { if (p.value != null) customByLabel[p.label] = p.value; });
+  qCustom.forEach(p => { if (p.value != null) customByLabel[p.label] = p.value; });
   const compareStats = (() => {
     if (chartMode !== 'compare') return null;
-    const base = (statsSlice && statsSlice.length ? statsSlice : defaultPoints);
+    const base = (statsSlice && statsSlice.length ? statsSlice : qDefault);
     const diffs = [];
     base.forEach(p => {
       const c = customByLabel[p.label];
