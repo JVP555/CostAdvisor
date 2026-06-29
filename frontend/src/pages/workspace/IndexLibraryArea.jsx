@@ -37,9 +37,11 @@ export default function IndexLibraryArea() {
   const [popupRow, setPopupRow] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [collapsed, toggleCollapsed] = useOpenSet([]); // keys present = collapsed group
+  const [pairs, setPairs] = useState([]);          // all configured fx_pairs
   const [pairsLive, setPairsLive] = useState({}); // FX pair name -> live daily rate
   const [fxCustomAll, setFxCustomAll] = useState([]);   // team FX custom overrides
   const [fxPlatformAll, setFxPlatformAll] = useState([]); // platform quarterly FX rates
+  const [canManagePairs, setCanManagePairs] = useState(false); // FX-manager permission
   const [editCell, setEditCell] = useState(null);  // non-FX cell being overridden
   const [fxEdit, setFxEdit] = useState(null);       // FX cell override context
 
@@ -69,10 +71,15 @@ export default function IndexLibraryArea() {
         ]);
         const m = {};
         (pr.data || []).forEach(p => { if (p.live_rate != null) m[p.name] = Number(p.live_rate); });
+        setPairs(pr.data || []);
         setPairsLive(m);
         setFxCustomAll(cu.data || []);
         setFxPlatformAll(pl.data || []);
       } catch { /* non-critical */ }
+      try {
+        const cm = await api.get('/api/fx-rates/can-manage-pairs');
+        setCanManagePairs(!!cm.data?.can_manage);
+      } catch { setCanManagePairs(false); }
     } catch (err) {
       console.error('Failed to load indexes:', err);
     } finally { setLoading(false); }
@@ -89,10 +96,11 @@ export default function IndexLibraryArea() {
   const periods = useMemo(() => {
     const set = new Set();
     data.forEach(d => set.add(`${d.year}-${d.quarter}`));
+    fxPlatformAll.forEach(r => set.add(`${r.year}-${r.quarter}`)); // include FX-only quarters
     return [...set].map(p => { const [y, q] = p.split('-'); return { year: +y, quarter: +q }; })
       .sort((a, b) => a.year - b.year || a.quarter - b.quarter)
       .map(p => ({ ...p, label: `Q${p.quarter}-${String(p.year).slice(2)}` }));
-  }, [data]);
+  }, [data, fxPlatformAll]);
   const periodsDesc = useMemo(() => [...periods].reverse(), [periods]);
 
   const findSource = (cid, region) => sources.find(s => s.commodity_id === cid && s.region === region) || null;
@@ -116,14 +124,24 @@ export default function IndexLibraryArea() {
     }
   };
 
+  // FX commodity rows come from fx_pairs instead of /api/indexes/values, so the
+  // library lists ALL configured pairs (not just the few with index_values).
+  const fxCommodityIdByName = useMemo(() => {
+    const m = {};
+    commodities.forEach(c => { if (c.category === 'FX') m[c.name] = c.id; });
+    return m;
+  }, [commodities]);
+
   const rows = useMemo(() => {
+    // Non-FX rows from /api/indexes/values (exclude FX commodities — handled below).
     const grouped = {};
     data.forEach(d => {
+      if (commodityMap.get(d.commodity_id)?.category === 'FX') return;
       const key = `${d.commodity_name}__${d.region}`;
       if (!grouped[key]) grouped[key] = { mat: d.commodity_name, reg: d.region, commodity_id: d.commodity_id, valMap: {} };
       grouped[key].valMap[`Q${d.quarter}-${String(d.year).slice(2)}`] = d;
     });
-    return Object.values(grouped).map(r => {
+    const indexRows = Object.values(grouped).map(r => {
       const cells = periods.map(p => r.valMap[p.label] || null);
       const nums = cells.map(c => c?.value).filter(v => v != null);
       const base = nums[0] ?? null;
@@ -131,8 +149,43 @@ export default function IndexLibraryArea() {
       const meta = commodityMap.get(r.commodity_id) || {};
       const delta = (base != null && latest != null && base !== 0) ? (latest / base - 1) * 100 : null;
       return { ...r, cells, base, latest, meta, delta, hist: nums };
-    }).sort((a, b) => a.mat.localeCompare(b.mat));
-  }, [data, periods, commodityMap]);
+    });
+
+    // FX rows: one per configured pair; per-period value = team custom override (resolved) or platform quarterly.
+    const fxRows = pairs.map(pair => {
+      const from = pair.from_currency, to = pair.to_currency;
+      const valMap = {};
+      periods.forEach(p => {
+        const plat = fxPlatformAll.find(x => x.from_currency === from && x.to_currency === to && x.year === p.year && x.quarter === p.quarter);
+        const cust = fxCustomAll.find(x => x.from_currency === from && x.to_currency === to && x.year === p.year && x.quarter === p.quarter);
+        let value = plat ? Number(plat.rate) : null;
+        let source = 'scraped';
+        if (cust) {
+          source = 'team_override';
+          if (cust.value_type === 'fixed') value = cust.rate != null ? Number(cust.rate) : value;
+          else if (cust.value_type === 'live') value = pair.live_rate != null ? Number(pair.live_rate) : value;
+          else if (cust.value_type === 'quarter_ref') {
+            const ref = fxPlatformAll.find(x => x.from_currency === from && x.to_currency === to && x.year === cust.ref_year && x.quarter === cust.ref_quarter);
+            value = ref ? Number(ref.rate) : value;
+          }
+        }
+        if (value != null) valMap[p.label] = { commodity_id: fxCommodityIdByName[pair.name] ?? null, commodity_name: pair.name, region: 'GLOBAL', year: p.year, quarter: p.quarter, value, scraped_value: plat ? Number(plat.rate) : null, source };
+      });
+      const cells = periods.map(p => valMap[p.label] || null);
+      const nums = cells.map(c => c?.value).filter(v => v != null);
+      const base = nums[0] ?? null;
+      const latest = pair.live_rate != null ? Number(pair.live_rate) : (nums[nums.length - 1] ?? null);
+      const delta = (base != null && latest != null && base !== 0) ? (latest / base - 1) * 100 : null;
+      return {
+        mat: pair.name, reg: 'GLOBAL', commodity_id: fxCommodityIdByName[pair.name] ?? null,
+        valMap, cells, base, latest, delta, hist: nums,
+        meta: { category: 'FX', unit: pair.name, provider: pair.source_type, frequency: 'Daily' },
+        _pair: pair,
+      };
+    });
+
+    return [...indexRows, ...fxRows].sort((a, b) => a.mat.localeCompare(b.mat));
+  }, [data, periods, commodityMap, pairs, fxPlatformAll, fxCustomAll, fxCommodityIdByName]);
 
   const categories = useMemo(() => {
     const counts = {};

@@ -299,20 +299,22 @@ export default function IndexPopupModal({
           )}
         </div>
 
-        {/* Source & Controls (reuse IndexDetailPanel) */}
-        <div className="ca-card" style={{ marginBottom: 0 }}>
-          <div className="ca-card-title" style={{ marginBottom: 8 }}>Source & Controls</div>
-          <IndexDetailPanel
-            commodity_id={commodityId}
-            commodity_name={commodityName}
-            region={region}
-            teamId={teamId}
-            source={source}
-            globalScraper={globalScraper}
-            onSourceChanged={onSourceChanged}
-            onRemoved={onRemoved}
-          />
-        </div>
+        {/* Source & Controls (reuse IndexDetailPanel) — non-FX only; FX uses pair config */}
+        {!isFx && (
+          <div className="ca-card" style={{ marginBottom: 0 }}>
+            <div className="ca-card-title" style={{ marginBottom: 8 }}>Source & Controls</div>
+            <IndexDetailPanel
+              commodity_id={commodityId}
+              commodity_name={commodityName}
+              region={region}
+              teamId={teamId}
+              source={source}
+              globalScraper={globalScraper}
+              onSourceChanged={onSourceChanged}
+              onRemoved={onRemoved}
+            />
+          </div>
+        )}
         </div>
       </div>
     </div>
