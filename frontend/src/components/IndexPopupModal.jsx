@@ -104,34 +104,27 @@ export default function IndexPopupModal({
   });
   const hasOverride = periods.some(p => cellAt(p)?.source === 'team_override');
 
-  // FX has a continuous daily series; inject each overridden quarter's value as a
-  // flat segment so the Custom line stays continuous (not a lone spike).
+  // FX keeps its high-res daily series for the Default view only.
   const dailyPoints = [...daily].reverse().map(d => ({ label: d.date, value: Number(d.rate), date: d.date }));
-  const ovByYQ = {};
-  periods.forEach(p => { const c = cellAt(p); if (c?.source === 'team_override') ovByYQ[`${p.year}-${p.quarter}`] = c.value; });
-  const customDaily = dailyPoints.map(d => {
-    const dt = new Date(d.date + 'T00:00:00');
-    const k = `${dt.getFullYear()}-${Math.ceil((dt.getMonth() + 1) / 3)}`;
-    return ovByYQ[k] != null ? { ...d, value: ovByYQ[k] } : d;
-  });
-
   const defaultPoints = isFx ? dailyPoints : qDefault;
-  // Custom = default line that takes the CUSTOM value in overridden regions, with
-  // those points highlighted. Compare overlays the default line + the custom line.
-  let points = defaultPoints;
-  if (chartMode === 'custom' && hasOverride) points = isFx ? customDaily : qCustom;
-  const comparePoints = (chartMode === 'compare' && hasOverride) ? (isFx ? customDaily : qCustom) : null;
 
-  const rangeOptions = isFx
+  // Custom/Compare use the QUARTERLY series for both FX and non-FX:
+  //   Default mode  → defaultPoints (FX daily / non-FX quarterly)
+  //   Custom mode   → qCustom (all points; line passes through the custom value at overridden quarters)
+  //   Compare mode  → qDefault (primary) + qCustom (overlay)
+  let points = defaultPoints;
+  if (chartMode === 'custom' && hasOverride) points = qCustom;
+  else if (chartMode === 'compare' && hasOverride) points = qDefault;
+  const comparePoints = (chartMode === 'compare' && hasOverride) ? qCustom : null;
+
+  const usingDaily = isFx && chartMode === 'default';
+  const rangeOptions = usingDaily
     ? [['1M', 30], ['3M', 90], ['6M', 180], ['1Y', 365], ['5Y', 1825], ['All', Infinity]]
     : [['1Y', 4], ['2Y', 8], ['3Y', 12], ['5Y', 20], ['All', Infinity]];
-  // Labels of the overridden points to mark on the Custom line.
-  const overriddenLabels = isFx
-    ? dailyPoints.filter(d => {
-        const dt = new Date(d.date + 'T00:00:00');
-        return ovByYQ[`${dt.getFullYear()}-${Math.ceil((dt.getMonth() + 1) / 3)}`] != null;
-      }).map(d => d.label)
-    : periods.filter(p => cellAt(p)?.source === 'team_override').map(p => p.label);
+  // Overridden quarter labels to ring on the Custom line.
+  const overriddenLabels = periods.filter(p => cellAt(p)?.source === 'team_override').map(p => p.label);
+  // Custom series is orange; default/compare-primary is blue.
+  const lineColor = chartMode === 'custom' ? 'var(--accent3)' : 'var(--accent4)';
   const stats = computeStats(statsSlice && statsSlice.length ? statsSlice : points);
   const fmtStat = v => (v == null ? '—' : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(isFx ? 4 : 2));
 
@@ -312,6 +305,7 @@ export default function IndexPopupModal({
             points={points}
             comparePoints={comparePoints}
             markedLabels={chartMode === 'default' ? undefined : overriddenLabels}
+            color={lineColor}
             rangeOptions={rangeOptions}
             valueDecimals={isFx ? 4 : undefined}
             unit={commodity?.unit}

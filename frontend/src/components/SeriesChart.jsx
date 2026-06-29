@@ -115,8 +115,8 @@ export default function SeriesChart({ points, comparePoints, markedLabels, range
     );
   }
 
-  const up = vals[N - 1] >= vals[0];
-  const stroke = up ? 'var(--accent2)' : 'var(--danger)';
+  const stroke = color || 'var(--accent4)';   // primary line (Default=blue / Custom=orange via prop)
+  const cmpStroke = 'var(--accent3)';          // compare (Custom) line — orange dashed
 
   // y grid
   const range = maxV - minV;
@@ -126,20 +126,27 @@ export default function SeriesChart({ points, comparePoints, markedLabels, range
   if (range / step > 8) step *= 2;
   for (let v = Math.ceil(minV / step) * step; v <= maxV; v += step) gridLines.push(v);
 
-  const linePath = windowed.map((d, i) => `${i === 0 ? 'M' : 'L'}${xScale(i).toFixed(1)},${yScale(Number(d.value)).toFixed(1)}`).join(' ');
+  // Smooth (Catmull-Rom → cubic bezier) path through an [{x,y}] array.
+  const smooth = (pts) => {
+    if (pts.length < 2) return pts.length ? `M${pts[0].x},${pts[0].y}` : '';
+    let d = `M${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+    return d;
+  };
+
+  const linePts = windowed.map((d, i) => ({ x: xScale(i), y: yScale(Number(d.value)) }));
+  const linePath = smooth(linePts);
   const fillPath = `${linePath} L${xScale(N - 1).toFixed(1)},${(H - PAD.b).toFixed(1)} L${xScale(0).toFixed(1)},${(H - PAD.b).toFixed(1)} Z`;
-  // Compare line (Custom series), drawn over the primary (Default) when present.
-  const cmpStroke = 'var(--accent4)';
-  let comparePath = '';
-  if (hasCompare) {
-    let started = false;
-    windowed.forEach((d, i) => {
-      const v = compareByLabel[d.label];
-      if (v == null) { started = false; return; }
-      comparePath += `${started ? 'L' : 'M'}${xScale(i).toFixed(1)},${yScale(v).toFixed(1)} `;
-      started = true;
-    });
-  }
+  // Compare (Custom) line — assume continuous across the window.
+  const cmpPts = hasCompare
+    ? windowed.map((d, i) => (compareByLabel[d.label] != null ? { x: xScale(i), y: yScale(compareByLabel[d.label]) } : null)).filter(Boolean)
+    : [];
+  const comparePath = hasCompare ? smooth(cmpPts) : '';
   const labelStep = Math.max(1, Math.ceil(N / 6));
 
   const idxFromEvent = e => {
@@ -193,18 +200,27 @@ export default function SeriesChart({ points, comparePoints, markedLabels, range
             </g>
           )}
 
-          <path d={fillPath} fill={stroke} opacity={0.08} />
-          <path d={linePath} fill="none" stroke={stroke} strokeWidth={1.6} />
+          {!hasCompare && <path d={fillPath} fill={stroke} opacity={0.08} />}
+          <path d={linePath} fill="none" stroke={stroke} strokeWidth={1.8} />
           {hasCompare && comparePath && (
-            <path d={comparePath} fill="none" stroke={cmpStroke} strokeWidth={1.6} strokeDasharray="5 3" />
+            <path d={comparePath} fill="none" stroke={cmpStroke} strokeWidth={1.8} strokeDasharray="6 4" />
           )}
 
-          {/* override markers — dot the overridden points on the Custom line */}
+          {/* a small dot on every plotted point (primary, and compare when present) */}
+          {windowed.map((d, i) => (d.value == null ? null : (
+            <circle key={`pd-${i}`} cx={xScale(i)} cy={yScale(Number(d.value))} r={2.2} fill={stroke} />
+          )))}
+          {hasCompare && windowed.map((d, i) => {
+            const v = compareByLabel[d.label];
+            return v == null ? null : <circle key={`cd-${i}`} cx={xScale(i)} cy={yScale(v)} r={2.2} fill={cmpStroke} />;
+          })}
+
+          {/* override markers — white-ringed dot at the custom value */}
           {markedSet.size > 0 && windowed.map((d, i) => {
             if (!markedSet.has(d.label)) return null;
             const v = hasCompare ? compareByLabel[d.label] : Number(d.value);
             if (v == null) return null;
-            return <circle key={`mk-${i}`} cx={xScale(i)} cy={yScale(v)} r={3.5} fill="var(--accent4)" stroke="var(--surface)" strokeWidth={1.5} />;
+            return <circle key={`mk-${i}`} cx={xScale(i)} cy={yScale(v)} r={6} fill="var(--accent3)" stroke="var(--surface)" strokeWidth={2.5} />;
           })}
 
           {/* selection endpoint markers */}
