@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
+import { useToast } from './Toast';
 import SeriesChart from './SeriesChart';
 import { computeStats } from '../utils/seriesStats';
 import IndexDetailPanel from './IndexDetailPanel';
+import FxPairModal from './FxPairModal';
 import exportCsv from '../utils/exportCsv';
 
 /**
@@ -21,9 +23,14 @@ export default function IndexPopupModal({
   cellData,        // array of cell values matching periods (for chart)
   source,          // TeamIndexSource or null
   globalScraper,   // {scraper, scrape_at} or null
+  fxPair,          // FxPairOut for FX rows (pair config), else null
+  canManagePairs,  // FX-manager permission
+  onPairChanged,   // refetch after pair edit/scrape
+  onPairRemoved,   // close + refetch after pair delete
   onSourceChanged,
   onRemoved,
 }) {
+  const { addToast } = useToast();
   const [impacts, setImpacts] = useState([]);
   const [loadingImpacts, setLoadingImpacts] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(null);
@@ -31,6 +38,8 @@ export default function IndexPopupModal({
   const [daily, setDaily] = useState([]);          // FX daily series (FX rows only)
   const [statsSlice, setStatsSlice] = useState(null); // current chart selection/window, for stats
   const [graphMode, setGraphMode] = useState('default'); // 'default' | 'custom'
+  const [showEditPair, setShowEditPair] = useState(false);
+  const [pairBusy, setPairBusy] = useState(false);
 
   const isFx = commodity?.category === 'FX';
   const [fxFrom, fxTo] = isFx && commodityName ? commodityName.split('/') : [null, null];
@@ -113,6 +122,37 @@ export default function IndexPopupModal({
 
   const exportDaily = () => exportCsv(`${(commodityName || 'fx').replace('/', '-')}-daily.csv`, ['Date', 'Rate'],
     [...daily].reverse().map(d => [d.date, d.rate]));
+
+  // FX pair admin actions (FX-manager only)
+  const scrapeLive = async () => {
+    if (!fxPair) return;
+    setPairBusy(true);
+    try {
+      const { data } = await api.post(`/api/fx-rates/pairs/${fxPair.id}/scrape-live`);
+      addToast(`${fxPair.name} live: ${data.live_rate != null ? Number(data.live_rate).toFixed(4) : 'n/a'}`, 'success');
+      onPairChanged?.();
+    } catch (e) { addToast(e?.response?.data?.detail || 'Scrape failed', 'error'); }
+    finally { setPairBusy(false); }
+  };
+  const scrapePlatform = async () => {
+    setPairBusy(true);
+    try {
+      const { data } = await api.post('/api/fx-rates/scrape');
+      addToast(`Synced ${data.synced ?? 0} quarterly rates`, 'success');
+      onPairChanged?.();
+    } catch (e) { addToast(e?.response?.data?.detail || 'Scrape failed', 'error'); }
+    finally { setPairBusy(false); }
+  };
+  const deletePair = async () => {
+    if (!fxPair || !window.confirm(`Delete FX pair ${fxPair.name}? Quarterly rates are retained.`)) return;
+    setPairBusy(true);
+    try {
+      await api.delete(`/api/fx-rates/pairs/${fxPair.id}`);
+      addToast('Pair deleted', 'success');
+      onPairRemoved?.();
+    } catch (e) { addToast(e?.response?.data?.detail || 'Delete failed', 'error'); }
+    finally { setPairBusy(false); }
+  };
 
   const categoryColors = {
     Metal: 'var(--cat-metal)', Energy: 'var(--cat-energy)', Chemical: 'var(--cat-chemical)',
@@ -315,8 +355,30 @@ export default function IndexPopupModal({
             />
           </div>
         )}
+
+        {/* FX Pair admin (FX-manager only) — source config, scrape, delete */}
+        {isFx && canManagePairs && fxPair && (
+          <div className="ca-card" style={{ marginBottom: 0 }}>
+            <div className="ca-card-title" style={{ marginBottom: 8 }}>FX Pair (admin)</div>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+              <div>Source: <strong>{fxPair.source_type}</strong>{fxPair.scrape_enabled ? '' : ' · scraping off'}</div>
+              {fxPair.scrape_url && <div style={{ wordBreak: 'break-all' }}>URL: {fxPair.scrape_url}</div>}
+              <div>Live rate: <strong>{fxPair.live_rate != null ? Number(fxPair.live_rate).toFixed(4) : '—'}</strong>{fxPair.live_scraped_at ? ` · ${new Date(fxPair.live_scraped_at).toLocaleDateString()}` : ''}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={() => setShowEditPair(true)} disabled={pairBusy}>Edit pair</button>
+              <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={scrapeLive} disabled={pairBusy}>Scrape live now</button>
+              <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={scrapePlatform} disabled={pairBusy}>Scrape platform rates</button>
+              <button className="ca-btn ca-btn-sm ca-btn-danger" onClick={deletePair} disabled={pairBusy}>Delete pair</button>
+            </div>
+          </div>
+        )}
         </div>
       </div>
+
+      {showEditPair && fxPair && (
+        <FxPairModal pair={fxPair} onSaved={() => onPairChanged?.()} onClose={() => setShowEditPair(false)} />
+      )}
     </div>
   );
 }

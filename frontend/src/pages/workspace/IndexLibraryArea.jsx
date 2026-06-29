@@ -5,6 +5,7 @@ import IndexPopupModal from '../../components/IndexPopupModal';
 import AddIndexModal from '../../components/AddIndexModal';
 import EditCellModal from '../../components/EditCellModal';
 import FxCustomEditModal from '../../components/FxCustomEditModal';
+import FxPairModal from '../../components/FxPairModal';
 import exportCsv from '../../utils/exportCsv';
 import { Sparkline, GroupHeader, useOpenSet } from './wsCharts';
 
@@ -44,6 +45,7 @@ export default function IndexLibraryArea() {
   const [canManagePairs, setCanManagePairs] = useState(false); // FX-manager permission
   const [editCell, setEditCell] = useState(null);  // non-FX cell being overridden
   const [fxEdit, setFxEdit] = useState(null);       // FX cell override context
+  const [showAddPair, setShowAddPair] = useState(false); // add-FX-pair modal
 
   const fetchData = async () => {
     if (!activeTeamId) return;
@@ -257,6 +259,9 @@ export default function IndexLibraryArea() {
         ))}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleExport} disabled={!rows.length}>Export CSV</button>
+          {canManagePairs && (
+            <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={() => setShowAddPair(true)}>+ Add FX pair</button>
+          )}
           <button className="ca-btn ca-btn-sm ca-btn-primary" onClick={() => setShowAddModal(true)}>+ Add Index</button>
         </div>
       </div>
@@ -332,11 +337,15 @@ export default function IndexLibraryArea() {
         commodityName={popupRow?.mat}
         region={popupRow?.reg}
         teamId={activeTeamId}
-        commodity={popupRow ? commodityMap.get(popupRow.commodity_id) : null}
+        commodity={popupRow?.meta || null}
         periods={periods}
         cellData={popupRow?.cells || []}
         source={popupRow ? findSource(popupRow.commodity_id, popupRow.reg) : null}
         globalScraper={popupRow ? getGlobalScraperInfo(popupRow.commodity_id) : null}
+        fxPair={popupRow?._pair || null}
+        canManagePairs={canManagePairs}
+        onPairChanged={() => fetchData()}
+        onPairRemoved={() => { setPopupRow(null); fetchData(); }}
         onSourceChanged={fetchData}
         onRemoved={() => { setPopupRow(null); fetchData(); }}
       />
@@ -370,6 +379,10 @@ export default function IndexLibraryArea() {
           onSaved={() => fetchData()}
           onClose={() => setFxEdit(null)}
         />
+      )}
+
+      {showAddPair && (
+        <FxPairModal pair={null} onSaved={() => fetchData()} onClose={() => setShowAddPair(false)} />
       )}
     </div>
   );
