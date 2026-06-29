@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 
 /**
  * Generalized interactive SVG line chart (stock-app style), used by the Index
@@ -45,7 +45,16 @@ export default function SeriesChart({ points, rangeOptions, valueDecimals, unit,
     [windowed, selLo, selHi],
   );
 
-  useEffect(() => { onWindowChange?.(slice); }, [slice, onWindowChange]);
+  // Emit the slice only when the window/selection actually changes — `points`
+  // (hence `slice`) is a fresh array each parent render, so guarding on a stable
+  // key avoids an infinite setState↔render loop with the parent's stats state.
+  const lastKey = useRef(null);
+  useEffect(() => {
+    const key = `${count}|${selLo}|${selHi}|${windowed.length}`;
+    if (lastKey.current === key) return;
+    lastKey.current = key;
+    onWindowChange?.(slice);
+  }, [count, selLo, selHi, windowed.length, slice, onWindowChange]);
 
   const W = 760, H = 220;
   const PAD = { l: 52, r: 12, t: 14, b: 26 };

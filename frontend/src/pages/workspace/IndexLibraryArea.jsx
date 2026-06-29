@@ -299,7 +299,7 @@ export default function IndexLibraryArea() {
                         // In use — MOCK placeholder for now (TODO: wire to /api/indexes/{id}/impact)
                         const inUse = findSource(r.commodity_id, r.reg) ? 'Yes' : '—';
                         return (
-                          <tr key={`${r.commodity_id}-${r.reg}`} style={{ cursor: 'pointer' }} onClick={() => setPopupRow(r)}>
+                          <tr key={`${r.mat}-${r.reg}`} style={{ cursor: 'pointer' }} onClick={() => setPopupRow(r)}>
                             <td><span className="ca-badge" style={{ background: inUse === 'Yes' ? 'var(--success-bg)' : 'var(--neutral-bg)', color: inUse === 'Yes' ? 'var(--accent)' : 'var(--muted)' }}>{inUse}</span></td>
                             <td style={{ fontWeight: 600, color: 'var(--accent4)' }}>{r.mat}</td>
                             <td><span className="ca-badge" style={{ background: 'var(--neutral-bg)', color: CAT_COLOR[r.meta.category] || 'var(--text-secondary)' }}>{r.meta.category || '—'}</span></td>
