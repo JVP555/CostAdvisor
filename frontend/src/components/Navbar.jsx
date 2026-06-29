@@ -27,8 +27,6 @@ export default function Navbar() {
 
   const tabs = [
     { path: '/dashboard', label: 'Dashboard' },
-    { path: '/indexes', label: 'Indexes' },
-    { path: '/fx-rates', label: 'FX Rates' },
     { path: '/formulas', label: 'Formulas' },
     { path: '/products', label: 'Products' },
     { path: '/suppliers', label: 'Suppliers' },
