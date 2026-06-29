@@ -117,8 +117,16 @@ export default function IndexPopupModal({
     ? (defaultPoints.length ? defaultPoints[defaultPoints.length - 1].value : null)
     : (customPoints.map(p => p.value).filter(v => v != null).pop() ?? null);
   const quarterlyPrice = lastCell ? (lastCell.scraped_value ?? lastCell.value ?? null) : null;
-  const overrideCell = !isFx ? [...periods].reverse().map(cellAt).find(c => c?.source === 'team_override') : null;
+  const overrideCell = [...periods].reverse().map(cellAt).find(c => c?.source === 'team_override') || null;
   const overriddenPrice = overrideCell ? overrideCell.value : null;
+
+  // Historical data table: Period | Default | Custom (newest first). Custom column
+  // shows only if at least one period has a team override.
+  const histRows = [...periods].reverse().map((p) => {
+    const c = cellAt(p);
+    return { label: p.label, def: c ? (c.scraped_value ?? c.value ?? null) : null, cust: c?.source === 'team_override' ? c.value : null };
+  });
+  const anyCustom = histRows.some(r => r.cust != null);
 
   const exportDaily = () => exportCsv(`${(commodityName || 'fx').replace('/', '-')}-daily.csv`, ['Date', 'Rate'],
     [...daily].reverse().map(d => [d.date, d.rate]));
@@ -271,6 +279,37 @@ export default function IndexPopupModal({
             </div>
           )}
         </div>
+
+        {/* Historical data — Period | Default | Custom (custom column only if any override) */}
+        {histRows.length > 0 && (
+          <div className="ca-card" style={{ marginBottom: 16 }}>
+            <div className="ca-card-title" style={{ marginBottom: 8 }}>Historical Data</div>
+            <div className="ca-scroll-x" style={{ maxHeight: 260, overflowY: 'auto' }}>
+              <table className="ca-table" style={{ fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    <th>{isFx ? 'Quarter' : 'Period'}</th>
+                    <th className="right">Default</th>
+                    {anyCustom && <th className="right">Custom</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {histRows.map(r => (
+                    <tr key={r.label}>
+                      <td>{r.label}</td>
+                      <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{r.def == null ? '—' : fmtStat(r.def)}</td>
+                      {anyCustom && (
+                        <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", color: r.cust != null ? 'var(--accent4)' : 'var(--muted)' }}>
+                          {r.cust == null ? '—' : fmtStat(r.cust)}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* AI Analysis */}
         <div className="ca-card" style={{ marginBottom: 16, padding: 16 }}>

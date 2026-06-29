@@ -301,7 +301,9 @@ export default function IndexLibraryArea() {
                             <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.meta.provider || '—'}</td>
                             <td style={{ fontSize: 12 }}>{r.reg}</td>
                             <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.meta.frequency || '—'}</td>
-                            <td className="right" title={r.meta.category === 'FX' && pairsLive[r.mat] != null ? 'Live daily rate' : undefined} style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: 'var(--text)' }}>{fmtVal(r.meta.category === 'FX' && pairsLive[r.mat] != null ? pairsLive[r.mat] : r.latest, r.meta.unit)}</td>
+                            <td className="right" title="Click to override the latest period"
+                              onClick={(e) => { const lp = periods[periods.length - 1]; if (lp) openCellEdit(e, r, lp, r.valMap[lp.label]); }}
+                              style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: 'var(--text)', cursor: 'cell' }}>{fmtVal(r.meta.category === 'FX' && pairsLive[r.mat] != null ? pairsLive[r.mat] : r.latest, r.meta.unit)}</td>
                             <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", color: r.delta == null ? 'var(--muted)' : up ? 'var(--accent2)' : 'var(--accent)' }}>
                               {r.delta == null ? '—' : `${up ? '+' : ''}${r.delta.toFixed(1)}%`}
                             </td>

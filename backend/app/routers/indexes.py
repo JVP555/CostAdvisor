@@ -393,6 +393,11 @@ def cell_override(
     log_event(db, body.team_id, current_user.id, "override", "index_cell",
               f"{commodity.name}/{body.region}/Q{body.quarter}-{body.year}",
               new_value={"value": body.value})
+    # Capture before commit — post-commit attribute access triggers a refresh
+    # under a transaction with no RLS GUC set, which can fail / return nothing.
+    override_id = override.id
+    scraped = float(iv.value) if iv else None
+    display_name = current_user.display_name
     db.commit()
 
     return IndexValueOut(
@@ -403,9 +408,9 @@ def cell_override(
         quarter=body.quarter,
         value=float(body.value),
         source="team_override",
-        scraped_value=float(iv.value) if iv else None,
-        override_id=override.id,
-        override_by=current_user.display_name,
+        scraped_value=scraped,
+        override_id=override_id,
+        override_by=display_name,
         override_at=now.isoformat(),
     )
 
