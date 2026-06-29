@@ -19,7 +19,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
  *   onWindowChange: (slice) => void — called with the effective slice (the
  *                   selection if two points are picked, else the full window)
  */
-export default function SeriesChart({ points, comparePoints, markedLabels, rangeOptions, valueDecimals, unit, onWindowChange }) {
+export default function SeriesChart({ points, comparePoints, markedLabels, color, rangeOptions, valueDecimals, unit, onWindowChange }) {
   const opts = rangeOptions && rangeOptions.length ? rangeOptions : [['All', Infinity]];
   const [rangeIdx, setRangeIdx] = useState(opts.length - 1); // default 'All'
   const [hover, setHover] = useState(null);
