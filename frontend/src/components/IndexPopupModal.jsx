@@ -93,23 +93,39 @@ export default function IndexPopupModal({
 
   const cellAt = (p) => cellData?.find(c => c?.year === p.year && c?.quarter === p.quarter);
 
-  // Quarterly series from the row cells (works for FX and non-FX — both carry
-  // scraped_value + override-applied value + source). Overrides live here.
-  const qDefault = periods.map((p) => { const c = cellAt(p); return { label: p.label, value: c?.scraped_value ?? c?.value ?? null }; });
-  const qCustom = periods.map((p) => { const c = cellAt(p); return { label: p.label, value: c?.value ?? null }; });
+  // Quarterly series from the row cells. Default = platform/scraped only (no
+  // fallback to the override, so the default line stays pure); Custom = default
+  // everywhere with the override applied at overridden quarters → a continuous
+  // line that matches Default except at changed points.
+  const qDefault = periods.map((p) => { const c = cellAt(p); return { label: p.label, value: c?.scraped_value ?? null }; });
+  const qCustom = periods.map((p) => {
+    const c = cellAt(p);
+    return { label: p.label, value: c?.source === 'team_override' ? c.value : (c?.scraped_value ?? null) };
+  });
   const hasOverride = periods.some(p => cellAt(p)?.source === 'team_override');
-  // Default chart view: FX shows its high-res daily series; non-FX shows quarterly.
-  const dailyPoints = [...daily].reverse().map(d => ({ label: d.date, value: Number(d.rate), date: d.date }));
-  const defaultPoints = isFx ? dailyPoints : qDefault;
 
-  // Custom/Compare operate on the quarterly series (where overrides apply), for both types.
+  // FX has a continuous daily series; inject each overridden quarter's value as a
+  // flat segment so the Custom line stays continuous (not a lone spike).
+  const dailyPoints = [...daily].reverse().map(d => ({ label: d.date, value: Number(d.rate), date: d.date }));
+  const ovByYQ = {};
+  periods.forEach(p => { const c = cellAt(p); if (c?.source === 'team_override') ovByYQ[`${p.year}-${p.quarter}`] = c.value; });
+  const customDaily = dailyPoints.map(d => {
+    const dt = new Date(d.date + 'T00:00:00');
+    const k = `${dt.getFullYear()}-${Math.ceil((dt.getMonth() + 1) / 3)}`;
+    return ovByYQ[k] != null ? { ...d, value: ovByYQ[k] } : d;
+  });
+
+  const defaultPoints = isFx ? dailyPoints : qDefault;
+  // Custom = full default line with overrides applied; Compare overlays both.
   let points = defaultPoints;
   let comparePoints = null;
-  if (chartMode === 'custom' && hasOverride) points = qCustom;
-  else if (chartMode === 'compare' && hasOverride) { points = qDefault; comparePoints = qCustom; }
+  if (chartMode === 'custom' && hasOverride) points = isFx ? customDaily : qCustom;
+  else if (chartMode === 'compare' && hasOverride) {
+    points = defaultPoints;
+    comparePoints = isFx ? customDaily : qCustom;
+  }
 
-  const usingDaily = isFx && points === defaultPoints; // daily only in the FX default view
-  const rangeOptions = usingDaily
+  const rangeOptions = isFx
     ? [['1M', 30], ['3M', 90], ['6M', 180], ['1Y', 365], ['5Y', 1825], ['All', Infinity]]
     : [['1Y', 4], ['2Y', 8], ['3Y', 12], ['5Y', 20], ['All', Infinity]];
   const stats = computeStats(statsSlice && statsSlice.length ? statsSlice : points);
@@ -140,15 +156,15 @@ export default function IndexPopupModal({
   );
   const printPopup = () => window.print();
 
-  // Compare-mode diff stats: Default vs Custom over the selected window.
-  const customByLabel = {};
-  qCustom.forEach(p => { if (p.value != null) customByLabel[p.label] = p.value; });
+  // Compare-mode diff stats: the two drawn series (Default vs Custom) over the window.
   const compareStats = (() => {
-    if (chartMode !== 'compare') return null;
-    const base = (statsSlice && statsSlice.length ? statsSlice : qDefault);
+    if (chartMode !== 'compare' || !comparePoints) return null;
+    const cByLabel = {};
+    comparePoints.forEach(p => { if (p.value != null) cByLabel[p.label] = p.value; });
+    const base = (statsSlice && statsSlice.length ? statsSlice : points);
     const diffs = [];
     base.forEach(p => {
-      const c = customByLabel[p.label];
+      const c = cByLabel[p.label];
       if (p.value != null && c != null && Math.abs(c - p.value) > 1e-9) {
         diffs.push({ diff: c - p.value, pct: p.value !== 0 ? (c / p.value - 1) * 100 : null });
       }
