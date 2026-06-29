@@ -128,6 +128,13 @@ export default function IndexPopupModal({
   const rangeOptions = isFx
     ? [['1M', 30], ['3M', 90], ['6M', 180], ['1Y', 365], ['5Y', 1825], ['All', Infinity]]
     : [['1Y', 4], ['2Y', 8], ['3Y', 12], ['5Y', 20], ['All', Infinity]];
+  // Labels of the overridden points to mark on the Custom line.
+  const overriddenLabels = isFx
+    ? dailyPoints.filter(d => {
+        const dt = new Date(d.date + 'T00:00:00');
+        return ovByYQ[`${dt.getFullYear()}-${Math.ceil((dt.getMonth() + 1) / 3)}`] != null;
+      }).map(d => d.label)
+    : periods.filter(p => cellAt(p)?.source === 'team_override').map(p => p.label);
   const stats = computeStats(statsSlice && statsSlice.length ? statsSlice : points);
   const fmtStat = v => (v == null ? '—' : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(isFx ? 4 : 2));
 
@@ -307,6 +314,7 @@ export default function IndexPopupModal({
             key={chartMode}
             points={points}
             comparePoints={comparePoints}
+            markedLabels={chartMode === 'default' ? undefined : overriddenLabels}
             rangeOptions={rangeOptions}
             valueDecimals={isFx ? 4 : undefined}
             unit={commodity?.unit}

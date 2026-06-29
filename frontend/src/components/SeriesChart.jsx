@@ -19,7 +19,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
  *   onWindowChange: (slice) => void — called with the effective slice (the
  *                   selection if two points are picked, else the full window)
  */
-export default function SeriesChart({ points, comparePoints, rangeOptions, valueDecimals, unit, onWindowChange }) {
+export default function SeriesChart({ points, comparePoints, markedLabels, rangeOptions, valueDecimals, unit, onWindowChange }) {
   const opts = rangeOptions && rangeOptions.length ? rangeOptions : [['All', Infinity]];
   const [rangeIdx, setRangeIdx] = useState(opts.length - 1); // default 'All'
   const [hover, setHover] = useState(null);
@@ -68,6 +68,7 @@ export default function SeriesChart({ points, comparePoints, rangeOptions, value
     return m;
   }, [comparePoints]);
   const hasCompare = (comparePoints || []).length > 0;
+  const markedSet = useMemo(() => new Set(markedLabels || []), [markedLabels]);
 
   const N = windowed.length;
   const vals = windowed.map(d => Number(d.value));
@@ -197,6 +198,14 @@ export default function SeriesChart({ points, comparePoints, rangeOptions, value
           {hasCompare && comparePath && (
             <path d={comparePath} fill="none" stroke={cmpStroke} strokeWidth={1.6} strokeDasharray="5 3" />
           )}
+
+          {/* override markers — dot the overridden points on the Custom line */}
+          {markedSet.size > 0 && windowed.map((d, i) => {
+            if (!markedSet.has(d.label)) return null;
+            const v = hasCompare ? compareByLabel[d.label] : Number(d.value);
+            if (v == null) return null;
+            return <circle key={`mk-${i}`} cx={xScale(i)} cy={yScale(v)} r={3.5} fill="var(--accent4)" stroke="var(--surface)" strokeWidth={1.5} />;
+          })}
 
           {/* selection endpoint markers */}
           {selLo != null && [selLo, selHi].map((si, k) => (
