@@ -90,6 +90,19 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offse
   transition:box-shadow .2s ease,transform .2s ease
 }
 
+/* ── Icons (stroke set, replaces emoji) ─────────────────── */
+.ic{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
+.security-tile-icon,.legal-card-icon,.fd3-icon,.fd3-item-icon{color:var(--blue)}
+.security-tile-icon .ic{width:26px;height:26px}
+.legal-card-icon .ic{width:22px;height:22px}
+.hwb1-icon .ic,.fd3-icon .ic{width:26px;height:26px}
+.fd3-item-icon .ic{width:18px;height:18px}
+.hwb1-card--blue .hwb1-icon{color:var(--blue)}
+.hwb1-card--green .hwb1-icon{color:var(--green)}
+.hwb1-card--amber .hwb1-icon{color:var(--amber)}
+.modal-success-icon{color:var(--green)}
+.modal-success-icon .ic{width:46px;height:46px;margin:0 auto}
+
 /* ── Buttons ────────────────────────────────────────────── */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:600;border:none;transition:all .18s ease;white-space:nowrap}
 .btn:disabled,button:disabled{opacity:.55;cursor:not-allowed}
@@ -575,6 +588,25 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <circle cx="25" cy="9.5" r="2.5" fill="#ffffff"/>
   </symbol>
 </svg>
+<!-- Professional stroke-icon set (Lucide-style); referenced via <svg class="ic"><use href="#ic-…"/> -->
+<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true" focusable="false">
+  <symbol id="ic-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="ic-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 21 2"/><path d="m16 7 3 3"/></symbol>
+  <symbol id="ic-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h5"/></symbol>
+  <symbol id="ic-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 6 10 7 10-7"/></symbol>
+  <symbol id="ic-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20"/></symbol>
+  <symbol id="ic-landmark" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V10"/><path d="M9 21V10"/><path d="M15 21V10"/><path d="M19 21V10"/><path d="M12 3 21 8H3z"/></symbol>
+  <symbol id="ic-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></symbol>
+  <symbol id="ic-alert" viewBox="0 0 24 24"><path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="ic-flask" viewBox="0 0 24 24"><path d="M9 3h6"/><path d="M10 3v6l-5.2 8.6A2 2 0 0 0 6.5 21h11a2 2 0 0 0 1.7-3.4L14 9V3"/><path d="M7.5 15h9"/></symbol>
+  <symbol id="ic-calc" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01"/></symbol>
+  <symbol id="ic-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h4"/></symbol>
+  <symbol id="ic-trend" viewBox="0 0 24 24"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></symbol>
+  <symbol id="ic-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="ic-fx" viewBox="0 0 24 24"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></symbol>
+  <symbol id="ic-bars" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M8 17v-5"/><path d="M13 17V7"/><path d="M18 17v-9"/></symbol>
+</svg>
 <!-- ── Nav ──────────────────────────────────────────────────── -->
 <nav class="nav">
   <div class="nav-inner">
@@ -834,19 +866,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <div class="hwb1-grid">
       <div class="hwb1-card hwb1-card--blue" style="--i:0;--enter-from:translate(-32px,8px)">
         <span class="hwb1-bg-num" aria-hidden="true">01</span>
-        <div class="hwb1-icon">🔬</div>
+        <div class="hwb1-icon"><svg class="ic"><use href="#ic-flask"/></svg></div>
         <h3 class="hwb1-h3">Decompose</h3>
         <p class="hwb1-p">Break your product into weighted raw-material components. Map each to a commodity index by region — Ammonia 40%, Energy 30%, Packaging 20%, Labour 10%.</p>
       </div>
       <div class="hwb1-card hwb1-card--green" style="--i:1;--enter-from:translateY(28px)">
         <span class="hwb1-bg-num" aria-hidden="true">02</span>
-        <div class="hwb1-icon">⚡</div>
+        <div class="hwb1-icon"><svg class="ic"><use href="#ic-calc"/></svg></div>
         <h3 class="hwb1-h3">Calculate</h3>
         <p class="hwb1-p">CostAdvisor resolves live index values, applies FX conversion and Incoterm adjustments, and returns an auditable should-cost figure for any quarter.</p>
       </div>
       <div class="hwb1-card hwb1-card--amber" style="--i:2;--enter-from:translate(32px,8px)">
         <span class="hwb1-bg-num" aria-hidden="true">03</span>
-        <div class="hwb1-icon">📋</div>
+        <div class="hwb1-icon"><svg class="ic"><use href="#ic-clipboard"/></svg></div>
         <h3 class="hwb1-h3">Negotiate</h3>
         <p class="hwb1-p">Compare should-cost against your supplier's actual price. Export a branded PDF brief with verdict, gap analysis, top drivers, and evidence-backed talking points.</p>
       </div>
@@ -889,7 +921,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <div class="fd3-primary">
       <div class="fd3-card reveal">
         <div class="fd3-num">01 · Foundation</div>
-        <div class="fd3-icon">⚗️</div>
+        <div class="fd3-icon"><svg class="ic"><use href="#ic-flask"/></svg></div>
         <h4>Should-Cost Modelling</h4>
         <p>Build weighted formulas from commodity components — each linked to a live index. Quarterly recalculation is automatic. No spreadsheet maintenance, no stale numbers.</p>
         <div class="fd3-stat">
@@ -899,7 +931,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       </div>
       <div class="fd3-card reveal" style="transition-delay:.07s">
         <div class="fd3-num">02 · Intelligence</div>
-        <div class="fd3-icon">📈</div>
+        <div class="fd3-icon"><svg class="ic"><use href="#ic-trend"/></svg></div>
         <h4>Evolution Tracking</h4>
         <p>See how your should-cost moves quarter-over-quarter as indices shift. Know when a supplier's price increase is justified by the market — and when it isn't.</p>
         <div class="fd3-stat">
@@ -909,7 +941,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       </div>
       <div class="fd3-card reveal" style="transition-delay:.14s">
         <div class="fd3-num">03 · Outcome</div>
-        <div class="fd3-icon">📄</div>
+        <div class="fd3-icon"><svg class="ic"><use href="#ic-file"/></svg></div>
         <h4>Negotiation Brief</h4>
         <p>Export a branded PDF with verdict, gap, ranked cost drivers, and AI talking points. One click from analysis to a brief that survives an enterprise procurement review.</p>
         <div class="fd3-stat">
@@ -920,19 +952,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     </div>
     <div class="fd3-secondary">
       <div class="fd3-item reveal">
-        <span class="fd3-item-icon">🎯</span>
+        <span class="fd3-item-icon"><svg class="ic"><use href="#ic-target"/></svg></span>
         <div><h5>Gap Analysis</h5><p>Quantify the gap in % and total financial exposure — instantly, against the live should-cost.</p></div>
       </div>
       <div class="fd3-item reveal" style="transition-delay:.05s">
-        <span class="fd3-item-icon">💱</span>
+        <span class="fd3-item-icon"><svg class="ic"><use href="#ic-fx"/></svg></span>
         <div><h5>FX Rate Engine</h5><p>Daily ECB-sourced live rates and quarterly averages back to 2020. Team custom overrides supported.</p></div>
       </div>
       <div class="fd3-item reveal" style="transition-delay:.10s">
-        <span class="fd3-item-icon">🧮</span>
+        <span class="fd3-item-icon"><svg class="ic"><use href="#ic-calc"/></svg></span>
         <div><h5>Advanced Formula Mode</h5><p>Free-form expressions with variables mapped to indices, fixed values, or per-period uploads.</p></div>
       </div>
       <div class="fd3-item reveal" style="transition-delay:.15s">
-        <span class="fd3-item-icon">📊</span>
+        <span class="fd3-item-icon"><svg class="ic"><use href="#ic-bars"/></svg></span>
         <div><h5>Data Import &amp; Export</h5><p>CSV and XLSX for prices, volumes, FX, and index overrides. Export any view in one click.</p></div>
       </div>
     </div>
@@ -964,13 +996,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
               <div class="demo-gap-tile-val" style="color:var(--red)" id="demoImpact">€2.1M</div>
             </div>
           </div>
-          <div class="demo-verdict over" id="demoVerdict">⚠ Supplier €56/t over should-cost</div>
+          <div class="demo-verdict over" id="demoVerdict">▲ Supplier €56/t over should-cost</div>
         </div>
         <div class="reveal" style="transition-delay:.1s">
           <div class="slider-group">
             <div class="slider-header">
               <div>
-                <div class="slider-name">🧪 Ammonia index</div>
+                <div class="slider-name">Ammonia index</div>
                 <div class="slider-sub">40% weight · base $340/t</div>
               </div>
               <span class="slider-val" id="slAmmVal">$340/t</span>
@@ -980,7 +1012,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           <div class="slider-group">
             <div class="slider-header">
               <div>
-                <div class="slider-name">⚡ Natural gas</div>
+                <div class="slider-name">Natural gas</div>
                 <div class="slider-sub">30% weight · base $3.0/MMBtu</div>
               </div>
               <span class="slider-val" id="slGasVal">$3.0/MMBtu</span>
@@ -990,7 +1022,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           <div class="slider-group">
             <div class="slider-header">
               <div>
-                <div class="slider-name">📦 Packaging</div>
+                <div class="slider-name">Packaging</div>
                 <div class="slider-sub">20% weight · base $80/t</div>
               </div>
               <span class="slider-val" id="slPkgVal">$80/t</span>
@@ -1000,7 +1032,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           <div class="slider-group">
             <div class="slider-header">
               <div>
-                <div class="slider-name">👷 Labour cost</div>
+                <div class="slider-name">Labour cost</div>
                 <div class="slider-sub">10% weight · base $50/t</div>
               </div>
               <span class="slider-val" id="slLabVal">$50/t</span>
@@ -1032,22 +1064,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <p class="section-sub">Built for buyers who put real negotiation data into the platform. Your cost intelligence stays yours — always.</p>
     <div class="security-grid">
       <div class="security-tile glass skeuo reveal">
-        <div class="security-tile-icon">🛡️</div>
+        <div class="security-tile-icon"><svg class="ic"><use href="#ic-shield"/></svg></div>
         <h4>Row-Level Security</h4>
         <p>Postgres RLS enforced at the database layer. Every tenant's data is strictly isolated — not just in application logic.</p>
       </div>
       <div class="security-tile glass skeuo reveal" style="transition-delay:.08s">
-        <div class="security-tile-icon">🔐</div>
+        <div class="security-tile-icon"><svg class="ic"><use href="#ic-lock"/></svg></div>
         <h4>Encrypted at Rest &amp; Transit</h4>
         <p>AES-256 at rest via Railway Postgres. TLS everywhere in transit. Internal AI calls over private Tailscale network only.</p>
       </div>
       <div class="security-tile glass skeuo reveal" style="transition-delay:.16s">
-        <div class="security-tile-icon">📋</div>
+        <div class="security-tile-icon"><svg class="ic"><use href="#ic-clipboard"/></svg></div>
         <h4>Full Audit Log</h4>
         <p>Every mutation, login, export, and role change is recorded in an append-only audit trail for compliance review.</p>
       </div>
       <div class="security-tile glass skeuo reveal" style="transition-delay:.24s">
-        <div class="security-tile-icon">🔑</div>
+        <div class="security-tile-icon"><svg class="ic"><use href="#ic-key"/></svg></div>
         <h4>RBAC + Permissions</h4>
         <p>Team-scoped roles with granular permission gates. Plan ceilings enforced server-side. Invite-only sign-up.</p>
       </div>
@@ -1105,32 +1137,32 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <p class="section-sub">How we handle your data, your IP, and your trust — no dark patterns.</p>
     <div class="legal-grid">
       <div class="legal-card reveal">
-        <div class="legal-card-icon">📜</div>
+        <div class="legal-card-icon"><svg class="ic"><use href="#ic-file"/></svg></div>
         <h4>Terms of Service</h4>
         <p>Use CostAdvisor to build and analyse should-cost models for your organisation's procurement. Redistribution, resale, or reverse-engineering is prohibited. It's a decision-support tool — we're not liable for commercial outcomes of the figures or briefs it generates.</p>
       </div>
       <div class="legal-card reveal" style="transition-delay:.07s">
-        <div class="legal-card-icon">🔒</div>
+        <div class="legal-card-icon"><svg class="ic"><use href="#ic-lock"/></svg></div>
         <h4>Privacy &amp; GDPR</h4>
         <p>Operated from the EU on the lawful basis of contract performance and legitimate interest. You can access, correct, export, or delete your data at any time. We never sell personal data.</p>
       </div>
       <div class="legal-card reveal" style="transition-delay:.14s">
-        <div class="legal-card-icon">🏛️</div>
+        <div class="legal-card-icon"><svg class="ic"><use href="#ic-landmark"/></svg></div>
         <h4>Your Data, Your IP</h4>
         <p>Your cost models, uploaded data, and negotiation briefs stay your intellectual property. The platform, formulas, and UI are ours. Index data (ECB, EIA, Eurostat, FRED, World Bank) is provided for information — always validate before negotiating.</p>
       </div>
       <div class="legal-card reveal" style="transition-delay:.21s">
-        <div class="legal-card-icon">🇪🇺</div>
+        <div class="legal-card-icon"><svg class="ic"><use href="#ic-globe"/></svg></div>
         <h4>Residency &amp; Retention</h4>
         <p>Data is stored on EU (Frankfurt) Postgres, encrypted at rest (AES-256) and in transit (TLS 1.2+). Account data is kept for your subscription term; on deletion, personal data is removed within 30 days.</p>
       </div>
       <div class="legal-card reveal" style="transition-delay:.28s">
-        <div class="legal-card-icon">🔑</div>
+        <div class="legal-card-icon"><svg class="ic"><use href="#ic-key"/></svg></div>
         <h4>Authentication &amp; AI</h4>
         <p>Google OAuth for sign-in — we never store passwords. AI narratives run on a self-hosted model; no data is sent to OpenAI or any third-party AI provider.</p>
       </div>
       <div class="legal-card reveal" style="transition-delay:.35s">
-        <div class="legal-card-icon">✉️</div>
+        <div class="legal-card-icon"><svg class="ic"><use href="#ic-mail"/></svg></div>
         <h4>Questions?</h4>
         <p>Privacy and legal queries go to <a href="mailto:laurent.thomas@staminachem.com" style="color:var(--blue)">laurent.thomas@staminachem.com</a> (StaminaChem). We respond within two business days.</p>
       </div>
@@ -1202,7 +1234,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       <button class="btn btn-primary" id="lpModalSubmit" style="width:100%;justify-content:center" onclick="submitAccessModal()">Send request</button>
     </div>
     <div class="modal-success" id="lpModalSuccess">
-      <div class="modal-success-icon">✅</div>
+      <div class="modal-success-icon"><svg class="ic"><use href="#ic-check"/></svg></div>
       <h4>Request received</h4>
       <p>We'll be in touch within 48 hours. Keep an eye on your inbox.</p>
     </div>
@@ -1271,7 +1303,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <!-- Success -->
     <div id="lpDemoSuccess" style="display:none">
       <div style="text-align:center;padding:20px 0">
-        <div style="font-size:48px;margin-bottom:14px">🎉</div>
+        <div style="margin-bottom:14px;color:var(--green)"><svg class="ic" style="width:48px;height:48px;margin:0 auto"><use href="#ic-check"/></svg></div>
         <h4 style="font-size:20px;font-weight:700;margin-bottom:8px">Demo booked!</h4>
         <p style="font-size:14px;color:var(--muted)">Check your inbox for a confirmation with Google Meet link.</p>
       </div>
@@ -1280,7 +1312,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <!-- Error -->
     <div id="lpDemoError" style="display:none">
       <div style="text-align:center;padding:20px 0">
-        <div style="font-size:48px;margin-bottom:14px">⚠️</div>
+        <div style="margin-bottom:14px;color:var(--amber)"><svg class="ic" style="width:48px;height:48px;margin:0 auto"><use href="#ic-alert"/></svg></div>
         <h4 style="font-size:20px;font-weight:700;margin-bottom:8px">Something went wrong</h4>
         <p id="lpDemoErrorMsg" style="font-size:14px;color:var(--muted)">Please try again or email us.</p>
         <button class="btn btn-ghost" style="margin-top:16px" onclick="openDemoModal()">Try again</button>
@@ -1719,7 +1751,7 @@ function updateDemo() {
   document.getElementById('demoTotal').style.color=sevColor;
   document.getElementById('demoDonutTotal').style.color=sevColor;
   const verdict=document.getElementById('demoVerdict');
-  if(gap>5){verdict.className='demo-verdict over';verdict.textContent=`⚠ Supplier €${Math.round(diff)}/t over should-cost`;}
+  if(gap>5){verdict.className='demo-verdict over';verdict.textContent=`▲ Supplier €${Math.round(diff)}/t over should-cost`;}
   else if(gap<-5){verdict.className='demo-verdict under';verdict.textContent=`↓ Supplier €${Math.round(-diff)}/t below should-cost`;}
   else{verdict.className='demo-verdict fair';verdict.textContent='✓ Fair price — within range';}
 
