@@ -10,6 +10,11 @@
   <meta property="og:url" content="https://www.costadvisor.org/" />
   <meta property="og:title" content="CostAdvisor — Procurement Cost Intelligence" />
   <meta property="og:description" content="Know if your supplier's price increase is justified — before you negotiate." />
+  <meta property="og:image" content="https://www.costadvisor.org/og-cover.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="CostAdvisor — know what your products should cost. A StaminaChem company." />
+  <meta name="twitter:image" content="https://www.costadvisor.org/og-cover.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="CostAdvisor — Procurement Cost Intelligence" />
   <meta name="twitter:description" content="Should-cost models. Live market indices. AI negotiation briefs." />
@@ -22,6 +27,14 @@
   <noscript><link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" /></noscript>
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"CostAdvisor","url":"https://www.costadvisor.org/","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Buyer-side should-cost intelligence for procurement teams.","publisher":{"@type":"Organization","name":"StaminaChem","url":"https://staminachem.com/","email":"laurent.thomas@staminachem.com","address":{"@type":"PostalAddress","streetAddress":"Schubertring 14/1, Stock/1","postalCode":"1010","addressLocality":"Wien","addressCountry":"AT"}}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+    {"@type":"Question","name":"What does CostAdvisor do?","acceptedAnswer":{"@type":"Answer","text":"CostAdvisor builds buyer-side should-cost models: decompose a product into raw-material components, link each to a live commodity index, and calculate what it should cost today — then compare against your supplier's price to quantify the negotiation gap."}},
+    {"@type":"Question","name":"Is my data secure?","acceptedAnswer":{"@type":"Answer","text":"Yes. Every tenant is isolated at the database level via Postgres row-level security. Data is encrypted at rest (AES-256) and in transit (TLS 1.2+), and all mutations are audit-logged."}},
+    {"@type":"Question","name":"Where is my data stored?","acceptedAnswer":{"@type":"Answer","text":"On EU (Frankfurt) Postgres. Account data is kept for your subscription term; on deletion, personal data is removed within 30 days."}},
+    {"@type":"Question","name":"Do you use my data to train AI?","acceptedAnswer":{"@type":"Answer","text":"No. AI narratives run on a self-hosted model. No data is sent to OpenAI or any third-party AI provider."}},
+    {"@type":"Question","name":"Who owns my cost models and briefs?","acceptedAnswer":{"@type":"Answer","text":"You do. Your cost models, uploaded data, and negotiation briefs remain your intellectual property."}},
+    {"@type":"Question","name":"How do I get access?","acceptedAnswer":{"@type":"Answer","text":"CostAdvisor is currently invite-only. Request access with your work email and we'll review and reach out within 48 hours."}}
+  ]}</script>
 
 <style>
 /* ── Reset & tokens ─────────────────────────────────────── */
