@@ -213,7 +213,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Security posture document ready to share with enterprise IT
 
 - 🔴 **Scrum 11** — SOC 2 groundwork
-  - 🔴 Sentry capturing errors in production
+  - 🟡 Sentry capturing errors in production (`init_sentry()` wired in `observability.py` + called from `main.py`, user context attached; `sentry_dsn` config defaults empty — needs the Railway env var set in prod to actually capture)
   - 🔴 Uptime monitoring with alerting configured
   - 🔴 Branch protection on `main` enforced
   - 🟢 Costing engine has determinism regression tests — `test_brief.py` covers brief / evolution / squeeze (repeated calls return identical output) + exact numeric anchors on the brief
@@ -376,7 +376,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
     - 🟢 Comments — `Brief.jsx` + engine comment only the non-obvious *why* (null-passthrough, active-formula choice); no redundant comments
 
 - 🔴 **Scrum 16** — Self-serve onboarding (empty states, example data, guidance to first should-cost vs actual gap)
-  - 🟡 Every list/chart page has a non-empty empty state with a clear next action (Dashboard, Pricing, Products, FX Rates covered; Suppliers now has a "+ Add your first supplier" CTA; Indexes / Formulas / Scenarios still to do)
+  - 🟡 Every list/chart page has a non-empty empty state with a clear next action (Dashboard, Pricing, Products, Suppliers "+ Add your first supplier", Formulas, and the merged Index Library "No index data… yet" all covered; standalone FX Rates / Indexes pages were retired into the Index Library; Scenarios still to do)
   - 🔴 "Load example data" works for a brand-new team and produces a runnable should-cost
   - 🔴 Onboarding checklist tracks real progress and disappears when done
   - 🔴 A new user can reach a gap insight without external guidance
@@ -404,12 +404,13 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
 
 ### Wave 2
 
-- 🔴 **Scrum 19** — Automatic gap flagging (dashboard as portfolio triage screen ranked by money at stake)
-  - 🔴 Dashboard shows all products with a should-cost vs actual comparison in one view
-  - 🔴 Each row shows: product, supplier, should-cost, actual price, gap %, gap value (price × volume)
-  - 🔴 Rows sorted by absolute gap value descending — biggest opportunity first
-  - 🔴 Visual indicator (colour or bar) for gap severity
-  - 🔴 Clicking a row navigates to the cost model
+- 🟡 **Scrum 19** — Automatic gap flagging (dashboard as portfolio triage screen ranked by money at stake)
+  - 🟢 Dashboard shows all products with a should-cost vs actual comparison in one view (`Dashboard.jsx` → `GET /api/portfolio/summary` in `routers/portfolio.py`)
+  - 🟢 Each row shows: product, supplier, should-cost, actual price, gap %, gap value (price × volume) (`Dashboard.jsx` table; gap = `latest_actual − current_sc`, exposure = `gap × total_vol`)
+  - 🟢 Rows sorted by absolute gap value descending — biggest opportunity first (default sort `exposure` desc, also sortable by gap%/should-cost)
+  - 🟡 Visual indicator (colour or bar) for gap severity (colour-coded gap% cell + IDX/DRIFT flag badges; no graded severity bar yet)
+  - 🟢 Clicking a row navigates to the cost model (View → `/cost-models/:id`, plus Evo/Brief actions)
+  - 🟡 **Audit note (this pass):** the triage Dashboard is live and real (not demo). What's left for 🟢: a graded severity bar and any category-level rollup.
 
 - 🔴 **Scrum 20** — Procurement Priority Matrix (portfolio view: volatility × spend exposure)
   - 🔴 2×2 or scatter matrix: index volatility (x) vs spend exposure (y) per product/category
@@ -417,22 +418,25 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Volatility calculated from index movement over trailing 4 quarters
   - 🔴 Spend exposure = should-cost × volume
   - 🔴 Exportable as CSV and image
+  - 🔴 **Audit note (this pass):** `workspace/PortfolioArea.jsx` is a read-only demo mockup (hardcoded data), not a real matrix; no volatility calc or quadrant logic exists yet.
 
-- 🔴 **Scrum 21** — Predictive index forecasting (directional, uncertainty-honest)
-  - 🔴 Each tracked index shows a trailing trend and a 2-quarter forward projection
-  - 🔴 Projection uses simple trend extrapolation; confidence band shown
-  - 🔴 "Impact on my models" — shows projected should-cost change if forecast holds
-  - 🔴 Clearly labelled as an estimate, not a guarantee
+- 🟡 **Scrum 21** — Predictive index forecasting (directional, uncertainty-honest)
+  - 🟡 Each tracked index shows a trailing trend and a 2-quarter forward projection (`workspace/ForecastArea.jsx` UI exists with Base/Bear/Bull series — but values are hardcoded demo data; no forecast engine)
+  - 🔴 Projection uses simple trend extrapolation; confidence band shown (no algorithm in `costing_engine.py`/`services/`)
+  - 🔴 "Impact on my models" — shows projected should-cost change if forecast holds (demo rows only, no backend compute)
+  - 🟢 Clearly labelled as an estimate, not a guarantee (`ForecastArea.jsx` subtitle: "Illustrative — the forecast engine is a Wave-2 build")
+  - 🟡 **Audit note (this pass):** UI scaffold only; the forecast engine itself is net-new and unbuilt.
 
 - 🔴 **Scrum 22** — Opportunistic buy windows (spot vs contract signal)
   - 🔴 Per-product signal: current should-cost vs 4-quarter average — "cheap now" or "expensive now"
   - 🔴 Requires spot-price data stored at product level (extend pricing model)
   - 🔴 Recommendation shown in cost model view and dashboard
 
-- 🔴 **Scrum 23** — Supplier benchmarking (who prices near should-cost, who pads margin)
-  - 🔴 Per-supplier view: average gap % across all products, trend over time
-  - 🔴 Ranking table: suppliers ordered by how closely they track should-cost
-  - 🔴 Visible to owner/admin only; seeds Wave 3 trust grading
+- 🟡 **Scrum 23** — Supplier benchmarking (who prices near should-cost, who pads margin)
+  - 🟡 Per-supplier view: average gap % across all products, trend over time (Suppliers CRUD + `GET /api/suppliers/{id}/purchase-history` returns per-product price/volume history — but no aggregated avg-gap% or trend computed yet)
+  - 🔴 Ranking table: suppliers ordered by how closely they track should-cost (no aggregation/ranking endpoint)
+  - 🟡 Visible to owner/admin only; seeds Wave 3 trust grading (export gated on `suppliers.export`, but no benchmarking view exists; no trust fields on `Supplier`)
+  - 🟡 **Audit note (this pass):** the data plumbing (suppliers + purchase history) exists; the benchmarking analytics/ranking layer does not.
 
 - 🔴 **Scrum 24** — Alerts (email & Slack on index moves, new gaps, buy windows)
   - 🔴 User can subscribe to alerts per index or per product
@@ -446,6 +450,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Flag a model as "in negotiation", "agreed", "under review"
   - 🔴 Notes and flags visible to all team members; recorded in AuditLog
   - 🔴 @mention teammate in a note triggers email notification
+  - 🔴 **Audit note (this pass):** no Note/Comment model and no flag-state field; a nullable `formula_versions.notes` column exists but is unused — not wired to any endpoint or UI.
 
 - 🔴 **Scrum 26** — Index-provider API integration (stretch — Fastmarkets, Argus, ICIS)
   - 🔴 Team can configure an API key for a supported index provider
@@ -463,17 +468,19 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 UI shows nested breakdown: top-level components expand to reveal sub-model detail
   - 🔴 Export and brief generation handle nested structure correctly
 
-- 🔴 **Scrum 28** — Complex mathematical formulas (non-linear, thresholds, conditional logic)
-  - 🔴 Formula components support: min/max bounds, step functions, yield/conversion factors
-  - 🔴 Expression editor or structured form for defining non-linear relationships
-  - 🔴 Costing engine validates and evaluates complex expressions deterministically
+- 🟡 **Scrum 28** — Complex mathematical formulas (non-linear, thresholds, conditional logic)
+  - 🔴 Formula components support: min/max bounds, step functions, yield/conversion factors (none of these exist on `FormulaComponent`)
+  - 🟢 Expression editor or structured form for defining non-linear relationships (advanced free-form expression mode shipped in Scrum 14b — UI editor + variable mapping)
+  - 🟡 Costing engine validates and evaluates complex expressions deterministically (`safe_eval_expr` evaluates arithmetic expressions safely — but only arithmetic; no thresholds/conditionals/bounds)
   - 🔴 Pairs with Scrum 27 (Lego) — designed together
+  - 🟡 **Audit note (this pass):** 14b delivered the arithmetic-expression substrate; Scrum 28's *additional* non-linear/threshold/bounds/yield features are still unbuilt.
 
-- 🔴 **Scrum 29** — Negotiation aid system (guided advisor with auto-generated script and materials)
-  - 🔴 "Prepare negotiation" flow: enter known supplier position, get counter-argument suggestions
-  - 🔴 Auto-generates talking points from the gap, drivers, and index movement
+- 🟡 **Scrum 29** — Negotiation aid system (guided advisor with auto-generated script and materials)
+  - 🔴 "Prepare negotiation" flow: enter known supplier position, get counter-argument suggestions (no flow/endpoint; `workspace/NegotiateArea.jsx` is a hardcoded mockup, not wired to an API)
+  - 🟡 Auto-generates talking points from the gap, drivers, and index movement (`services/narrative.py` produces rule-based + LLM talking points for the brief — but not as a distinct counter-argument advisor)
   - 🔴 Produces a structured negotiation brief: your position, likely counter, recommended floor
   - 🔴 Output exportable as PDF alongside the standard cost brief
+  - 🟡 **Audit note (this pass):** narrative generation is the only real piece; the guided advisor (position/counter/floor + script) is unbuilt and the Negotiate workspace page is demo-only.
 
 - 🔴 **Scrum 30** — Extract pricing from PDFs (supplier quotes and price lists)
   - 🔴 User uploads a supplier PDF; system extracts product name, price, date, currency
