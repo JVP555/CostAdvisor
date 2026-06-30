@@ -534,6 +534,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       <a href="#security">Security</a>
     </div>
     <div class="nav-actions">
+      <a class="btn btn-ghost js-signin" href="https://app.costadvisor.org">Sign in</a>
       <button class="btn btn-ghost" onclick="openAccessModal()">Request Access</button>
       <button class="btn btn-primary" onclick="openDemoModal()">Schedule Demo</button>
     </div>
@@ -545,6 +546,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <a href="#how">How It Works</a>
     <a href="#security">Security</a>
     <a href="#cta">Request Access</a>
+    <a class="js-signin" href="https://app.costadvisor.org">Sign in</a>
     <a href="javascript:void(0)" onclick="openDemoModal()" style="color:var(--blue);font-weight:600">Schedule a Demo →</a>
   </div>
 </nav>
@@ -1235,6 +1237,14 @@ const API_URL = window.location.hostname.includes('dev.')
   : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:8000'
     : 'https://api.costadvisor.org';
+
+// The app lives on app.<env> (dev: app.dev.costadvisor.org); point Sign-in links at it.
+const APP_URL = window.location.hostname.includes('dev.')
+  ? 'https://app.dev.costadvisor.org'
+  : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5173'
+    : 'https://app.costadvisor.org';
+document.querySelectorAll('.js-signin').forEach(a => { a.href = APP_URL; });
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
