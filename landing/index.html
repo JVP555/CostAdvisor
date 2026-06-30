@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"CostAdvisor","url":"https://www.costadvisor.org/","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Buyer-side should-cost intelligence for procurement teams."}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"CostAdvisor","url":"https://www.costadvisor.org/","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Buyer-side should-cost intelligence for procurement teams.","publisher":{"@type":"Organization","name":"StaminaChem","url":"https://staminachem.com/","email":"laurent.thomas@staminachem.com","address":{"@type":"PostalAddress","streetAddress":"Schubertring 14/1, Stock/1","postalCode":"1010","addressLocality":"Wien","addressCountry":"AT"}}}</script>
 
 <style>
 /* ── Reset & tokens ─────────────────────────────────────── */
@@ -1073,7 +1073,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       <div class="legal-card reveal" style="transition-delay:.35s">
         <div class="legal-card-icon">✉️</div>
         <h4>Questions?</h4>
-        <p>Privacy and legal queries go to <a href="mailto:privacy@costadvisor.org" style="color:var(--blue)">privacy@costadvisor.org</a>. We respond within two business days.</p>
+        <p>Privacy and legal queries go to <a href="mailto:laurent.thomas@staminachem.com" style="color:var(--blue)">laurent.thomas@staminachem.com</a> (StaminaChem). We respond within two business days.</p>
       </div>
     </div>
   </div>
@@ -1089,6 +1089,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           <span class="nav-wordmark">CostAdvisor</span>
         </a>
         <p>Buyer-side cost intelligence for procurement teams. Know what your products should cost before your supplier tells you.</p>
+        <p style="margin-top:14px">Built by <a href="https://staminachem.com/" target="_blank" rel="noopener noreferrer" style="color:var(--blue);font-weight:600">StaminaChem ↗</a> — chemical-industry strategy &amp; procurement consultants.</p>
+        <p style="margin-top:12px;font-size:12px;line-height:1.8">
+          <a href="mailto:laurent.thomas@staminachem.com" style="color:var(--blue)">laurent.thomas@staminachem.com</a><br>
+          +1 646 468 87 17 &nbsp;·&nbsp; +33 6 07 89 34 82<br>
+          Schubertring 14/1, Stock/1, 1010 Wien, Austria
+        </p>
       </div>
       <div class="footer-col">
         <h5>Platform</h5>
@@ -1103,10 +1109,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
         <a href="javascript:void(0)" onclick="openDemoModal()">Schedule Demo</a>
         <a href="#terms">Privacy Policy</a>
         <a href="#terms">Terms of Service</a>
+        <a href="https://staminachem.com/" target="_blank" rel="noopener noreferrer">StaminaChem ↗</a>
       </div>
     </div>
     <div class="footer-bottom">
-      <p>© 2026 CostAdvisor. All rights reserved.</p>
+      <p>© 2026 CostAdvisor — a <a href="https://staminachem.com/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline">StaminaChem</a> company. All rights reserved.</p>
       <p style="font-family:var(--font-mono);font-size:11px;color:var(--dim)">Procurement intelligence. Not guesswork.</p>
     </div>
   </div>
@@ -1627,7 +1634,7 @@ async function submitAccessModal(){
     document.getElementById('lpModalSuccess').style.display='block';
   }catch{
     btn.disabled=false;btn.textContent='Send request';
-    errEl.textContent='Something went wrong. Try again or email access@costadvisor.org.';
+    errEl.textContent='Something went wrong. Try again or email laurent.thomas@staminachem.com.';
     errEl.style.display='block';
   }
 }
