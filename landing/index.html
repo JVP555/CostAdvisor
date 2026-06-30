@@ -16,7 +16,10 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <!-- Non-render-blocking font load: preload + swap media on load; <noscript> fallback -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" /></noscript>
   <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"CostAdvisor","url":"https://www.costadvisor.org/","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Buyer-side should-cost intelligence for procurement teams.","publisher":{"@type":"Organization","name":"StaminaChem","url":"https://staminachem.com/","email":"laurent.thomas@staminachem.com","address":{"@type":"PostalAddress","streetAddress":"Schubertring 14/1, Stock/1","postalCode":"1010","addressLocality":"Wien","addressCountry":"AT"}}}</script>
 
@@ -148,7 +151,7 @@ section{padding:96px 0}
 .mockup-metric-val{font-size:15px;font-weight:700;font-family:var(--font-mono)}
 
 /* ── Ticker ─────────────────────────────────────────────── */
-.ticker-wrap{background:rgba(0,0,0,.03);border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden;padding:12px 0;margin-top:56px}
+.ticker-wrap{background:rgba(0,0,0,.03);border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden;padding:12px 0;margin-top:56px;min-height:44px}
 .ticker-inner{display:flex;gap:48px;width:max-content;animation:ticker 28s linear infinite}
 @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .ticker-item{display:flex;align-items:center;gap:10px;white-space:nowrap}
