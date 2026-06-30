@@ -110,8 +110,11 @@ section{padding:96px 0}
 .nav.scrolled{box-shadow:0 2px 20px rgba(0,0,0,.09)}
 .nav-inner{max-width:1180px;margin:0 auto;padding:0 24px;height:64px;display:flex;align-items:center;gap:32px}
 .nav-logo{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.nav-logomark{width:32px;height:32px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;box-shadow:0 2px 8px rgba(0,169,157,.35),inset 0 1px 0 rgba(255,255,255,.25)}
-.nav-wordmark{font-size:15px;font-weight:700}
+.nav-logomark{width:34px;height:34px;border-radius:9px;overflow:hidden;flex-shrink:0;box-shadow:0 3px 10px rgba(0,169,157,.34),inset 0 1px 0 rgba(255,255,255,.22)}
+.nav-logomark svg{display:block;width:100%;height:100%}
+.nav-wordmark{font-size:16px;font-weight:700;letter-spacing:-.015em}
+.nav-wordmark b{font-weight:800}
+.nav-wordmark .wm-light{font-weight:500;opacity:.85}
 .nav-links{display:flex;align-items:center;gap:28px;flex:1;justify-content:center}
 .nav-links a{font-size:13px;font-weight:500;color:var(--muted);transition:color .15s}
 .nav-links a:hover{color:var(--text)}
@@ -545,12 +548,27 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <div id="lpProgress"></div>
 
 <a href="#main" class="skip-link">Skip to content</a>
+<!-- Shared brand mark (single source of truth, referenced via <use> in nav + footer) -->
+<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true" focusable="false">
+  <symbol id="ca-logo" viewBox="0 0 32 32">
+    <defs>
+      <linearGradient id="ca-logo-grad" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#00c8bc"/><stop offset="1" stop-color="#007e93"/>
+      </linearGradient>
+    </defs>
+    <rect width="32" height="32" rx="8" fill="url(#ca-logo-grad)"/>
+    <!-- ascending index line + node — "cost intelligence from market indices" -->
+    <path d="M7 21 L13 15.5 L18 18 L25 9.5" fill="none" stroke="#ffffff" stroke-width="2.4"
+          stroke-linecap="round" stroke-linejoin="round" opacity=".96"/>
+    <circle cx="25" cy="9.5" r="2.5" fill="#ffffff"/>
+  </symbol>
+</svg>
 <!-- ── Nav ──────────────────────────────────────────────────── -->
 <nav class="nav">
   <div class="nav-inner">
     <a href="/" class="nav-logo">
-      <div class="nav-logomark">CA</div>
-      <span class="nav-wordmark">CostAdvisor</span>
+      <span class="nav-logomark"><svg viewBox="0 0 32 32"><use href="#ca-logo"/></svg></span>
+      <span class="nav-wordmark"><b>Cost</b><span class="wm-light">Advisor</span></span>
     </a>
     <div class="nav-links">
       <a href="#features">Features</a>
@@ -1114,8 +1132,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <div class="footer-grid">
       <div class="footer-brand">
         <a href="/" class="nav-logo" style="display:inline-flex;margin-bottom:12px">
-          <div class="nav-logomark">CA</div>
-          <span class="nav-wordmark">CostAdvisor</span>
+          <span class="nav-logomark"><svg viewBox="0 0 32 32"><use href="#ca-logo"/></svg></span>
+          <span class="nav-wordmark"><b>Cost</b><span class="wm-light">Advisor</span></span>
         </a>
         <p>Buyer-side cost intelligence for procurement teams. Know what your products should cost before your supplier tells you.</p>
         <p style="margin-top:14px">Built by <a href="https://staminachem.com/" target="_blank" rel="noopener noreferrer" style="color:var(--blue);font-weight:600">StaminaChem ↗</a> — chemical-industry strategy &amp; procurement consultants.</p>
