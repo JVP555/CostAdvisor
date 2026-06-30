@@ -49,6 +49,8 @@ input,textarea,select{
 input:focus,textarea:focus{border-color:var(--blue)}
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:4px}
 button:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.skip-link{position:absolute;left:-9999px;top:0;z-index:10000;background:var(--blue);color:#fff;padding:10px 16px;border-radius:0 0 8px 0;font-weight:600;text-decoration:none}
+.skip-link:focus{left:0}
 
 /* ── Glass / skeuo ──────────────────────────────────────── */
 /* Glass: reserved for nav only (One Glass Rule). On cards it degrades to a clean white surface. */
@@ -520,6 +522,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <div id="lpProgress"></div>
 
+<a href="#main" class="skip-link">Skip to content</a>
 <!-- ── Nav ──────────────────────────────────────────────────── -->
 <nav class="nav">
   <div class="nav-inner">
@@ -551,6 +554,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   </div>
 </nav>
 
+<main id="main">
 <!-- ── Hero ─────────────────────────────────────────────────── -->
 <section class="hero">
   <div class="hero-dots"></div>
@@ -683,7 +687,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           </div>
           <div class="fx-range-row" id="fxRangeRow"></div>
           <div class="fx-chart-canvas-wrap">
-            <canvas id="fxChart"></canvas>
+            <canvas id="fxChart" role="img" aria-label="Daily exchange-rate trend chart for the selected currency pair"></canvas>
           </div>
         </div>
         <div class="fx-current-grid" id="fxCurrentGrid"></div>
@@ -704,7 +708,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           <div class="evo-legend-item"><span class="evo-legend-dot" style="background:#EF4444"></span>Supplier Price</div>
           <div class="evo-legend-item"><span class="evo-legend-dot" style="background:rgba(239,68,68,.35)"></span>Negotiation Gap</div>
         </div>
-        <div class="evo-chart-wrap"><canvas id="evoChart"></canvas></div>
+        <div class="evo-chart-wrap"><canvas id="evoChart" role="img" aria-label="Quarterly should-cost versus supplier price, showing the negotiation gap widening over time"></canvas></div>
         <p id="evoNote" style="font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-top:10px"></p>
       </div>
       <div class="evo-stats">
@@ -955,7 +959,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       <div class="demo-viz reveal" style="transition-delay:.15s">
         <div class="demo-viz-title">COMPONENT COST BREAKDOWN · €/t</div>
         <div class="demo-donut-wrap">
-          <canvas id="demoChart"></canvas>
+          <canvas id="demoChart" role="img" aria-label="Should-cost component breakdown doughnut chart"></canvas>
           <div class="demo-donut-center">
             <div class="demo-donut-center-label">SHOULD-COST</div>
             <div class="demo-donut-center-val" id="demoDonutTotal">€342</div>
@@ -1081,6 +1085,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   </div>
 </section>
 
+</main>
 <!-- ── Footer ────────────────────────────────────────────────── -->
 <footer class="footer">
   <div class="container">
@@ -1123,9 +1128,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- ── Access Request Modal ──────────────────────────────────── -->
 <div class="modal-backdrop" id="lpAccessModal" onclick="handleModalBackdrop(event)">
-  <div class="modal">
-    <button class="modal-close" onclick="closeAccessModal()">×</button>
-    <h3>Request Early Access</h3>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lpAccessTitle">
+    <button class="modal-close" onclick="closeAccessModal()" aria-label="Close dialog">×</button>
+    <h3 id="lpAccessTitle">Request Early Access</h3>
     <p class="modal-sub">CostAdvisor is currently invite-only. We'll review your request and reach out within 48 hours.</p>
     <div id="lpModalForm">
       <div class="form-group" style="margin-bottom:10px">
@@ -1153,9 +1158,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- ── Demo Scheduling Modal ─────────────────────────────────── -->
 <div class="modal-backdrop" id="lpDemoModal" onclick="handleDemoBackdrop(event)">
-  <div class="modal" style="max-width:500px">
-    <button class="modal-close" onclick="closeDemoModal()">×</button>
-    <h3>Schedule a Demo</h3>
+  <div class="modal" style="max-width:500px" role="dialog" aria-modal="true" aria-labelledby="lpDemoTitle">
+    <button class="modal-close" onclick="closeDemoModal()" aria-label="Close dialog">×</button>
+    <h3 id="lpDemoTitle">Schedule a Demo</h3>
     <p class="modal-sub">Pick a date and time — 30 minutes, no slides.</p>
     <div class="demo-steps">
       <div class="demo-step-dot active" id="lpStep1Dot"></div>
@@ -1469,7 +1474,7 @@ function buildPulseCards() {
       <div class="pulse-card-val">${valStr}</div>
       <div class="pulse-card-unit">${c.unit}${period?' · '+period:''}</div>
       <span class="pulse-card-chg ${up?'chg-up':'chg-dn'}">${up?'▲':'▼'} ${Math.abs(chg)}% QoQ</span>
-      <div class="pulse-canvas-wrap"><canvas id="spark${i}"></canvas></div>
+      <div class="pulse-canvas-wrap"><canvas id="spark${i}" role="img" aria-label="${c.name} price index, last 12 quarters"></canvas></div>
     </div>`;
   }).join('');
   const note=document.getElementById('pulseNote');
@@ -1695,7 +1700,9 @@ function initDemoChart() {
 }
 
 // ── Access modal ─────────────────────────────────────────────
+let _lastFocus=null, _activeModal=null;  // for modal focus trap + restore
 function openAccessModal(){
+  _lastFocus=document.activeElement; _activeModal='lpAccessModal';
   document.getElementById('lpModalForm').style.display='';
   document.getElementById('lpModalSuccess').style.display='none';
   document.getElementById('lpModalError').style.display='none';
@@ -1709,6 +1716,7 @@ function openAccessModal(){
 function closeAccessModal(){
   document.getElementById('lpAccessModal').style.display='none';
   document.body.style.overflow='';
+  if(_activeModal==='lpAccessModal'){_activeModal=null; if(_lastFocus&&_lastFocus.focus)_lastFocus.focus();}
 }
 function handleModalBackdrop(e){if(e.target===document.getElementById('lpAccessModal'))closeAccessModal()}
 
@@ -1742,6 +1750,7 @@ let _demoYear, _demoMonth, _demoSelDate=null, _demoSelSlot=null;
 const _availDates={};
 
 function openDemoModal(){
+  _lastFocus=document.activeElement; _activeModal='lpDemoModal';
   const now=new Date();
   _demoYear=now.getFullYear();_demoMonth=now.getMonth();
   _demoSelDate=null;_demoSelSlot=null;
@@ -1753,6 +1762,7 @@ function openDemoModal(){
 function closeDemoModal(){
   document.getElementById('lpDemoModal').style.display='none';
   document.body.style.overflow='';
+  if(_activeModal==='lpDemoModal'){_activeModal=null; if(_lastFocus&&_lastFocus.focus)_lastFocus.focus();}
 }
 function handleDemoBackdrop(e){if(e.target===document.getElementById('lpDemoModal'))closeDemoModal()}
 
@@ -2007,7 +2017,18 @@ setTimeout(()=>{if(!_popupShown){_popupShown=true;showPopup()}},16000);
 
 // ── Keyboard ─────────────────────────────────────────────────
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closeAccessModal();closeDemoModal()}
+  if(e.key==='Escape'){closeAccessModal();closeDemoModal();return}
+  // Trap Tab within the open modal (focus can't escape to background content).
+  if(e.key==='Tab'&&_activeModal){
+    const modal=document.querySelector('#'+_activeModal+' .modal');
+    if(!modal)return;
+    const list=[...modal.querySelectorAll('a[href],button:not([disabled]),input,select,textarea,[tabindex]:not([tabindex="-1"])')]
+      .filter(el=>el.offsetParent!==null);
+    if(!list.length)return;
+    const first=list[0], last=list[list.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+  }
 });
 
 // ── Nav burger ────────────────────────────────────────────────
