@@ -39,9 +39,10 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        settings.app_url,
+        settings.app_url,  # the app (prod: costadvisor.org; dev: app.dev.costadvisor.org)
         "http://localhost:3333",
-        "https://www.costadvisor.org",  # landing page submitting access requests
+        "https://www.costadvisor.org",   # prod landing — access requests / demos
+        "https://dev.costadvisor.org",   # dev landing — access requests / demos
     ],
     allow_credentials=True,
     allow_methods=["*"],
