@@ -141,6 +141,14 @@ export default function IndexLibraryArea() {
       if (!grouped[key]) grouped[key] = { mat: d.commodity_name, reg: d.region, commodity_id: d.commodity_id, valMap: {} };
       grouped[key].valMap[`Q${d.quarter}-${String(d.year).slice(2)}`] = d;
     });
+    // List EVERY tracked non-FX index (subtitle: "every tracked index"), incl. seeded
+    // catalog entries that have no values yet — they get one empty GLOBAL row.
+    commodities.forEach(c => {
+      if (c.category === 'FX') return;
+      if (!Object.values(grouped).some(g => g.commodity_id === c.id)) {
+        grouped[`${c.name}__GLOBAL`] = { mat: c.name, reg: 'GLOBAL', commodity_id: c.id, valMap: {} };
+      }
+    });
     const indexRows = Object.values(grouped).map(r => {
       const cells = periods.map(p => r.valMap[p.label] || null);
       const nums = cells.map(c => c?.value).filter(v => v != null);
@@ -179,13 +187,13 @@ export default function IndexLibraryArea() {
       return {
         mat: pair.name, reg: 'GLOBAL', commodity_id: fxCommodityIdByName[pair.name] ?? null,
         valMap, cells, base, latest, delta, hist: nums,
-        meta: { category: 'FX', unit: pair.name, provider: pair.source_type, frequency: 'Daily' },
+        meta: { category: 'FX', unit: pair.name, provider: pair.source_type, frequency: 'Daily', source_url: pair.scrape_url },
         _pair: pair,
       };
     });
 
     return [...indexRows, ...fxRows].sort((a, b) => a.mat.localeCompare(b.mat));
-  }, [data, periods, commodityMap, pairs, fxPlatformAll, fxCustomAll, fxCommodityIdByName]);
+  }, [data, periods, commodityMap, commodities, pairs, fxPlatformAll, fxCustomAll, fxCommodityIdByName]);
 
   const categories = useMemo(() => {
     const counts = {};
@@ -200,7 +208,7 @@ export default function IndexLibraryArea() {
 
   // Export the currently-visible rows (respects type/region/search filters), in display order.
   const handleExport = () => {
-    const headers = ['In use', 'Index', 'Type', 'Provider', 'Region', 'Frequency', 'Latest price', 'vs base %', ...periodsDesc.map(p => p.label)];
+    const headers = ['In use', 'Index', 'Type', 'Provider', 'Source URL', 'Region', 'Frequency', 'Latest price', 'vs base %', ...periodsDesc.map(p => p.label)];
     const out = [];
     categories.forEach(cat => {
       if (typeFilter !== 'all' && typeFilter !== cat.key) return;
@@ -210,6 +218,7 @@ export default function IndexLibraryArea() {
           r.mat,
           r.meta.category || '',
           r.meta.provider || '',
+          r.meta.source_url || '',
           r.reg,
           r.meta.frequency || '',
           r.latest != null ? r.latest : '',
@@ -298,7 +307,13 @@ export default function IndexLibraryArea() {
                             <td><span className="ca-badge" style={{ background: inUse === 'Yes' ? 'var(--success-bg)' : 'var(--neutral-bg)', color: inUse === 'Yes' ? 'var(--accent)' : 'var(--muted)' }}>{inUse}</span></td>
                             <td style={{ fontWeight: 600, color: 'var(--accent4)' }}>{r.mat}</td>
                             <td><span className="ca-badge" style={{ background: 'var(--neutral-bg)', color: CAT_COLOR[r.meta.category] || 'var(--text-secondary)' }}>{r.meta.category || '—'}</span></td>
-                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.meta.provider || '—'}</td>
+                            <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                              {r.meta.source_url
+                                ? <a href={r.meta.source_url} target="_blank" rel="noopener noreferrer" title={r.meta.source_url}
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{ color: 'var(--accent4)', textDecoration: 'underline' }}>{r.meta.provider || 'source'}</a>
+                                : (r.meta.provider || '—')}
+                            </td>
                             <td style={{ fontSize: 12 }}>{r.reg}</td>
                             <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.meta.frequency || '—'}</td>
                             <td className="right" title="Click to override the latest period"
