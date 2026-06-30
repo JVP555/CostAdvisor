@@ -69,6 +69,32 @@ NEW_INDEXES = [
     ("Chromite", "$/mt", "USD", "Metal", None, "Quarterly", None, False),
 ]
 
+# Free public source pages for indexes seeded without one — verified live.
+# Chemicals → businessanalytiq (the same provider as the seeded chemical indexes);
+# minerals → USGS National Minerals Information Center. Backfilled onto rows whose
+# source_url is still empty (idempotent).
+INDEX_SOURCE_URLS = {
+    "Ethylene Oxide": "https://businessanalytiq.com/procurementanalytics/index/ethylene-oxide-price-index/",
+    "Propylene Oxide": "https://businessanalytiq.com/procurementanalytics/index/propylene-oxide-price-index/",
+    "Acrylonitrile (ACN)": "https://businessanalytiq.com/procurementanalytics/index/acrylonitrile-price-index/",
+    "Acrylic Acid": "https://businessanalytiq.com/procurementanalytics/index/acrylic-acid/",
+    "Formaldehyde": "https://businessanalytiq.com/procurementanalytics/index/formaldehyde-price-index/",
+    "Nitric Acid": "https://businessanalytiq.com/procurementanalytics/index/nitric-acid-price-index/",
+    "NMP": "https://businessanalytiq.com/procurementanalytics/index/n-methyl-2-pyrrolidone-nmp-price-index/",
+    "Methyl Chloride": "https://businessanalytiq.com/procurementanalytics/index/chloromethane-price-index/",
+    "Ethyleneamines (TEPA/DETA)": "https://businessanalytiq.com/procurementanalytics/index/ethylenediamine-price-index/",
+    "Aniline": "https://businessanalytiq.com/procurementanalytics/index/aniline-price-index/",
+    "Bisphenol A (BPA)": "https://businessanalytiq.com/procurementanalytics/index/bisphenol-a-price-index/",
+    "Epichlorohydrin (ECH)": "https://businessanalytiq.com/procurementanalytics/index/epichlorohydrin-price-index/",
+    "Hydrogen (grey)": "https://businessanalytiq.com/procurementanalytics/index/green-hydrogen-price-index/",
+    # Minerals — USGS NMIC (free reference; no per-commodity free scrape feed exists)
+    "Salt (NaCl)": "https://www.usgs.gov/centers/national-minerals-information-center/salt-statistics-and-information",
+    "Limestone": "https://www.usgs.gov/centers/national-minerals-information-center/crushed-stone-statistics-and-information",
+    "Ilmenite": "https://www.usgs.gov/centers/national-minerals-information-center/titanium-statistics-and-information",
+    "Rutile": "https://www.usgs.gov/centers/national-minerals-information-center/titanium-statistics-and-information",
+    "Chromite": "https://www.usgs.gov/centers/national-minerals-information-center/chromium-statistics-and-information",
+}
+
 # ── Variable symbol per canonical index name (kept short & readable) ──────────
 SYMBOL = {
     "Sulfur": "S", "Industrial Electricity": "ELEC", "Natural Gas": "GAS",
@@ -261,6 +287,15 @@ def run():
         inserted_idx += 1
     db.commit()
 
+    # Backfill free source URLs onto indexes still missing one (idempotent).
+    filled_urls = 0
+    for nm, src in INDEX_SOURCE_URLS.items():
+        ci = db.query(CommodityIndex).filter(CommodityIndex.name == nm).first()
+        if ci and not ci.source_url:
+            ci.source_url = src
+            filled_urls += 1
+    db.commit()
+
     # Resolve index name -> commodity_id for variable wiring.
     id_by_name = {c.name: c.id for c in db.query(CommodityIndex).all()}
 
@@ -299,6 +334,7 @@ def run():
     db.close()
 
     print(f"indexes:   +{inserted_idx} inserted, {skipped_idx} already present")
+    print(f"source_urls backfilled: {filled_urls}")
     print(f"templates: +{inserted_tpl} inserted, {updated_tpl} updated "
           f"({inserted_tpl + updated_tpl}/42)")
 
