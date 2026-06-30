@@ -341,7 +341,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .demo-nav{display:flex;gap:10px;margin-top:18px}
 
 /* ── Hero engineering grid ────────────────────────────────── */
-.hero-dots{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.5;background-image:radial-gradient(rgba(0,0,0,.07) 1px,transparent 1px);background-size:34px 34px;-webkit-mask-image:radial-gradient(ellipse 78% 62% at 50% 40%,#000 28%,transparent 76%);mask-image:radial-gradient(ellipse 78% 62% at 50% 40%,#000 28%,transparent 76%)}
+/* Hexagonal (benzene-ring) lattice — chemistry motif behind the hero */
+.hero-dots{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.6;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='49' viewBox='0 0 56 49'%3E%3Cpath d='M14 1H42L55 24.5L42 48H14L1 24.5Z' fill='none' stroke='%2300A99D' stroke-opacity='0.14' stroke-width='1.2'/%3E%3C/svg%3E");background-size:56px 49px;-webkit-mask-image:radial-gradient(ellipse 80% 64% at 50% 38%,#000 26%,transparent 78%);mask-image:radial-gradient(ellipse 80% 64% at 50% 38%,#000 26%,transparent 78%)}
 .hero .container{position:relative;z-index:1}
 
 
@@ -610,8 +611,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   <div class="container">
     <div class="hero-grid">
       <div>
+        <div class="hero-badge">⬡ Should-cost intelligence for chemical procurement</div>
 <h1>Know what your products should cost —<br><span>before your supplier tells you.</span></h1>
-        <p class="hero-sub">Build should-cost models from live commodity indices. Track quarterly evolution. Export structured negotiation briefs with ranked cost drivers. Win every pricing conversation.</p>
+        <p class="hero-sub">Decompose chemical products into raw-material components, link each to a live commodity index, and calculate the defensible should-cost. Track quarterly evolution, expose the supplier gap, and export ranked negotiation briefs.</p>
         <div class="hero-actions">
           <button class="btn btn-primary btn-lg" onclick="openAccessModal()">Request Early Access</button>
           <button class="btn btn-ghost btn-lg" onclick="openDemoModal()">Schedule a Demo →</button>
