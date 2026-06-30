@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"CostAdvisor","url":"https://www.costadvisor.org/","applicationCategory":"BusinessApplication","operatingSystem":"Web","description":"Buyer-side should-cost intelligence for procurement teams."}</script>
 
 <style>
@@ -1958,8 +1958,18 @@ function boot(){
   observeCounters();
   initSliderFills();
   initDemoChart();
-  initFxChart();
-  loadDailyFx();   // swap quarterly fallback for live daily series (Frankfurter)
+  initFxChart();   // draws instantly with fallback data — no network
+  // Lazy-load the live daily FX series only when the FX section scrolls into view,
+  // keeping the network call off the initial render path (protects LCP / Core Web Vitals).
+  const fxSection = document.getElementById('fx');
+  if (fxSection && 'IntersectionObserver' in window) {
+    const fxObs = new IntersectionObserver((entries, o) => {
+      if (entries.some(e => e.isIntersecting)) { o.disconnect(); loadDailyFx(); }
+    }, { rootMargin: '200px' });
+    fxObs.observe(fxSection);
+  } else {
+    loadDailyFx();
+  }
   initEvoChart();
   // sparklines + tilt need cards in DOM — slight delay to ensure they've rendered
   setTimeout(()=>{initSparklines();initTilt();observeReveal();},250);
