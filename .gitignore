@@ -53,5 +53,6 @@ jvpdocs/
 PRODUCT.md
 DESIGN.md
 .impeccable/.claude/
-.claude/
+.claude/*
+!.claude/skills/
 .impeccable/
