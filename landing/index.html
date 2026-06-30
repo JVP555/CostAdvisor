@@ -103,6 +103,19 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offse
 .modal-success-icon{color:var(--green)}
 .modal-success-icon .ic{width:46px;height:46px;margin:0 auto}
 
+/* ── Decorative chemistry motifs (distinct from the hero hex lattice) ── */
+.mol-deco{position:absolute;pointer-events:none;z-index:0;color:var(--blue);opacity:.13;fill:none;stroke:currentColor}
+.mol-deco circle{fill:currentColor;stroke:none}
+.mol-deco .bond{stroke-width:1.6}
+.mol-deco .orbit{stroke-width:1.4;fill:none}
+#security{position:relative;overflow:hidden}
+#security .container{position:relative;z-index:1}
+#cta{position:relative;overflow:hidden}
+#cta .container{position:relative;z-index:1}
+.mol-tr{top:-40px;right:-30px;width:360px;height:auto}
+.mol-bl{bottom:-50px;left:-40px;width:300px;height:auto;opacity:.1}
+@media(max-width:760px){.mol-deco{display:none}}
+
 /* ── Buttons ────────────────────────────────────────────── */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:600;border:none;transition:all .18s ease;white-space:nowrap}
 .btn:disabled,button:disabled{opacity:.55;cursor:not-allowed}
@@ -1059,6 +1072,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- ── Security ─────────────────────────────────────────────── -->
 <section id="security">
+  <svg class="mol-deco mol-tr" viewBox="0 0 200 160" aria-hidden="true">
+    <g class="bond">
+      <line x1="30" y1="42" x2="70" y2="30"/>
+      <line x1="73" y1="33" x2="73" y2="80"/><line x1="67" y1="33" x2="67" y2="80"/>
+      <line x1="70" y1="80" x2="110" y2="56"/>
+      <line x1="110" y1="56" x2="150" y2="40"/>
+      <line x1="110" y1="56" x2="110" y2="110"/>
+      <line x1="113" y1="110" x2="150" y2="95"/><line x1="111" y1="116" x2="148" y2="101"/>
+      <line x1="70" y1="80" x2="40" y2="112"/>
+    </g>
+    <circle cx="30" cy="42" r="5"/><circle cx="70" cy="30" r="5"/><circle cx="70" cy="80" r="5"/>
+    <circle cx="110" cy="56" r="5"/><circle cx="150" cy="40" r="5"/><circle cx="110" cy="110" r="5"/>
+    <circle cx="150" cy="95" r="5"/><circle cx="40" cy="112" r="5"/>
+  </svg>
   <div class="container">
     <h2 class="section-title">Enterprise-grade data protection</h2>
     <p class="section-sub">Built for buyers who put real negotiation data into the platform. Your cost intelligence stays yours — always.</p>
@@ -1101,6 +1128,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
 <!-- ── CTA ───────────────────────────────────────────────────── -->
 <section id="cta" style="background:var(--surface)">
+  <svg class="mol-deco mol-bl" viewBox="0 0 200 200" aria-hidden="true">
+    <g class="orbit">
+      <ellipse cx="100" cy="100" rx="92" ry="34"/>
+      <ellipse cx="100" cy="100" rx="92" ry="34" transform="rotate(60 100 100)"/>
+      <ellipse cx="100" cy="100" rx="92" ry="34" transform="rotate(120 100 100)"/>
+    </g>
+    <circle cx="100" cy="100" r="9"/>
+    <circle cx="192" cy="100" r="4"/><circle cx="54" cy="20" r="4"/><circle cx="54" cy="180" r="4"/>
+  </svg>
   <div class="container">
     <div class="cta-grid">
       <div class="cta-card glass skeuo reveal">
