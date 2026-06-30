@@ -126,8 +126,8 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offse
 .btn-primary{background:var(--blue);color:#fff;box-shadow:0 0 0 1px rgba(0,169,157,.25),0 4px 16px rgba(0,169,157,.3),inset 0 1px 0 rgba(255,255,255,.18)}
 .btn-primary:hover{background:#009990;box-shadow:0 0 0 1px rgba(0,169,157,.4),0 6px 24px rgba(0,169,157,.4),inset 0 1px 0 rgba(255,255,255,.2);transform:translateY(-1px)}
 .btn-primary:active{transform:translateY(1px);box-shadow:0 2px 8px rgba(0,169,157,.3)}
-.btn-ghost{background:rgba(0,0,0,.04);border:1px solid var(--border);color:var(--muted);backdrop-filter:none}
-.btn-ghost:hover{background:rgba(0,0,0,.07);border-color:#b8c4cc;color:var(--text)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);backdrop-filter:none}
+.btn-ghost:hover{background:rgba(0,169,157,.07);border-color:var(--blue);color:var(--blue)}
 .btn-lg{padding:14px 28px;font-size:15px;border-radius:12px}
 
 /* ── Layout ─────────────────────────────────────────────── */
@@ -187,7 +187,9 @@ section{padding:96px 0}
 .hero-mockup-wrap{perspective:900px;display:flex;justify-content:center;align-items:center}
 @media(max-width:900px){.hero-mockup-wrap{margin-top:40px}}
 @media(max-width:900px){.hero-mockup{transform:none!important;max-width:100%}}
-.hero-mockup{border-radius:18px;padding:20px;transform:perspective(900px) rotateX(8deg) rotateY(-6deg);transform-origin:center center;transition:transform .5s cubic-bezier(.23,1,.32,1);width:100%;max-width:480px;background:linear-gradient(145deg,#ffffff 0%,#f0f4f8 100%);box-shadow:20px 30px 60px rgba(0,0,0,.14),-2px -2px 8px rgba(255,255,255,.9),inset 0 1px 0 rgba(255,255,255,.95);border:1px solid var(--border)}
+.hero-mockup{border-radius:18px;padding:20px;transform:perspective(900px) rotateX(8deg) rotateY(-6deg);transform-origin:center center;transition:transform .5s cubic-bezier(.23,1,.32,1);width:100%;max-width:480px;background:var(--surface);box-shadow:var(--shadow-lg);border:1px solid var(--border);position:relative;overflow:hidden}
+.hero-mockup::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),var(--teal))}
+.hero-mockup:hover{transform:perspective(900px) rotateX(5deg) rotateY(-3deg)}
 .hero-mockup:hover{transform:perspective(900px) rotateX(0) rotateY(0) translateY(-4px)}
 .hero-mockup-bar{display:flex;align-items:center;gap:6px;margin-bottom:16px}
 .hero-mockup-dot{width:10px;height:10px;border-radius:50%}
@@ -404,12 +406,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .evo-stat-sub{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.5}
 
 /* ── Testimonial ──────────────────────────────────────────── */
-.quote-section{padding:84px 0}
-.quote-card{max-width:840px;margin:0 auto;text-align:center;border-radius:24px;padding:56px 48px;position:relative}
-.quote-mark{font-family:var(--font-sans);font-size:110px;line-height:.5;color:var(--blue);opacity:.28;height:48px;user-select:none}
-.quote-text{font-size:clamp(19px,2.5vw,27px);font-weight:600;line-height:1.5;margin:18px 0 26px;letter-spacing:-.01em}
-.quote-attr{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
-.quote-badge{display:inline-flex;align-items:center;gap:8px;margin-top:18px;font-family:var(--font-mono);font-size:11px;color:var(--blue);background:rgba(0,169,157,.1);border:1px solid rgba(0,169,157,.2);border-radius:20px;padding:6px 14px}
+/* Deep teal-ink contrast band — a premium dark focal moment in the page rhythm */
+.quote-section{padding:96px 0;position:relative;overflow:hidden;background:
+  radial-gradient(120% 90% at 80% -10%,rgba(0,200,188,.16) 0%,transparent 55%),
+  radial-gradient(90% 80% at 10% 120%,rgba(16,185,129,.10) 0%,transparent 50%),
+  linear-gradient(160deg,var(--ink2) 0%,var(--ink) 100%);
+  color:#eafffb}
+.quote-card{max-width:840px;margin:0 auto;text-align:center;border-radius:24px;padding:56px 48px;position:relative;
+  background:transparent;border:1px solid rgba(0,200,188,.18);box-shadow:none;
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.quote-mark{font-family:var(--font-display);font-size:110px;line-height:.5;color:var(--teal);opacity:.45;height:48px;user-select:none}
+.quote-text{font-size:clamp(19px,2.5vw,27px);font-weight:600;line-height:1.5;margin:18px 0 26px;letter-spacing:-.01em;color:#f3fffd}
+.quote-attr{font-family:var(--font-mono);font-size:13px;color:#a6cfc9}
+.quote-badge{display:inline-flex;align-items:center;gap:8px;margin-top:18px;font-family:var(--font-mono);font-size:11px;color:var(--teal);background:rgba(0,200,188,.12);border:1px solid rgba(0,200,188,.3);border-radius:20px;padding:6px 14px}
 @media(max-width:600px){.quote-card{padding:40px 24px}}
 
 /* ── Interactive demo (donut) ─────────────────────────────── */
@@ -709,8 +718,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
               <line x1="0" y1="58" x2="420" y2="58" stroke="rgba(0,0,0,0.08)" stroke-width="1"/>
             </svg>
             <div class="mockup-chart-labels">
-              <span>Q1-24</span><span>Q2-24</span><span>Q3-24</span><span>Q4-24</span>
-              <span>Q1-25</span><span>Q2-25</span><span>Q3-25</span><span>Q4-25</span>
+              <span>Q3-24</span><span>Q4-24</span><span>Q1-25</span><span>Q2-25</span>
+              <span>Q3-25</span><span>Q4-25</span><span>Q1-26</span><span>Q2-26</span>
             </div>
           </div>
           <div class="mockup-metric-grid">
@@ -1117,7 +1126,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <!-- ── Testimonial ───────────────────────────────────────────── -->
 <section class="quote-section">
   <div class="container">
-    <div class="quote-card glass skeuo reveal">
+    <div class="quote-card reveal">
       <div class="quote-mark">&ldquo;</div>
       <p class="quote-text">CostAdvisor turns a two-week analysis into a 20-minute preparation. We walked into our last ammonia negotiation with numbers our supplier simply couldn't dispute.</p>
       <div class="quote-attr">Head of Procurement</div>
