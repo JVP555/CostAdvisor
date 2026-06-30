@@ -637,8 +637,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <h2 class="section-title">Commodity indices that drive your costs</h2>
     <p class="section-sub">Every should-cost model links to these real indices. Watch them move — and know exactly what that means for your procurement position.</p>
     <div class="pulse-grid" id="pulseGrid"></div>
+    <p class="pulse-note" id="pulseNote" style="text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-top:14px"></p>
 
-    <div class="signal-row">
+    <div class="signal-row" id="signalRow">
       <div class="signal-tile reveal">
         <span class="signal-arrow" style="color:var(--green)">▲</span>
         <div>
@@ -704,21 +705,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           <div class="evo-legend-item"><span class="evo-legend-dot" style="background:rgba(239,68,68,.35)"></span>Negotiation Gap</div>
         </div>
         <div class="evo-chart-wrap"><canvas id="evoChart"></canvas></div>
+        <p id="evoNote" style="font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-top:10px"></p>
       </div>
       <div class="evo-stats">
         <div class="evo-stat-card glass skeuo reveal">
           <div class="evo-stat-label">TOTAL GAP / YEAR</div>
-          <div class="evo-stat-val" style="color:var(--red)">€2.3M</div>
-          <div class="evo-stat-sub">Supplier price above defensible should-cost across 38,000 t/yr.</div>
+          <div class="evo-stat-val" id="evoStatGap" style="color:var(--red)">€2.3M</div>
+          <div class="evo-stat-sub">Supplier price above defensible should-cost across 38,000 t/yr (illustrative).</div>
         </div>
         <div class="evo-stat-card glass skeuo reveal" style="transition-delay:.08s">
           <div class="evo-stat-label">SUPPLIER OVERCHARGE</div>
-          <div class="evo-stat-val" style="color:var(--amber)">18.4%</div>
+          <div class="evo-stat-val" id="evoStatOver" style="color:var(--amber)">18.4%</div>
           <div class="evo-stat-sub">Current quarter premium over the modelled cost.</div>
         </div>
         <div class="evo-stat-card glass skeuo reveal" style="transition-delay:.16s">
           <div class="evo-stat-label">QUARTERS TRACKED</div>
-          <div class="evo-stat-val" style="color:var(--blue)">8</div>
+          <div class="evo-stat-val" id="evoStatQ" style="color:var(--blue)">8</div>
           <div class="evo-stat-sub">Continuous history feeding the negotiation brief.</div>
         </div>
       </div>
@@ -1262,18 +1264,40 @@ const Q_LABELS = [
   'Q1-24','Q2-24','Q3-24','Q4-24','Q1-25','Q2-25','Q3-25','Q4-25',
 ];
 
+// Colour per headline commodity (used for cards/sparklines whether live or fallback).
+const PULSE_COLORS = {
+  'Caustic Soda':'#0EA5E9','Chlorine':'#10B981','Sulfuric Acid':'#F59E0B',
+  'Natural Gas':'#8B5CF6','Naphtha':'#EF4444','Hydrochloric Acid':'#EC4899',
+};
+// Fallback only — replaced at runtime by loadMarketData() with REAL platform index data
+// from /api/indexes/public-quarterly. Mirrors the live shape so both paths render identically.
+let MARKET_LIVE = false;
+const FALLBACK_QLABELS = ['Q3-24','Q4-24','Q1-25','Q2-25','Q3-25','Q4-25','Q1-26','Q2-26'];
 const COMMODITIES = [
-  { name:'Brent Crude', unit:'$/bbl', color:'#F59E0B',
-    data:[50,28,40,47,61,71,73,79,100,113,93,83,81,75,85,79,82,83,79,73,76,72,74,78] },
-  { name:'Natural Gas', unit:'$/MMBtu', color:'#0EA5E9',
-    data:[1.9,1.7,2.1,2.8,3.1,2.9,4.1,4.8,4.5,7.2,8.1,6.3,2.7,2.2,2.5,2.6,2.2,2.3,2.1,2.8,3.1,2.9,3.2,3.0] },
-  { name:'Ammonia', unit:'$/t', color:'#10B981',
-    data:[220,195,225,285,350,450,590,750,820,900,750,620,420,310,290,310,350,340,320,315,330,345,360,340] },
-  { name:'Aluminium', unit:'$/t', color:'#8B5CF6',
-    data:[1700,1480,1700,1950,2100,2480,2620,2750,3100,2900,2300,2350,2300,2230,2200,2190,2350,2600,2450,2500,2580,2490,2550,2480] },
-  { name:'HRC Steel', unit:'$/t', color:'#EF4444',
-    data:[480,430,510,640,850,1100,1150,900,950,870,700,620,650,660,600,580,700,680,620,580,610,590,600,590] },
+  { name:'Caustic Soda', unit:'$/mt', color:PULSE_COLORS['Caustic Soda'], labels:FALLBACK_QLABELS,
+    data:[300,295,290,288,285,283,290,280] },
+  { name:'Chlorine', unit:'$/kg', color:PULSE_COLORS['Chlorine'], labels:FALLBACK_QLABELS,
+    data:[0.40,0.39,0.39,0.38,0.38,0.37,0.37,0.36] },
+  { name:'Sulfuric Acid', unit:'$/mt', color:PULSE_COLORS['Sulfuric Acid'], labels:FALLBACK_QLABELS,
+    data:[150,145,142,140,138,137,138,132] },
+  { name:'Natural Gas', unit:'EUR/MWh', color:PULSE_COLORS['Natural Gas'], labels:FALLBACK_QLABELS,
+    data:[55,53,52,51,50,50,50,49.5] },
+  { name:'Naphtha', unit:'$/mt', color:PULSE_COLORS['Naphtha'], labels:FALLBACK_QLABELS,
+    data:[500,495,490,485,482,478,480,475] },
 ];
+
+// Format a commodity value with its unit for the ticker/cards (e.g. "280 $/mt").
+function fmtCommodity(v, unit){
+  const n = (+v);
+  const s = n >= 1000 ? n.toLocaleString() : (n < 10 ? n.toFixed(2) : n.toString());
+  return unit ? `${s} ${unit}` : s;
+}
+function qoqStr(data){
+  const last=data[data.length-1], prev=data[data.length-2];
+  if(prev==null) return {txt:'', up:true};
+  const chg=(last-prev)/prev*100;
+  return {txt:(chg>=0?'+':'')+chg.toFixed(1)+'%', up:chg>=0};
+}
 
 // Labels start as a quarterly fallback; replaced with daily dates once the
 // live Frankfurter fetch (loadDailyFx) succeeds. fxIsDaily flips the headline
@@ -1339,19 +1363,88 @@ async function loadDailyFx(){
 }
 
 
+// ── Live market data (real platform indices) ─────────────────
+const qlabel = (y,q)=>`Q${q}-${String(y).slice(2)}`;
+const SYM = {USD:'$', EUR:'€', GBP:'£', JPY:'¥'};
+
+// Fetch the curated headline commodities from the public endpoint and replace the
+// fallback arrays with real data, then re-render ticker / cards / signals / evolution.
+async function loadMarketData(){
+  try{
+    const r=await fetch(`${API_URL}/api/indexes/public-quarterly?limit=12`);
+    if(!r.ok) throw 0;
+    const rows=await r.json();
+    if(!Array.isArray(rows)||!rows.length) throw 0;
+    const mapped=rows.map(it=>({
+      name:it.commodity_name, unit:it.unit||'', currency:it.currency,
+      color:PULSE_COLORS[it.commodity_name]||'#0EA5E9',
+      labels:it.points.map(p=>qlabel(p.year,p.quarter)),
+      data:it.points.map(p=>p.value),
+    }));
+    COMMODITIES.length=0; COMMODITIES.push(...mapped);
+    MARKET_LIVE=true;
+    buildTicker(); buildPulseCards(); initSparklines();
+    buildSignalTiles(rows);
+    updateEvoFromLive(rows);
+  }catch{ /* keep the hardcoded fallback already on screen */ }
+}
+
+// Top-3 movers by |QoQ| → signal tiles (real names/deltas; impact kept illustrative).
+function buildSignalTiles(rows){
+  const row=document.getElementById('signalRow');
+  if(!row) return;
+  const movers=rows.filter(r=>r.qoq_pct!=null)
+    .sort((a,b)=>Math.abs(b.qoq_pct)-Math.abs(a.qoq_pct)).slice(0,3);
+  if(!movers.length) return;
+  row.innerHTML=movers.map((m,i)=>{
+    const up=m.qoq_pct>=0, col=up?'var(--green)':'var(--red)';
+    return `<div class="signal-tile${up?'':' down'} reveal" style="transition-delay:${i*80}ms">
+      <span class="signal-arrow" style="color:${col}">${up?'▲':'▼'}</span>
+      <div>
+        <div class="signal-tile-name">${m.commodity_name} ${up?'+':''}${m.qoq_pct.toFixed(1)}% QoQ</div>
+        <div class="signal-tile-impact">Moves the should-cost of every model linking <b style="color:${col}">${m.commodity_name}</b>.</div>
+      </div>
+    </div>`;
+  }).join('');
+  observeReveal();
+}
+
+// Drive the evolution chart's should-cost line from a real commodity index; the
+// supplier line is an illustrative pass-through-plus-margin scenario.
+function updateEvoFromLive(rows){
+  const pick=rows.find(r=>r.commodity_name==='Caustic Soda')
+    || rows.find(r=>(r.category||'')==='Chemical') || rows[0];
+  if(!pick||!pick.points||pick.points.length<2) return;
+  const pts=pick.points.slice(-8);
+  const labels=pts.map(p=>qlabel(p.year,p.quarter));
+  const should=pts.map(p=>p.value);
+  const n=should.length;
+  // Illustrative supplier line: margin widens 7% → 18% across the window.
+  const supplier=should.map((v,i)=>+(v*(1.07+0.11*(i/(n-1)))).toFixed(2));
+  const sym=SYM[pick.currency]||'';
+  buildEvoChart(labels, should, supplier, sym);
+  const lastGap=(supplier[n-1]-should[n-1])/should[n-1]*100;
+  const over=document.getElementById('evoStatOver'); if(over) over.textContent=lastGap.toFixed(1)+'%';
+  const q=document.getElementById('evoStatQ'); if(q) q.textContent=n;
+  const gapVal=(supplier[n-1]-should[n-1])*38000;  // illustrative annual volume
+  const gapEl=document.getElementById('evoStatGap');
+  if(gapEl) gapEl.textContent=sym+(gapVal>=1e6?(gapVal/1e6).toFixed(1)+'M':Math.round(gapVal/1e3)+'K');
+  const note=document.getElementById('evoNote');
+  if(note) note.textContent=`Should-cost line: live ${pick.commodity_name} index (${pick.region}). Supplier line illustrative.`;
+}
+
 // ── Ticker ───────────────────────────────────────────────────
 function buildTicker() {
-  const items = [
-    {name:'Brent Crude',val:'$78.2/bbl',chg:'+5.4%',up:true},
-    {name:'Natural Gas',val:'$3.0/MMBtu',chg:'-6.2%',up:false},
-    {name:'Ammonia',val:'$340/t',chg:'+2.1%',up:true},
-    {name:'Aluminium',val:'$2,480/t',chg:'-1.3%',up:false},
-    {name:'HRC Steel',val:'$590/t',chg:'+1.7%',up:true},
-    {name:'EUR/USD',val:'1.1600',chg:'+0.4%',up:true},
-    {name:'CNY/EUR',val:'8.1032',chg:'-0.3%',up:false},
-    {name:'JPY/EUR',val:'183.60',chg:'-2.1%',up:false},
-    {name:'GBP/EUR',val:'0.8810',chg:'+0.2%',up:true},
-  ];
+  // Derive from the same data the cards use — real index values when live, fallback otherwise.
+  const comm = COMMODITIES.map(c=>{
+    const q=qoqStr(c.data);
+    return {name:c.name, val:fmtCommodity(c.data[c.data.length-1], c.unit), chg:q.txt, up:q.up};
+  });
+  const fx = Object.entries(FX_DATA).slice(0,4).map(([pair,d])=>{
+    const q=qoqStr(d.data);
+    return {name:pair, val:(+d.data[d.data.length-1]).toFixed(d.data[d.data.length-1]<10?4:2), chg:q.txt, up:q.up};
+  });
+  const items = [...comm, ...fx];
   const el = document.getElementById('tickerInner');
   if (!el) return;
   el.innerHTML = [...items,...items].map(i=>`
@@ -1369,15 +1462,20 @@ function buildPulseCards() {
   grid.innerHTML = COMMODITIES.map((c,i)=>{
     const last=c.data[c.data.length-1], prev=c.data[c.data.length-2];
     const chg=((last-prev)/prev*100).toFixed(1), up=chg>=0;
-    const valStr = c.unit.includes('t') && last>999 ? last.toLocaleString() : last;
+    const valStr = (+last) >= 1000 ? (+last).toLocaleString() : last;
+    const period = (c.labels && c.labels.length) ? c.labels[c.labels.length-1] : '';
     return `<div class="pulse-card skeuo reveal tilt-card" style="transition-delay:${i*70}ms">
       <div class="pulse-card-name">${c.name}</div>
       <div class="pulse-card-val">${valStr}</div>
-      <div class="pulse-card-unit">${c.unit} · Q4-25</div>
+      <div class="pulse-card-unit">${c.unit}${period?' · '+period:''}</div>
       <span class="pulse-card-chg ${up?'chg-up':'chg-dn'}">${up?'▲':'▼'} ${Math.abs(chg)}% QoQ</span>
       <div class="pulse-canvas-wrap"><canvas id="spark${i}"></canvas></div>
     </div>`;
   }).join('');
+  const note=document.getElementById('pulseNote');
+  if(note) note.textContent = MARKET_LIVE
+    ? 'Live platform index data'
+    : 'Showing sample data — live indices load as you browse';
 }
 
 function initSparklines() {
@@ -1390,7 +1488,7 @@ function initSparklines() {
     grad.addColorStop(0,c.color+'40');grad.addColorStop(1,c.color+'00');
     new Chart(canvas,{
       type:'line',
-      data:{labels:Q_LABELS.slice(-12),datasets:[{data:c.data.slice(-12),borderColor:c.color,backgroundColor:grad,fill:true,tension:0.4,pointRadius:0,borderWidth:2}]},
+      data:{labels:(c.labels||Q_LABELS).slice(-12),datasets:[{data:c.data.slice(-12),borderColor:c.color,backgroundColor:grad,fill:true,tension:0.4,pointRadius:0,borderWidth:2}]},
       options:{animation:false,responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{callbacks:{title:items=>items[0].label,label:item=>`${c.name}: ${item.raw} ${c.unit}`}}},
         scales:{x:{display:false},y:{display:false}}}
@@ -1803,13 +1901,11 @@ async function submitDemoRequest(){
 
 // ── Evolution chart ──────────────────────────────────────────
 let evoChartInst=null;
-function initEvoChart(){
-  if(typeof Chart==='undefined'){setTimeout(initEvoChart,150);return}
+// Build (or rebuild) the evolution chart. `sym` is the value-axis currency symbol.
+function buildEvoChart(labels, should, supplier, sym){
   const canvas=document.getElementById('evoChart');
   if(!canvas)return;
-  const labels=['Q1-24','Q2-24','Q3-24','Q4-24','Q1-25','Q2-25','Q3-25','Q4-25'];
-  const should=[310,318,325,332,328,335,342,348];
-  const supplier=[340,345,355,372,368,382,398,405];
+  if(evoChartInst){evoChartInst.destroy();evoChartInst=null;}
   const ctx=canvas.getContext('2d');
   const gapFill=ctx.createLinearGradient(0,0,0,300);
   gapFill.addColorStop(0,'rgba(239,68,68,.22)');gapFill.addColorStop(1,'rgba(239,68,68,.02)');
@@ -1820,12 +1916,20 @@ function initEvoChart(){
       {label:'Should-Cost',data:should,borderColor:'#10B981',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:3,pointBackgroundColor:'#10B981',borderWidth:2.5}
     ]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: €${c.raw}/t`,afterBody:items=>{
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${sym}${c.raw}`,afterBody:items=>{
         const s=items.find(i=>i.dataset.label==='Supplier Price'),m=items.find(i=>i.dataset.label==='Should-Cost');
         if(s&&m){const gap=((s.raw-m.raw)/m.raw*100).toFixed(1);return `\nGap: +${gap}%`}return ''}}}},
       scales:{x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10}}},
-              y:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},callback:v=>'€'+v}}}}
+              y:{grid:{color:'rgba(0,0,0,.06)'},ticks:{font:{size:10},callback:v=>sym+v}}}}
   });
+}
+function initEvoChart(){
+  if(typeof Chart==='undefined'){setTimeout(initEvoChart,150);return}
+  // Fallback illustrative series (replaced by real index data via updateEvoFromLive).
+  buildEvoChart(
+    ['Q1-24','Q2-24','Q3-24','Q4-24','Q1-25','Q2-25','Q3-25','Q4-25'],
+    [310,318,325,332,328,335,342,348],
+    [340,345,355,372,368,382,398,405], '€');
 }
 
 // ── Animated counters ─────────────────────────────────────────
@@ -1976,6 +2080,17 @@ function boot(){
     fxObs.observe(fxSection);
   } else {
     loadDailyFx();
+  }
+  // Lazy-load real commodity index data when the Market section nears the viewport
+  // (off the initial render path, same CWV rationale as FX). Falls back silently.
+  const mktSection = document.getElementById('market');
+  if (mktSection && 'IntersectionObserver' in window) {
+    const mktObs = new IntersectionObserver((entries, o) => {
+      if (entries.some(e => e.isIntersecting)) { o.disconnect(); loadMarketData(); }
+    }, { rootMargin: '200px' });
+    mktObs.observe(mktSection);
+  } else {
+    loadMarketData();
   }
   initEvoChart();
   // sparklines + tilt need cards in DOM — slight delay to ensure they've rendered
