@@ -42,6 +42,8 @@ app.add_middleware(
         settings.app_url,
         "http://localhost:3333",
         "https://www.costadvisor.org",  # landing page submitting access requests
+        "https://costadvisor.org",
+        "https://dev.costadvisor.org",  # staging landing page (calls public endpoints cross-origin)
     ],
     allow_credentials=True,
     allow_methods=["*"],

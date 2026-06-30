@@ -37,6 +37,27 @@ class IndexValueOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PublicQuarterPoint(BaseModel):
+    year: int
+    quarter: int
+    value: float
+
+
+class IndexValuePublicOut(BaseModel):
+    """Public, no-tenant view of one commodity's recent quarterly series — for the
+    marketing landing page. Platform scraped data only; no overrides, no team context."""
+    commodity_name: str
+    category: str | None = None
+    unit: str | None = None
+    currency: str | None = None
+    source_url: str | None = None
+    region: str
+    points: list[PublicQuarterPoint]  # oldest-first, ready to chart
+    latest: float | None = None
+    prev: float | None = None
+    qoq_pct: float | None = None  # quarter-over-quarter % change of the two most recent points
+
+
 class IndexValueFilter(BaseModel):
     """Query params for filtering index values."""
     region: str | None = None
