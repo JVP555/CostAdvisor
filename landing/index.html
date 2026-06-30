@@ -83,6 +83,11 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offse
 
 /* ── Buttons ────────────────────────────────────────────── */
 .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:600;border:none;transition:all .18s ease;white-space:nowrap}
+.btn:disabled,button:disabled{opacity:.55;cursor:not-allowed}
+.btn-spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:btnspin .7s linear infinite;vertical-align:-2px;margin-right:7px}
+@keyframes btnspin{to{transform:rotate(360deg)}}
+/* utility text colours — replace scattered inline style="color:var(--…)" */
+.text-pos{color:var(--green)}.text-neg{color:var(--red)}.text-muted{color:var(--muted)}
 .btn-primary{background:var(--blue);color:#fff;box-shadow:0 0 0 1px rgba(0,169,157,.25),0 4px 16px rgba(0,169,157,.3),inset 0 1px 0 rgba(255,255,255,.18)}
 .btn-primary:hover{background:#009990;box-shadow:0 0 0 1px rgba(0,169,157,.4),0 6px 24px rgba(0,169,157,.4),inset 0 1px 0 rgba(255,255,255,.2);transform:translateY(-1px)}
 .btn-primary:active{transform:translateY(1px);box-shadow:0 2px 8px rgba(0,169,157,.3)}
@@ -205,6 +210,7 @@ section{padding:96px 0}
 .fx-range-btn{padding:5px 12px;border-radius:7px;font-size:12px;font-family:var(--font-mono);font-weight:500;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:all .15s}
 .fx-range-btn:hover{color:var(--text);border-color:var(--blue)}
 .fx-range-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+.fx-range-btn:disabled{opacity:.4;cursor:not-allowed}
 .fx-chart-canvas-wrap{height:220px}
 .fx-current-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:24px}
 @media(max-width:640px){.fx-current-grid{grid-template-columns:repeat(3,1fr)}}
@@ -1534,7 +1540,8 @@ function fxWindow(pair){
 function buildFxRangeRow(){
   const row=document.getElementById('fxRangeRow');
   if(!row)return;
-  row.innerHTML=FX_RANGE_LABELS.map(r=>`<button class="fx-range-btn${r===activeRange?' active':''}" onclick="setFxRange('${r}')">${r}</button>`).join('');
+  // Range windows only apply to the live daily series — disable until it loads.
+  row.innerHTML=FX_RANGE_LABELS.map(r=>`<button class="fx-range-btn${r===activeRange?' active':''}" onclick="setFxRange('${r}')"${fxIsDaily?'':' disabled title="Loading live rates…"'}>${r}</button>`).join('');
 }
 
 function setFxRange(r){
@@ -1744,7 +1751,7 @@ async function submitAccessModal(){
   const btn=document.getElementById('lpModalSubmit');
   if(!email||!EMAIL_RE.test(email)){errEl.textContent='Please enter a valid work email.';errEl.style.display='block';return}
   errEl.style.display='none';
-  btn.disabled=true;btn.textContent='Sending…';
+  btn.disabled=true;btn.innerHTML='<span class="btn-spin"></span>Sending…';
   try{
     const res=await fetch(`${API_URL}/api/access-requests`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,name:name||undefined,company:company||undefined})});
     const data=await res.json().catch(()=>({}));
@@ -1819,8 +1826,10 @@ async function _fetchAvailDates(year,month){
 }
 
 function renderDemoCalendar(year,month){
+  const fetching=_availDates[`${year}-${month}`]===null; // null = request in flight
   document.getElementById('lpCalMonthLabel').textContent=
-    new Date(year,month,1).toLocaleString('default',{month:'long',year:'numeric'});
+    new Date(year,month,1).toLocaleString('default',{month:'long',year:'numeric'})
+    + (fetching?' · checking availability…':'');
   const cal=document.getElementById('lpCal');
   cal.innerHTML='';
   ['Mo','Tu','We','Th','Fr','Sa','Su'].forEach(d=>{
@@ -2010,7 +2019,12 @@ function updateSliderFill(s){
 function initSliderFills(){
   document.querySelectorAll('input[type=range]').forEach(s=>{
     updateSliderFill(s);
-    s.addEventListener('input',()=>updateSliderFill(s));
+    // Throttle the track repaint to one per animation frame (smoother on touch drags).
+    let raf=null;
+    s.addEventListener('input',()=>{
+      if(raf)return;
+      raf=requestAnimationFrame(()=>{raf=null;updateSliderFill(s);});
+    });
   });
 }
 
