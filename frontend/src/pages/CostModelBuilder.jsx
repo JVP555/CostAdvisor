@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { OVC_ITEMS, RM_ITEMS, PIE_COLORS, INCOTERMS } from '../utils/constants';
 import DonutChart from '../components/DonutChart';
 import IncotermAdjustments from '../components/IncotermAdjustments';
@@ -97,6 +97,22 @@ export default function CostModelBuilder() {
       setCanEditPlatform(permRes.data.can_edit);
     }).catch(() => setLoadError('Could not load reference data. Try reloading the page.'));
   }, [activeTeamId]);
+
+  // Preselect a product when arriving from Portfolio's draft "Complete formula"
+  // action (route state), so completing a draft attaches to the existing product
+  // instead of creating a near-duplicate.
+  useEffect(() => {
+    if (costModelId) return;
+    const pid = location.state?.productId;
+    if (!pid || !products.length) return;
+    const p = products.find(pp => pp.id === pid);
+    if (!p) return;
+    setProductId(p.id);
+    setProductName(p.name);
+    setFormula(p.formula || '');
+    setUnit(p.unit || 'kg');
+    setActiveContent(p.active_content ?? 0.65);
+  }, [products, location.state, costModelId]);
 
   // Close template dropdown on outside click
   useEffect(() => {

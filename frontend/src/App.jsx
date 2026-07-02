@@ -24,6 +24,7 @@ import Terms from './pages/Terms';
 import NotFound from './pages/NotFound';
 import IndexLibraryArea from './pages/workspace/IndexLibraryArea';
 import PortfolioArea from './pages/workspace/PortfolioArea';
+import ProductDetailArea from './pages/workspace/ProductDetailArea';
 import MonitorArea from './pages/workspace/MonitorArea';
 import ForecastArea from './pages/workspace/ForecastArea';
 import NegotiateArea from './pages/workspace/NegotiateArea';
@@ -61,6 +62,7 @@ export default function App() {
             <Route path="/fx-rates" element={<Navigate to="/index-library" replace />} />
             <Route path="/index-library" element={<IndexLibraryArea />} />
             <Route path="/portfolio" element={<PortfolioArea />} />
+            <Route path="/portfolio/:costModelId" element={<ProductDetailArea />} />
             <Route path="/monitor" element={<MonitorArea />} />
             <Route path="/forecast" element={<ForecastArea />} />
             <Route path="/negotiate" element={<NegotiateArea />} />

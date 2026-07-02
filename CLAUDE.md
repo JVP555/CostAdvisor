@@ -426,7 +426,8 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Volatility calculated from index movement over trailing 4 quarters
   - 🔴 Spend exposure = should-cost × volume
   - 🔴 Exportable as CSV and image
-  - 🔴 **Audit note (this pass):** `workspace/PortfolioArea.jsx` is a read-only demo mockup (hardcoded data), not a real matrix; no volatility calc or quadrant logic exists yet.
+  - 🟢 **Portfolio re-platform (product-centric)** — `workspace/PortfolioArea.jsx` rebuilt from a hardcoded demo to real data: one row per cost model + Draft rows for products with no cost model (every product visible), grouped by family/supplier/region, with search/status filters, stat tiles, CSV, and **index-evolved live should-cost** per row (`POST /api/costing/should-cost` at the current quarter, progressive fill). New product detail `workspace/ProductDetailArea.jsx` at `/portfolio/:costModelId` — live should-cost + breakdown + delta-since-starting-point, read-only formula display, and a **first-class starting-point editor** (base price / base quarter → `renegotiate`). `CostModelBuilder` preselects the product on the draft "Complete formula" flow (route state). No backend change.
+  - 🔴 **Audit note (this pass):** the product-centric Portfolio list + detail are now real. Still unbuilt for Scrum 20 proper: the volatility × spend-exposure **matrix** (2×2/scatter, quadrant labels, trailing-4Q volatility calc, image export).
 
 - 🟡 **Scrum 21** — Predictive index forecasting (directional, uncertainty-honest)
   - 🟡 Each tracked index shows a trailing trend and a 2-quarter forward projection (`workspace/ForecastArea.jsx` UI exists with Base/Bear/Bull series — but values are hardcoded demo data; no forecast engine)
