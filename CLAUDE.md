@@ -434,7 +434,9 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Projection uses simple trend extrapolation; confidence band shown (no algorithm in `costing_engine.py`/`services/`)
   - 🔴 "Impact on my models" — shows projected should-cost change if forecast holds (demo rows only, no backend compute)
   - 🟢 Clearly labelled as an estimate, not a guarantee (`ForecastArea.jsx` subtitle: "Illustrative — the forecast engine is a Wave-2 build")
-  - 🟡 **Audit note (this pass):** UI scaffold only; the forecast engine itself is net-new and unbuilt.
+  - 🟡 **Intelligence page (`/intelligence`, new navbar item)** — product-centric "market & pricing intelligence" (modelled on `sample_idea/intelligence_mockup.html`). Landing: family-grouped product cards → per-card should-cost `Sparkline` + trend, lazy-loaded via IntersectionObserver from `/api/costing/evolution`. Detail `/intelligence/:costModelId` (one `/api/costing/brief` call), Tab 1 "Market & Pricing" wired read-only: should-cost **index** history (rebased base 100) + `MultiLineChart` **stub** forecast band (dashed, ±1.5%, `splitIndex`; clearly labelled illustrative — no forecast engine), index-component/driver decomposition table, stored (Redis-cached) AI narrative + forward signals, derived cycle-position + snapshot cards. Tab 2 "Product Intelligence" is a **flagged placeholder**. No backend change.
+  - 🔴 **Dependency (flagged):** expert-reviewed narrative / product-reference **persistence** — narratives are Redis-cached only (`services/ollama.py`, 7-day TTL), never DB-stored or reviewed. A `ProductIntelligence` / `NarrativeReview` model (product/cost-model ref, authored text, `reviewed_by`, `review_status`, `reviewed_at`) is the prerequisite for operational review tracking (Tab 2) and a real forecast engine.
+  - 🟡 **Audit note (this pass):** the Forecast area + Intelligence forecast band are still stubs; the forecast engine itself is net-new and unbuilt.
 
 - 🔴 **Scrum 22** — Opportunistic buy windows (spot vs contract signal)
   - 🔴 Per-product signal: current should-cost vs 4-quarter average — "cheap now" or "expensive now"

@@ -35,6 +35,7 @@ export default function Navbar() {
     { path: '/monitor', label: 'Monitor' },
     { path: '/forecast', label: 'Forecast' },
     { path: '/negotiate', label: 'Negotiate' },
+    { path: '/intelligence', label: 'Intelligence' },
     { path: '/team', label: 'Team', badge: pendingInviteCount || 0 },
     ...(user?.is_super_admin ? [{ path: '/admin', label: 'Admin' }] : []),
   ];

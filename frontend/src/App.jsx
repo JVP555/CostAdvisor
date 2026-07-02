@@ -28,6 +28,8 @@ import ProductDetailArea from './pages/workspace/ProductDetailArea';
 import MonitorArea from './pages/workspace/MonitorArea';
 import ForecastArea from './pages/workspace/ForecastArea';
 import NegotiateArea from './pages/workspace/NegotiateArea';
+import IntelligenceArea from './pages/workspace/IntelligenceArea';
+import IntelligenceDetailArea from './pages/workspace/IntelligenceDetailArea';
 import { useAuth } from './AuthContext';
 
 export default function App() {
@@ -66,6 +68,8 @@ export default function App() {
             <Route path="/monitor" element={<MonitorArea />} />
             <Route path="/forecast" element={<ForecastArea />} />
             <Route path="/negotiate" element={<NegotiateArea />} />
+            <Route path="/intelligence" element={<IntelligenceArea />} />
+            <Route path="/intelligence/:costModelId" element={<IntelligenceDetailArea />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
