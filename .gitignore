@@ -56,3 +56,4 @@ DESIGN.md
 .claude/*
 !.claude/skills/
 .impeccable/
+.claude/skills/impeccable/
