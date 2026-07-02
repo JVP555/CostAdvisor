@@ -417,6 +417,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🟢 Rows sorted by absolute gap value descending — biggest opportunity first (default sort `exposure` desc, also sortable by gap%/should-cost)
   - 🟡 Visual indicator (colour or bar) for gap severity (colour-coded gap% cell + IDX/DRIFT flag badges; no graded severity bar yet)
   - 🟢 Clicking a row navigates to the cost model (View → `/cost-models/:id`, plus Evo/Brief actions)
+  - 🟢 **Monitor re-platform (new IA)** — `pages/workspace/MonitorArea.jsx` rebuilt from a hardcoded demo to real data: fetches the same `GET /api/portfolio/summary`, flat table ranked by exposure, derived status filter (Alert/Watch/On-track from `flag_price_drift`/`flag_index_moved`), graded severity bar (`DriftBar` on |gap %|), IDX/DRIFT flags, CSV export, and empty/loading/error/filtered-empty states. Reuses `exportCsv`, `useAuth().activeTeamId`, `formatApiError`. No backend change; `Dashboard.jsx` kept as-is (coexist). Trigger radar / priority matrix / alerts remain Wave 3.
   - 🟡 **Audit note (this pass):** the triage Dashboard is live and real (not demo). What's left for 🟢: a graded severity bar and any category-level rollup.
 
 - 🔴 **Scrum 20** — Procurement Priority Matrix (portfolio view: volatility × spend exposure)
