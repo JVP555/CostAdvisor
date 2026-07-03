@@ -39,6 +39,7 @@ def create_product(
         active_content=data.active_content,
         unit=data.unit,
         chemical_family_id=data.chemical_family_id,
+        subfamily_id=data.subfamily_id,
         custom_attributes=data.custom_attributes,
     )
     db.add(product)
@@ -81,7 +82,7 @@ def update_product(
     require_permission(db, current_user, product.team_id, "products.edit")
 
     prev = {"name": product.name, "formula": product.formula, "unit": product.unit}
-    for field in ["name", "formula", "active_content", "unit", "chemical_family_id", "custom_attributes"]:
+    for field in ["name", "formula", "active_content", "unit", "chemical_family_id", "subfamily_id", "custom_attributes"]:
         val = getattr(data, field, None)
         if val is not None:
             setattr(product, field, val)

@@ -9,6 +9,7 @@ class ProductCreate(BaseModel):
     active_content: float | None = None
     unit: str = "kg"
     chemical_family_id: int | None = None
+    subfamily_id: int | None = None
     custom_attributes: dict | None = None
 
 
@@ -18,6 +19,7 @@ class ProductUpdate(BaseModel):
     active_content: float | None = None
     unit: str | None = None
     chemical_family_id: int | None = None
+    subfamily_id: int | None = None
     custom_attributes: dict | None = None
 
 
@@ -26,6 +28,7 @@ class ProductOut(BaseModel):
     team_id: uuid.UUID
     created_by: uuid.UUID
     chemical_family_id: int | None
+    subfamily_id: int | None
     name: str
     formula: str | None
     active_content: float | None

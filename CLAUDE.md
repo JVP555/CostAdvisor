@@ -519,6 +519,21 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
 
 ---
 
+### Scrum 55 — Catalog taxonomy & platform/team forking
+
+Ship a shared starting catalog that any team can fork into a private, editable copy without touching ours or another team's. Reference: `sample_idea/scrum55/02-platform-vs-team.md`.
+
+- 🟢 **DB-1** — Taxonomy spine: add subfamily + platform/team forking (8 pts)
+  - 🟢 Model `ChemicalFamily` (family) extended with `team_id` (NULL = platform, set = team fork), `origin_id` (fork back-link to platform original), `code`; new `Subfamily` model (family → subfamily → product) with the same fork columns; `Product` gains nullable `subfamily_id` (family link kept)
+  - 🟢 Migration `tx1a2b3c4d5e` + backfill: existing products keep `chemical_family_id` (no orphaning); dropped global `UNIQUE(name)` (breaks forking) and re-scoped uniqueness via partial indexes (platform names unique among platform; team names unique per team; same for subfamilies per family)
+  - 🟢 RLS on `chemical_families` + `subfamilies`: platform rows (`team_id IS NULL`) readable by all; team rows scoped to the team (same policy shape as `formula_templates`); reversible downgrade verified
+  - 🟢 Fork endpoints: `POST /api/chemical-families/{id}/fork` and `POST /api/subfamilies/{id}/fork` (copy platform node → team node, set `origin_id`); only platform nodes forkable (400 on team row), duplicate fork per team blocked (409), gated on `products.edit`; team-scoped create/delete added, platform create/delete stays super-admin
+  - 🟢 Tests `tests/test_taxonomy.py` (8): DB-level RLS isolation (family + subfamily), fork creates team copy + survives rename (origin resolves), can't fork a team row, duplicate 409, foreign-team 403, subfamily fork keeps platform family, product maps to family with subfamily optional. Full suite 59 passed
+  - 🔴 Note: `code` is nullable and NOT globally unique (forks share their origin's code) and NOT contiguous (family codes F01–F28 skip numbers) — never assume either when walking the taxonomy
+  - 🔴 Follow-ups (not DB-1): seed the real 22 → 91 → 257 catalog; frontend taxonomy UI (browse/fork/rename); repoint a team's products onto their forks
+
+---
+
 ## Product Roadmap
 
 Direction for the next three waves. The "what" and "why" are here; the "how" is owned by whoever picks up the work.
