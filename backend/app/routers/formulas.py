@@ -1,15 +1,38 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.formula_template import FormulaTemplate
+from app.models.formula_template import (
+    FormulaTemplate,
+    FormulaTemplateComponent,
+    FormulaRegionCoverage,
+)
+from app.models.index_data import CommodityIndex
+from app.models.region import Region
 from app.models.team import TeamMembership
 from app.models.user import User
 from app.routers.auth import get_current_user
-from app.schemas.formula_template import FormulaTemplateCreate, FormulaTemplateUpdate, FormulaTemplateOut
+from app.schemas.formula_template import (
+    FormulaTemplateCreate,
+    FormulaTemplateUpdate,
+    FormulaTemplateOut,
+    FormulaComponentsReplace,
+    FormulaComponentOut,
+    FormulaCoverageIn,
+    FormulaCoverageOut,
+    FormulaResolveOut,
+    ResolvedLineOut,
+)
 from app.services.audit import log_event
+from app.services.formula_resolver import (
+    FormulaChainError,
+    assert_valid_chain_input,
+    flatten_components,
+    resolve_coverage,
+)
 from app.services.permissions import require_permission, require_platform_permission, has_platform_permission
 
 router = APIRouter()
@@ -147,13 +170,34 @@ def delete_formula(
     else:
         require_permission(db, current_user, template.team_id, "formulas.delete")
 
+    # A template chained into another formula can't be deleted — the visible
+    # pre-check gives a friendly message; the FK (no ondelete) backstops
+    # references RLS hides from this caller.
+    ref = (
+        db.query(FormulaTemplateComponent)
+        .filter(FormulaTemplateComponent.input_template_id == template_id)
+        .first()
+    )
+    if ref:
+        raise HTTPException(
+            status_code=409,
+            detail="This formula is used as an input by another formula — remove that reference first",
+        )
+
     audit_team_id = template.team_id or _first_team_id(db, current_user.id)
     if audit_team_id:
         log_event(db, audit_team_id, current_user.id, "delete", "formula_template",
                   str(template_id), previous_value={"name": template.name})
 
     db.delete(template)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This formula is used as an input by another formula — remove that reference first",
+        )
     return {"status": "deleted"}
 
 
@@ -164,3 +208,271 @@ def can_edit_platform_formulas(
 ):
     """Used by the frontend to gate platform formula UI without exposing the full permission check."""
     return {"can_edit": has_platform_permission(db, current_user, "formulas.edit")}
+
+
+# ── Weighted components + per-region coverage + resolver (Scrum 58) ──────────
+
+def _get_visible_template(
+    db: Session, template_id: uuid.UUID, team_id: uuid.UUID | None = None
+) -> FormulaTemplate:
+    """Fetch a template the caller may read (RLS enforces this at the DB too;
+    the explicit team check keeps a team from addressing another team's
+    template through a team_id they *are* a member of)."""
+    template = db.query(FormulaTemplate).filter(FormulaTemplate.id == template_id).first()
+    if not template or (
+        team_id is not None
+        and template.team_id is not None
+        and template.team_id != team_id
+    ):
+        raise HTTPException(status_code=404, detail="Formula template not found")
+    return template
+
+
+def _require_template_edit(db: Session, current_user: User, template: FormulaTemplate) -> None:
+    if template.team_id is None:
+        require_platform_permission(db, current_user, "formulas.edit")
+    else:
+        require_permission(db, current_user, template.team_id, "formulas.edit")
+
+
+@router.get("/{template_id}/components", response_model=list[FormulaComponentOut])
+def list_components(
+    template_id: uuid.UUID,
+    team_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_permission(db, current_user, team_id, "formulas.view")
+    _get_visible_template(db, template_id, team_id)
+    return (
+        db.query(FormulaTemplateComponent)
+        .filter(FormulaTemplateComponent.template_id == template_id)
+        .order_by(FormulaTemplateComponent.sort_order)
+        .all()
+    )
+
+
+@router.put("/{template_id}/components", response_model=list[FormulaComponentOut])
+def replace_components(
+    template_id: uuid.UUID,
+    data: FormulaComponentsReplace,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Replace the template's weighted lines as a block (weights sum to 100)."""
+    template = _get_visible_template(db, template_id)
+    _require_template_edit(db, current_user, template)
+
+    # Referenced commodity indexes must exist (friendlier than the FK error).
+    commodity_ids = {c.commodity_id for c in data.components if c.commodity_id is not None}
+    if commodity_ids:
+        found = {
+            row[0]
+            for row in db.query(CommodityIndex.id).filter(CommodityIndex.id.in_(commodity_ids)).all()
+        }
+        missing = commodity_ids - found
+        if missing:
+            raise HTTPException(status_code=400, detail=f"Unknown commodity index id(s): {sorted(missing)}")
+
+    # Chained inputs: must be visible, scope-compatible, acyclic, within depth.
+    for comp in data.components:
+        if comp.component_type != "formula":
+            continue
+        if comp.input_template_id == template_id:
+            raise HTTPException(status_code=400, detail="A formula cannot use itself as an input")
+        input_t = db.query(FormulaTemplate).filter(
+            FormulaTemplate.id == comp.input_template_id
+        ).first()
+        if not input_t:
+            raise HTTPException(status_code=404, detail="Input formula template not found")
+        # A platform formula resolved by any team must never pull in one
+        # team's private formula; a team formula may chain platform or its own.
+        if template.team_id is None and input_t.team_id is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="A platform formula can only use platform formulas as inputs",
+            )
+        if template.team_id is not None and input_t.team_id not in (None, template.team_id):
+            raise HTTPException(
+                status_code=400,
+                detail="A team formula can only use platform or same-team formulas as inputs",
+            )
+        try:
+            assert_valid_chain_input(db, template_id, comp.input_template_id)
+        except FormulaChainError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    db.query(FormulaTemplateComponent).filter(
+        FormulaTemplateComponent.template_id == template_id
+    ).delete(synchronize_session=False)
+
+    rows = [
+        FormulaTemplateComponent(
+            template_id=template_id,
+            name=c.name,
+            component_type=c.component_type,
+            commodity_id=c.commodity_id,
+            input_template_id=c.input_template_id,
+            weight_pct=c.weight_pct,
+            is_proxy=c.is_proxy,
+            sort_order=c.sort_order if c.sort_order else i,
+        )
+        for i, c in enumerate(data.components)
+    ]
+    db.add_all(rows)
+    db.flush()
+
+    audit_team_id = template.team_id or _first_team_id(db, current_user.id)
+    if audit_team_id:
+        log_event(db, audit_team_id, current_user.id, "update", "formula_template_components",
+                  str(template_id),
+                  new_value={"count": len(rows), "names": [r.name for r in rows]})
+
+    # Response built before commit — the transaction-local RLS GUCs reset on
+    # commit, so a post-commit re-query can come back empty.
+    out = [FormulaComponentOut.model_validate(r) for r in rows]
+    for r in rows:
+        db.expunge(r)
+    db.commit()
+    return out
+
+
+@router.get("/{template_id}/coverage", response_model=list[FormulaCoverageOut])
+def list_coverage(
+    template_id: uuid.UUID,
+    team_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_permission(db, current_user, team_id, "formulas.view")
+    _get_visible_template(db, template_id, team_id)
+    return (
+        db.query(FormulaRegionCoverage)
+        .filter(FormulaRegionCoverage.template_id == template_id)
+        .order_by(FormulaRegionCoverage.region)
+        .all()
+    )
+
+
+@router.put("/{template_id}/coverage/{region}", response_model=FormulaCoverageOut)
+def upsert_coverage(
+    template_id: uuid.UUID,
+    region: str,
+    data: FormulaCoverageIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create or update the combo (this formula priced in this region)."""
+    template = _get_visible_template(db, template_id)
+    _require_template_edit(db, current_user, template)
+
+    # Explicit check instead of leaning on the free-text safety net — a typo'd
+    # region on a curated pricing row should fail, not auto-register a region.
+    if not db.query(Region).filter(Region.code == region).first():
+        raise HTTPException(status_code=400, detail=f"Unknown region code: {region}")
+
+    row = db.query(FormulaRegionCoverage).filter(
+        FormulaRegionCoverage.template_id == template_id,
+        FormulaRegionCoverage.region == region,
+    ).first()
+    created = row is None
+    if created:
+        row = FormulaRegionCoverage(template_id=template_id, region=region)
+        db.add(row)
+    row.base_price = data.base_price
+    row.currency = data.currency
+    row.margin_pct = data.margin_pct
+    row.base_year = data.base_year
+    row.base_quarter = data.base_quarter
+    db.flush()
+
+    audit_team_id = template.team_id or _first_team_id(db, current_user.id)
+    if audit_team_id:
+        log_event(db, audit_team_id, current_user.id,
+                  "create" if created else "update", "formula_region_coverage",
+                  f"{template_id}:{region}",
+                  new_value={"base_price": data.base_price, "margin_pct": data.margin_pct})
+
+    out = FormulaCoverageOut.model_validate(row)
+    db.expunge(row)
+    db.commit()
+    return out
+
+
+@router.delete("/{template_id}/coverage/{region}")
+def delete_coverage(
+    template_id: uuid.UUID,
+    region: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    template = _get_visible_template(db, template_id)
+    _require_template_edit(db, current_user, template)
+
+    row = db.query(FormulaRegionCoverage).filter(
+        FormulaRegionCoverage.template_id == template_id,
+        FormulaRegionCoverage.region == region,
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="No coverage for this region")
+
+    audit_team_id = template.team_id or _first_team_id(db, current_user.id)
+    if audit_team_id:
+        log_event(db, audit_team_id, current_user.id, "delete", "formula_region_coverage",
+                  f"{template_id}:{region}")
+
+    db.delete(row)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@router.get("/{template_id}/resolve", response_model=FormulaResolveOut)
+def resolve_formula(
+    template_id: uuid.UUID,
+    region: str,
+    team_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Resolve a formula for a region: the coverage combo (with fallback
+    exact → parent region → GLOBAL → Europe) plus the flattened effective
+    component lines (chained formulas expanded, weights scaled)."""
+    require_permission(db, current_user, team_id, "formulas.view")
+    _get_visible_template(db, template_id, team_id)
+
+    cov, resolved_region = resolve_coverage(db, template_id, region)
+    try:
+        lines = flatten_components(db, template_id)
+    except FormulaChainError as e:
+        # Should be unreachable for API-written data (write-time guards), but
+        # seed scripts write directly — surface it rather than 500.
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Enrich with display names in two batch lookups.
+    commodity_ids = {l["commodity_id"] for l in lines if l["commodity_id"] is not None}
+    commodity_names = {
+        row.id: row.name
+        for row in db.query(CommodityIndex.id, CommodityIndex.name)
+        .filter(CommodityIndex.id.in_(commodity_ids)).all()
+    } if commodity_ids else {}
+    template_ids = {l["via_template_id"] for l in lines}
+    template_names = {
+        row.id: row.name
+        for row in db.query(FormulaTemplate.id, FormulaTemplate.name)
+        .filter(FormulaTemplate.id.in_(template_ids)).all()
+    } if template_ids else {}
+
+    return FormulaResolveOut(
+        template_id=template_id,
+        region_requested=region,
+        region_resolved=resolved_region,
+        coverage=FormulaCoverageOut.model_validate(cov) if cov else None,
+        lines=[
+            ResolvedLineOut(
+                **l,
+                commodity_name=commodity_names.get(l["commodity_id"]),
+                via_template_name=template_names.get(l["via_template_id"]),
+            )
+            for l in lines
+        ],
+    )

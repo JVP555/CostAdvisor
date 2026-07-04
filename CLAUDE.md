@@ -564,6 +564,21 @@ Carry, on each index, how it's approximated from free data, how often it refresh
 
 ---
 
+### Scrum 58 — Weighted components (no regression) + formula × region coverage
+
+Give FormulaTemplate a structured weighted-lines form and per-region pricing — the substrate the 257-formula / 676-combo catalog loads into. Reference: `sample_idea/scrum58/`; writeup: `jvpdocs/scrum58.md`.
+
+- 🟢 **FormulaTemplate component child** — `FormulaTemplateComponent` (`formula_template_components`): `component_type` (`index`/`fixed`/`formula`), nullable `commodity_id`, `input_template_id` (chaining), **signed** `weight_pct`, `is_proxy` ("stand-in index" = softer signal), `sort_order`. Type/target coherence + no-self-reference as DB CHECKs; weights must sum to 100 (±0.01) at the Pydantic layer (NOT the DB — seeders must keep the invariant themselves). `formula_templates.expression` now nullable (purely-weighted templates); frontend readers guard `|| ''`
+- 🟢 **Per-(formula × region) coverage table** — `FormulaRegionCoverage` (`formula_region_coverage`): a combo = one formula priced in one region, unique `(template_id, region)`, region FK → `regions.code`; carries `base_price`/`currency`/`margin_pct`/`base_year`+`base_quarter`. Coverage writes validate the region explicitly (400 on typo) instead of relying on the free-text auto-register net
+- 🟢 **Resolver (formula × region) + fallback** — `services/formula_resolver.py`: `resolve_coverage` falls back **exact → parent chain (NWE→Europe) → GLOBAL → Europe**; `flatten_components` expands chained formulas into effective lines with multiplicative weights (60% of a 50% line = 30%), each line tagged depth + source template for drill-down
+- 🟢 **Formula-as-input chaining (tiered, depth cap)** — `MAX_CHAIN_DEPTH = 3` hops + cycle detection; the same walk is the write-time guard (`assert_valid_chain_input`) so cycles/over-deep chains 400 before save. Scope rule: platform formulas chain only platform (a team resolving one must never silently miss a private line); team formulas chain platform or same-team. Deleting a template used as an input → 409 (visible pre-check + IntegrityError backstop)
+- 🟢 **API** — `GET/PUT /api/formulas/{id}/components` (PUT = replace-as-a-block), `GET …/coverage` + `PUT/DELETE …/coverage/{region}`, `GET …/resolve?region=&team_id=`. Permissions mirror the template tier (platform vs team `formulas.edit`; reads on `formulas.view`); mutations audit-logged
+- 🟢 **Migration `wc1a2b3c4d5e`** — both tables + RLS (transitive through the parent template, same pattern as `formula_components`→`cost_models`; FORCE RLS) + expression nullable; reversible downgrade verified
+- 🟢 Tests `tests/test_weighted_formulas.py` (12): RLS isolation (components + coverage), replace-block semantics, weight-sum/coherence 422s, fallback chain (exact / subregion→parent / GLOBAL / terminal Europe / unknown region 400), chained flattening weight math, depth cap at exactly 3 hops, cycle + self-ref blocked, delete-in-use 409, platform-can't-chain-team 400. Full suite 86 passed
+- 🔴 Follow-ups: seed the 257→676 catalog onto this substrate (idempotent, keyed `formula_id`+region); costing-engine evaluation of weighted templates (resolver output is API-only today); frontend weighted-lines editor + coverage grid + proxy/resolved-region badges
+
+---
+
 ## Product Roadmap
 
 Direction for the next three waves. The "what" and "why" are here; the "how" is owned by whoever picks up the work.

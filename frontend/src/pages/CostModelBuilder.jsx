@@ -666,7 +666,7 @@ export default function CostModelBuilder() {
                                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface2)'; }}
                                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                                       onClick={() => {
-                                        setAdvancedExpression(t.expression);
+                                        setAdvancedExpression(t.expression || '');
                                         setAdvancedVars(t.variables || {});
                                         setShowTemplateDropdown(false);
                                       }}
