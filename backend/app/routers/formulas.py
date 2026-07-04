@@ -239,14 +239,22 @@ def _require_template_edit(db: Session, current_user: User, template: FormulaTem
 def list_components(
     template_id: uuid.UUID,
     team_id: uuid.UUID,
+    region: str | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Without a region: the template-level (region-NULL) lines the API
+    manages. With one: that exact region's seeded line set (no fallback —
+    use /resolve for resolved views)."""
     require_permission(db, current_user, team_id, "formulas.view")
     _get_visible_template(db, template_id, team_id)
     return (
         db.query(FormulaTemplateComponent)
-        .filter(FormulaTemplateComponent.template_id == template_id)
+        .filter(
+            FormulaTemplateComponent.template_id == template_id,
+            FormulaTemplateComponent.region == region if region is not None
+            else FormulaTemplateComponent.region.is_(None),
+        )
         .order_by(FormulaTemplateComponent.sort_order)
         .all()
     )
@@ -302,8 +310,12 @@ def replace_components(
         except FormulaChainError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+    # Only the template-level (region-NULL) set is API-managed; the seeded
+    # per-region combo recipes (Scrum 60) are owned by the seed loader and
+    # must survive an API edit.
     db.query(FormulaTemplateComponent).filter(
-        FormulaTemplateComponent.template_id == template_id
+        FormulaTemplateComponent.template_id == template_id,
+        FormulaTemplateComponent.region.is_(None),
     ).delete(synchronize_session=False)
 
     rows = [
@@ -442,7 +454,7 @@ def resolve_formula(
 
     cov, resolved_region = resolve_coverage(db, template_id, region)
     try:
-        lines = flatten_components(db, template_id)
+        lines = flatten_components(db, template_id, region=region)
     except FormulaChainError as e:
         # Should be unreachable for API-written data (write-time guards), but
         # seed scripts write directly — surface it rather than 500.

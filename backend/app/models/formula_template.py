@@ -124,6 +124,12 @@ class FormulaTemplateComponent(Base):
     input_template_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("formula_templates.id"), nullable=True
     )
+    # NULL = template-level line set (applies to all regions — the API-authored
+    # Scrum 58 lines). Set = a per-(formula x region) seeded recipe (Scrum 60):
+    # the resolver prefers region-specific rows and falls back to NULL.
+    region: Mapped[str | None] = mapped_column(
+        String(20), ForeignKey("regions.code"), nullable=True
+    )
     # Signed percent share of cost this line explains (credit lines < 0).
     weight_pct: Mapped[float] = mapped_column(Numeric(8, 4), nullable=False)
     # "We don't have the exact index, so we lean on a close stand-in" — a
@@ -175,6 +181,21 @@ class FormulaRegionCoverage(Base):
     margin_pct: Mapped[float | None] = mapped_column(Numeric(7, 4), nullable=True)
     base_year: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     base_quarter: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    # ── Trust layer (Scrum 60) ────────────────────────────────────────────────
+    # CONF-HIGH / CONF-MED / CONF-LOW. A CONF-LOW combo is a proportional-scaling
+    # placeholder, not verified pricing — it loads with needs_review=True and
+    # must not be treated as authoritative until an expert signs it off.
+    data_confidence: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Worst retrieval tier among the combo's index inputs (free/good_proxy/
+    # weak_proxy/blocked) — a combination is only as strong as its weakest input.
+    coverage_tier: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    needs_review: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    reviewed_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The correction_plan_log entry for this combo's formula — the reasoning the
+    # expert reviews against. Loaded as metadata, never re-applied (the weight
+    # corrections are already baked into the source lines).
+    review_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

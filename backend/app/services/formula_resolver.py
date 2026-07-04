@@ -76,17 +76,45 @@ def resolve_coverage(
     return None, None
 
 
+def _select_line_set(
+    db: Session, template_id: uuid.UUID, chain: list[str] | None
+) -> tuple[list[FormulaTemplateComponent], str | None]:
+    """Pick the line set for a template: the first region in the fallback
+    chain that has seeded per-region rows, else the region-NULL (template-
+    level / API-authored) rows. Returns (rows, matched region or None)."""
+    rows = (
+        db.query(FormulaTemplateComponent)
+        .filter(FormulaTemplateComponent.template_id == template_id)
+        .order_by(FormulaTemplateComponent.sort_order)
+        .all()
+    )
+    if chain:
+        by_region: dict[str | None, list] = {}
+        for r in rows:
+            by_region.setdefault(r.region, []).append(r)
+        for code in chain:
+            if code in by_region:
+                return by_region[code], code
+        return by_region.get(None, []), None
+    return [r for r in rows if r.region is None], None
+
+
 def flatten_components(
     db: Session,
     template_id: uuid.UUID,
+    region: str | None = None,
     _depth: int = 0,
     _path: tuple[uuid.UUID, ...] = (),
     _scale: float = 1.0,
+    _chain: list[str] | None = None,
 ) -> list[dict]:
     """Expand a template's components into effective index/fixed lines.
 
-    Each returned dict carries the line's own weight, its effective weight
-    after chain scaling, and which template it came from (for drill-down).
+    With a region, each template level uses its region-specific line set
+    (resolved through the same fallback chain as coverage) and falls back to
+    the region-NULL set. Each returned dict carries the line's own weight,
+    its effective weight after chain scaling, which template it came from,
+    and which region its line set matched (for trust display).
     Raises FormulaChainError on a cycle or a chain deeper than MAX_CHAIN_DEPTH.
     """
     if template_id in _path:
@@ -95,13 +123,10 @@ def flatten_components(
         raise FormulaChainError(
             f"Formula chain exceeds the maximum depth of {MAX_CHAIN_DEPTH}"
         )
+    if region is not None and _chain is None:
+        _chain = region_fallback_chain(db, region)
 
-    components = (
-        db.query(FormulaTemplateComponent)
-        .filter(FormulaTemplateComponent.template_id == template_id)
-        .order_by(FormulaTemplateComponent.sort_order)
-        .all()
-    )
+    components, matched_region = _select_line_set(db, template_id, _chain)
 
     lines: list[dict] = []
     for c in components:
@@ -110,9 +135,11 @@ def flatten_components(
                 flatten_components(
                     db,
                     c.input_template_id,
+                    region=region,
                     _depth=_depth + 1,
                     _path=_path + (template_id,),
                     _scale=_scale * float(c.weight_pct) / 100.0,
+                    _chain=_chain,
                 )
             )
         else:
@@ -126,6 +153,7 @@ def flatten_components(
                 "is_proxy": c.is_proxy,
                 "depth": _depth,
                 "via_template_id": template_id,
+                "line_region": matched_region,
             })
     return lines
 

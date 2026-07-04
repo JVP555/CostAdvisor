@@ -95,6 +95,7 @@ class FormulaComponentOut(BaseModel):
     component_type: str
     commodity_id: int | None
     input_template_id: uuid.UUID | None
+    region: str | None = None
     weight_pct: float
     is_proxy: bool
     sort_order: int
@@ -132,6 +133,12 @@ class FormulaCoverageOut(BaseModel):
     margin_pct: float | None
     base_year: int | None
     base_quarter: int | None
+    data_confidence: str | None = None
+    coverage_tier: str | None = None
+    needs_review: bool = False
+    reviewed_by: str | None = None
+    reviewed_at: datetime | None = None
+    review_metadata: dict | None = None
     updated_at: datetime
 
     model_config = {"from_attributes": True}
@@ -151,6 +158,9 @@ class ResolvedLineOut(BaseModel):
     depth: int
     via_template_id: uuid.UUID
     via_template_name: str | None = None
+    # Region whose seeded line set this line came from (None = the template-
+    # level / API-authored set) — trust signal for the reader.
+    line_region: str | None = None
 
 
 class FormulaResolveOut(BaseModel):
