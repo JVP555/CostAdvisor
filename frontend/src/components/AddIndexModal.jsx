@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Modal from './Modal';
+import RegionSelect from './RegionSelect';
 import api, { formatApiError } from '../api';
 
 export default function AddIndexModal({ isOpen, onClose, commodities, teamId, onAdded, canManagePairs = false }) {
@@ -86,7 +87,7 @@ export default function AddIndexModal({ isOpen, onClose, commodities, teamId, on
       await api.post('/api/indexes/sources', {
         team_id: teamId,
         commodity_id: resolvedId,
-        region: region.toUpperCase().trim(),
+        region: region,
         source_type: sourceType,
         scrape_url: sourceType === 'scrape_url' ? scrapeUrl : null,
         scrape_config: sourceType === 'scrape_url' ? config : null,
@@ -346,12 +347,7 @@ export default function AddIndexModal({ isOpen, onClose, commodities, teamId, on
 
         <div style={{ marginBottom: 14 }}>
           <label className="ca-label">Region</label>
-          <input
-            className="ca-input"
-            value={region}
-            onChange={e => setRegion(e.target.value)}
-            placeholder="e.g. EU, GLOBAL, US, APAC"
-          />
+          <RegionSelect value={region} onChange={setRegion} includeEmpty emptyLabel="Select a region…" />
         </div>
 
         <div style={{ marginBottom: 14 }}>

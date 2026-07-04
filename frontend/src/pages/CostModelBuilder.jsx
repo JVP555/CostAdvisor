@@ -3,11 +3,10 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { OVC_ITEMS, RM_ITEMS, PIE_COLORS, INCOTERMS } from '../utils/constants';
 import DonutChart from '../components/DonutChart';
 import IncotermAdjustments from '../components/IncotermAdjustments';
+import RegionSelect from '../components/RegionSelect';
 import api, { formatApiError } from '../api';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
 import { useToast } from '../components/Toast';
-
-const REGIONS = ['Europe', 'NA', 'Asia', 'Latam'];
 import { useAuth } from '../AuthContext';
 
 export default function CostModelBuilder() {
@@ -445,16 +444,11 @@ export default function CostModelBuilder() {
                 </div>
                 <div>
                   <label className="ca-label">Destination Region</label>
-                  <select className="ca-select" value={destinationRegion} onChange={e => setDestinationRegion(e.target.value)}>
-                    <option value="">—</option>
-                    {REGIONS.map(r => <option key={r}>{r}</option>)}
-                  </select>
+                  <RegionSelect value={destinationRegion} onChange={setDestinationRegion} includeEmpty />
                 </div>
                 <div>
                   <label className="ca-label">Producing Region</label>
-                  <select className="ca-select" value={region} onChange={e => setRegion(e.target.value)}>
-                    {REGIONS.map(r => <option key={r}>{r}</option>)}
-                  </select>
+                  <RegionSelect value={region} onChange={setRegion} />
                 </div>
                 <div>
                   <label className="ca-label">Currency</label>

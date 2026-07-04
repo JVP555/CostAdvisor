@@ -17,7 +17,7 @@ class CommodityIndex(Base):
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     unit: Mapped[str | None] = mapped_column(String(32))
     currency: Mapped[str | None] = mapped_column(String(3))
-    category: Mapped[str | None] = mapped_column(String(32))
+    category: Mapped[str | None] = mapped_column(String(64))
     provider: Mapped[str | None] = mapped_column(String(64))      # e.g. ECB, EIA, Eurostat, FRED, World Bank
     frequency: Mapped[str | None] = mapped_column(String(16))     # e.g. Daily, Weekly, Monthly, Quarterly
     source_url: Mapped[str | None] = mapped_column(String(512))
@@ -25,8 +25,24 @@ class CommodityIndex(Base):
     quoted_incoterm: Mapped[str | None] = mapped_column(String(8), nullable=True)
     quoted_named_place: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
+    # ── Metadata + proxy mapping (Scrum 57) — all on the region-agnostic index ──
+    access_tier: Mapped[str | None] = mapped_column(String(16), nullable=True)        # Free / Partial / Subscription
+    role: Mapped[str | None] = mapped_column(String(16), nullable=True)               # feedstock / energy / fixed
+    # How we obtain a live number: free / good_proxy / weak_proxy / blocked.
+    retrieval_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    free_source_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    free_source_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Structured spec (base_index + operation + spread + recalibration + note),
+    # editable in the admin proxy menu (SCRUM-67), executed by FD-1 (SCRUM-80).
+    proxy_logic: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # This index is a proxy standing in FOR another (real) index.
+    proxy_for_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("commodity_indexes.id", ondelete="SET NULL"), nullable=True
+    )
+
     # Relationships
     values = relationship("IndexValue", back_populates="commodity", lazy="dynamic")
+    proxy_for = relationship("CommodityIndex", remote_side=[id])
 
 
 class IndexValue(Base):

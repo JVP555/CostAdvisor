@@ -15,6 +15,14 @@ class CommodityIndexOut(BaseModel):
     frequency: str | None = None
     source_url: str | None = None
     scrape_enabled: bool
+    # Metadata + proxy mapping (Scrum 57)
+    access_tier: str | None = None
+    role: str | None = None
+    retrieval_status: str | None = None
+    free_source_name: str | None = None
+    free_source_url: str | None = None
+    proxy_logic: dict | None = None
+    proxy_for_id: int | None = None
 
     model_config = {"from_attributes": True}
 

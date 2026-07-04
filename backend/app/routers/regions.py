@@ -71,11 +71,23 @@ def update_region(
     require_super_admin(current_user)
     region = _get(db, region_id)
 
-    if data.parent_id is not None:
-        if data.parent_id == region_id:
-            raise HTTPException(status_code=400, detail="A region cannot be its own parent")
-        _get(db, data.parent_id)
-        region.parent_id = data.parent_id
+    # Use model_fields_set so an explicit null (promote to top-level) is
+    # distinguishable from an omitted field in a partial update.
+    if "parent_id" in data.model_fields_set:
+        new_parent = data.parent_id
+        if new_parent is not None:
+            if new_parent == region_id:
+                raise HTTPException(status_code=400, detail="A region cannot be its own parent")
+            _get(db, new_parent)  # 404 if the parent doesn't exist
+            # Cycle guard: the new parent must not be a descendant of this region.
+            cur = db.query(Region).filter(Region.id == new_parent).first()
+            seen: set[int] = set()
+            while cur is not None and cur.parent_id is not None and cur.id not in seen:
+                if cur.parent_id == region_id:
+                    raise HTTPException(status_code=400, detail="That change would create a region cycle")
+                seen.add(cur.id)
+                cur = db.query(Region).filter(Region.id == cur.parent_id).first()
+        region.parent_id = new_parent
     if data.code is not None:
         region.code = data.code
     if data.name is not None:
