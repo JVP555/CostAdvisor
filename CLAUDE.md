@@ -579,6 +579,22 @@ Give FormulaTemplate a structured weighted-lines form and per-region pricing —
 
 ---
 
+### Scrum 59 — SEED-1: load families & indexes (idempotent, no duplicates) (8 pts)
+
+One re-runnable loader (`backend/seed_catalog.py`) that gets the catalog taxonomy + the 158 index feeds actually loaded — upsert by stable key, update-in-place, never delete. Reference: `sample_idea/scrum59/`; writeup: `jvpdocs/scrum59.md`.
+
+- 🟢 **Idempotent upsert framework (stable keys)** — family `code` (F01…, name fallback for pre-existing code-less rows) · subfamily (family, name) · formula shell `code` = formula_id · index base-name (Scrum 57 reconciliation). Nothing is deleted: platform rows missing from the source are reported **stale**, left in place
+- 🟢 **Taxonomy parser/loader** — 22 families → `chemical_families`, 91 subfamilies → `subfamilies`, 257 formula shells → `formula_templates` (platform; `expression` NULL — weighted components are SEED-2). Migration `sd1a2b3c4d5e`: `formula_templates` + `code` (partial-unique among platform rows; forks keep origin's code), `family_id`/`subfamily_id` FKs, `catalog_meta` JSONB (form/coverage_tier/data_confidence/region_count — SEED-2's gating input); reversible verified
+- 🟢 **Index-feed parser/loader (skips the retired list)** — reuses `seed_index_metadata` parse/reconcile (158 feeds → 59 region-agnostic commodities) with **value-compare** added so re-runs honestly report unchanged; retired `index_list.html` isn't in the repo and its orphan `IDX-CPO-CN` is a hard error if it ever reappears in a drop
+- 🟢 **Pre-import join-validation + dry-run/diff report** — errors block the load with nothing written: feed→formula refs must exist, every formula must be priced by ≥1 feed, duplicate stable keys, retired orphan. Warnings: count drift vs 22/91/257/158/676, `# Formulas` list mismatches, subfamily rollup vs Formulas tab. `--dry-run` prints the create/update/unchanged/stale diff and writes nothing. **Real workbook validates clean: 0 errors, 0 warnings**
+- 🟢 Handoff quirks: workbook resolution tolerates the ` (1)` filename suffix (exact name wins, else newest variant); custom path arg supported
+- 🟢 **Done-when verified live** — run twice → 0 created/0 updated/429 unchanged; mutate one DB value → exactly 1 update, rest untouched, value restored; counts 22/91/257 + 59 metadata commodities in dev DB; all 257 shells have family links
+- 🟢 Tests `tests/test_seed_catalog.py` (12): parsing, suffix-tolerant resolution, validation (unknown ref / unpriced formula / retired orphan / unknown family / duplicates / clean minimal), real-workbook clean + exact counts, E2E idempotency, one-value-one-row, shells carry taxonomy+meta+NULL expression, dry-run writes nothing. Full suite 98 passed
+- 🔴 Known gap: the workbook's Formulas tab carries family but NOT subfamily — `formula_templates.subfamily_id` stays NULL until a drop carries the formula→subfamily mapping (rollup warning will catch inconsistencies)
+- 🔴 Follow-ups: SEED-2 (weighted components + 676 combos onto the Scrum 58 substrate, gate `CONF-LOW` via `catalog_meta`); Formulas page family grouping/search (257 flat rows now); per-region feed rows stay SCRUM-80
+
+---
+
 ## Product Roadmap
 
 Direction for the next three waves. The "what" and "why" are here; the "how" is owned by whoever picks up the work.

@@ -28,6 +28,21 @@ class FormulaTemplate(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(128), nullable=False)
+    # Catalog formula_id (e.g. "OLE-FAC-SAT") — the stable key the seed loader
+    # upserts by. Unique among platform rows only; a fork keeps its origin's
+    # code (same rule as chemical_families.code).
+    code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Taxonomy spine links (family -> subfamily -> formula). subfamily_id stays
+    # NULL until the reference drop carries the formula->subfamily mapping.
+    family_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("chemical_families.id", ondelete="SET NULL"), nullable=True
+    )
+    subfamily_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("subfamilies.id", ondelete="SET NULL"), nullable=True
+    )
+    # Reference-drop metadata (form / coverage_tier / data_confidence /
+    # region_count); SEED-2 gates low-confidence rows on this.
+    catalog_meta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Nullable since Scrum 58: a template can be defined purely as weighted
     # component lines instead of a free-form expression.

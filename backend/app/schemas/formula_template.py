@@ -31,6 +31,10 @@ class FormulaTemplateOut(BaseModel):
     created_by: uuid.UUID
     creator_email: str | None = None
     name: str
+    code: str | None = None
+    family_id: int | None = None
+    subfamily_id: int | None = None
+    catalog_meta: dict | None = None
     description: str | None
     expression: str | None
     variables: dict | None
