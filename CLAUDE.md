@@ -534,6 +534,20 @@ Ship a shared starting catalog that any team can fork into a private, editable c
 
 ---
 
+### Scrum 56 — Region as a first-class entity (5 pts)
+
+Region was free-text/enum in 5 tables; promote it to a managed reference table with FKs and self-referential subregions.
+
+- 🟢 **Region model + seed 7 (+Global)** — new `Region` (`code` unique natural key, `name`, self-ref `parent_id` for subregions). Seeded 7 top-level (Europe, NA, Latam, Asia, ME, Africa, Oceania) + `GLOBAL` sentinel (preserved for the `data_resolver` Europe→GLOBAL→any fallback), plus subregions NWE/France→Europe, USA→NA, China→Asia to reconcile feed grain
+- 🟢 **Migrate 5 tables' region columns → FK + backfill** — migration `rg1a2b3c4d5e` FK-ifies all 7 region columns (`cost_models.region`+`destination_region`, `freight_lanes.origin_region`+`destination_region`, `index_values.region`, `index_overrides.region`, `team_index_sources.region`) → `regions.code`. Backfill inserts every DISTINCT existing region string first (absorbed real dev-DB typos like `EU`/`eu`/`ASIA`/`INDIA` as rows) so **no orphaned strings**; reversible downgrade verified. Columns stay VARCHAR so the string-matching resolver/costing/scraper code is untouched — value is now a validated FK, not free text
+- 🟢 **Admin CRUD endpoint** — `/api/regions` (GET open to authed for dropdowns; POST/PUT/DELETE super-admin). Subregion = POST with `parent_id` → **added as a child with no migration**; DELETE of an in-use region → 409 (FK-guarded); duplicate code → 409
+- 🟢 **Free-text safety net** — a single `before_flush` session listener (`services/regions.py`) auto-registers any region code written through the ORM (race-safe `ON CONFLICT DO NOTHING`), so the free-text write paths (AddIndexModal, CSV upload) never 500 on the new FK; registered in `main.py` + the Celery task module
+- 🟢 **Reconcile feed region grain** — scrapers all write `GLOBAL`; finer grain (NWE vs EU, France/USA/China) lives in commodity *names*. Seeded the subregion hierarchy as the target to reconcile onto; repointing specific feeds onto subregions is a follow-up
+- 🟢 Tests `tests/test_regions.py` (8): seed+hierarchy (NWE child of Europe), no-orphan invariant across all 5 tables, DB rejects unknown region (raw insert), ORM auto-registers new region, admin create-subregion, super-admin gating, delete-in-use 409, delete-unused 200. Full suite 67 passed
+- 🔴 Follow-ups: frontend region picker (replace the hardcoded `REGIONS = ['Europe','NA','Asia','Latam']` in `CostModelBuilder` + free-text AddIndexModal with a `/api/regions` dropdown); clean up backfilled typo regions (merge `EU`/`eu`→`Europe`, `ASIA`→`Asia`); repoint feeds onto subregions
+
+---
+
 ## Product Roadmap
 
 Direction for the next three waves. The "what" and "why" are here; the "how" is owned by whoever picks up the work.

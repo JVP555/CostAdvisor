@@ -2,6 +2,7 @@ from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.models.chemical_family import ChemicalFamily
 from app.models.subfamily import Subfamily
+from app.models.region import Region
 from app.models.product import Product
 from app.models.supplier import Supplier
 from app.models.cost_model import CostModel, FormulaVersion, FormulaComponent
@@ -25,6 +26,7 @@ __all__ = [
     "TeamMembership",
     "ChemicalFamily",
     "Subfamily",
+    "Region",
     "Product",
     "Supplier",
     "CostModel",

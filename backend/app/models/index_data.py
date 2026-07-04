@@ -40,7 +40,7 @@ class IndexValue(Base):
     commodity_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("commodity_indexes.id"), nullable=False
     )
-    region: Mapped[str] = mapped_column(String(20), nullable=False)
+    region: Mapped[str] = mapped_column(String(20), ForeignKey("regions.code"), nullable=False)
     year: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     quarter: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     value: Mapped[float] = mapped_column(Numeric(14, 4), nullable=False)
@@ -64,7 +64,7 @@ class IndexOverride(Base):
     commodity_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("commodity_indexes.id")
     )
-    region: Mapped[str] = mapped_column(String(20), nullable=False)
+    region: Mapped[str] = mapped_column(String(20), ForeignKey("regions.code"), nullable=False)
     year: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     quarter: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     value: Mapped[float | None] = mapped_column(Numeric(14, 4), nullable=True)
@@ -92,7 +92,7 @@ class TeamIndexSource(Base):
     commodity_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("commodity_indexes.id"), nullable=False
     )
-    region: Mapped[str] = mapped_column(String(20), nullable=False)
+    region: Mapped[str] = mapped_column(String(20), ForeignKey("regions.code"), nullable=False)
     source_type: Mapped[str] = mapped_column(
         String(20), nullable=False
     )  # "manual" | "scrape_url" | "upload" | "fixed"
