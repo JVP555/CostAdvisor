@@ -591,7 +591,7 @@ One re-runnable loader (`backend/seed_catalog.py`) that gets the catalog taxonom
 - 🟢 **Done-when verified live** — run twice → 0 created/0 updated/429 unchanged; mutate one DB value → exactly 1 update, rest untouched, value restored; counts 22/91/257 + 59 metadata commodities in dev DB; all 257 shells have family links
 - 🟢 Tests `tests/test_seed_catalog.py` (12): parsing, suffix-tolerant resolution, validation (unknown ref / unpriced formula / retired orphan / unknown family / duplicates / clean minimal), real-workbook clean + exact counts, E2E idempotency, one-value-one-row, shells carry taxonomy+meta+NULL expression, dry-run writes nothing. Full suite 98 passed
 - 🟢 Known gap closed by Scrum 60: the combos drop carries the formula→subfamily mapping — SEED-2 fills `formula_templates.subfamily_id` for all 257
-- 🟡 Follow-ups: ~~SEED-2~~ (shipped as Scrum 60); Formulas page family grouping/search (257 flat rows now); per-region feed rows stay SCRUM-80
+- 🟡 Follow-ups: ~~SEED-2~~ (shipped as Scrum 60); ~~Formulas page family grouping/search~~ (shipped — `Formulas.jsx` Default Formulas is now a collapsible family→subfamily catalog: search across name/code/family/subfamily, confidence filter chips, per-row code chip + CONF badge (LOW = amber "review") + coverage tier/region count, family-header review counts, catalog CSV export; formulas list API enriched with `family_code`/`family_name`/`subfamily_name`; code-less platform templates fall back to an "Other platform formulas" table); per-region feed rows stay SCRUM-80
 
 ---
 

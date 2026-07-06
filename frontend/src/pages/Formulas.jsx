@@ -1,8 +1,29 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../components/Toast';
 import api from '../api';
 import exportCsv from '../utils/exportCsv';
+
+// data_confidence → badge treatment. CONF-LOW is a placeholder pending expert
+// review — it must read as a caution, not as fact.
+const CONF_BADGE = {
+  'CONF-HIGH': {
+    bg: 'var(--success-bg)', color: 'var(--accent)', label: 'HIGH',
+    title: 'Verified against real process chemistry',
+  },
+  'CONF-MED': {
+    bg: 'var(--info-bg)', color: 'var(--accent4)', label: 'MED',
+    title: 'Missing lines added; dominant feedstock proportionally scaled',
+  },
+  'CONF-LOW': {
+    bg: 'var(--warn-bg)', color: 'var(--accent3)', label: 'LOW · REVIEW',
+    title: 'Placeholder — proportional scaling only, pending expert review',
+  },
+};
+
+const TIER_LABEL = {
+  free: 'free', good_proxy: 'good proxy', weak_proxy: 'weak proxy', blocked: 'blocked',
+};
 
 export default function Formulas() {
   const { activeTeamId, user } = useAuth();
@@ -112,9 +133,7 @@ export default function Formulas() {
         <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Loading…</div>
       ) : (
         <>
-          <FormulaSection
-            title="Default Formulas"
-            subtitle="Managed by platform Chemists and Super Admins — visible to all teams"
+          <CatalogSection
             rows={platformTemplates}
             canEdit={canEditPlatform}
             onEdit={openEdit}
@@ -187,6 +206,279 @@ export default function Formulas() {
         />
       )}
     </div>
+  );
+}
+
+function ConfidenceBadge({ confidence }) {
+  const style = CONF_BADGE[confidence];
+  if (!style) return <span style={{ color: 'var(--muted)', fontSize: 10 }}>—</span>;
+  return (
+    <span className="ca-badge" title={style.title}
+      style={{ background: style.bg, color: style.color, fontWeight: 600 }}>
+      {style.label}
+    </span>
+  );
+}
+
+function CatalogSection({ rows, canEdit, onEdit, onDelete }) {
+  const [query, setQuery] = useState('');
+  const [confFilter, setConfFilter] = useState('all');
+  const [expanded, setExpanded] = useState(() => new Set());
+
+  const catalogRows = rows.filter(t => t.code);
+  const otherRows = rows.filter(t => !t.code);
+
+  // family code → { code, name, subfamilies: Map(subName → rows[]) }, sorted
+  const families = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const map = new Map();
+    for (const t of catalogRows) {
+      if (confFilter !== 'all' && t.catalog_meta?.data_confidence !== confFilter) continue;
+      if (q) {
+        const hay = `${t.name} ${t.code} ${t.family_name || ''} ${t.subfamily_name || ''}`.toLowerCase();
+        if (!hay.includes(q)) continue;
+      }
+      const fcode = t.family_code || '—';
+      if (!map.has(fcode)) {
+        map.set(fcode, { code: fcode, name: t.family_name || 'Uncategorised', subs: new Map(), count: 0, review: 0 });
+      }
+      const fam = map.get(fcode);
+      const sub = t.subfamily_name || '—';
+      if (!fam.subs.has(sub)) fam.subs.set(sub, []);
+      fam.subs.get(sub).push(t);
+      fam.count += 1;
+      if (t.catalog_meta?.data_confidence === 'CONF-LOW') fam.review += 1;
+    }
+    const list = [...map.values()].sort((a, b) => a.code.localeCompare(b.code));
+    for (const fam of list) {
+      fam.subs = new Map([...fam.subs.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+      for (const rowsInSub of fam.subs.values()) rowsInSub.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return list;
+  }, [catalogRows, query, confFilter]);
+
+  const filtering = query.trim() !== '' || confFilter !== 'all';
+  const shown = families.reduce((n, f) => n + f.count, 0);
+  const reviewTotal = catalogRows.filter(t => t.catalog_meta?.data_confidence === 'CONF-LOW').length;
+  const isOpen = (fam) => filtering || expanded.has(fam.code);
+  const allOpen = families.length > 0 && families.every(isOpen);
+
+  const toggle = (code) => setExpanded(prev => {
+    const next = new Set(prev);
+    if (next.has(code)) next.delete(code); else next.add(code);
+    return next;
+  });
+
+  const handleExport = () => {
+    exportCsv(
+      'formulas_default_catalog.csv',
+      ['Family', 'Subfamily', 'Formula', 'Code', 'Confidence', 'Coverage', 'Regions'],
+      families.flatMap(fam => [...fam.subs.entries()].flatMap(([sub, list]) =>
+        list.map(t => [
+          `${fam.code} ${fam.name}`, sub, t.name, t.code,
+          t.catalog_meta?.data_confidence || '', t.catalog_meta?.coverage_tier || '',
+          t.catalog_meta?.region_count ?? '',
+        ])
+      ))
+    );
+  };
+
+  if (catalogRows.length === 0 && otherRows.length === 0 && !canEdit) return null;
+
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Default Formulas</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+            Managed by platform Chemists and Super Admins — visible to all teams
+          </div>
+          {catalogRows.length > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+              {families.length} families · {shown} formulas
+              {reviewTotal > 0 && (
+                <span style={{ color: 'var(--accent3)' }}> · {reviewTotal} pending expert review</span>
+              )}
+            </div>
+          )}
+        </div>
+        {catalogRows.length > 0 && (
+          <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }} onClick={handleExport}>
+            Export CSV
+          </button>
+        )}
+      </div>
+
+      {catalogRows.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            className="ca-input"
+            style={{ maxWidth: 300, padding: '7px 10px', fontSize: 12 }}
+            placeholder="Search name, code, family…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            aria-label="Search default formulas"
+          />
+          {['all', 'CONF-HIGH', 'CONF-MED', 'CONF-LOW'].map(c => (
+            <button
+              key={c}
+              onClick={() => setConfFilter(c)}
+              style={{
+                padding: '5px 12px', borderRadius: 20, fontSize: 10, cursor: 'pointer',
+                fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5,
+                border: `1px solid ${confFilter === c ? 'var(--border-light)' : 'var(--border)'}`,
+                background: confFilter === c ? 'var(--surface3)' : 'transparent',
+                color: confFilter === c ? 'var(--text)' : 'var(--text-secondary)',
+                fontWeight: confFilter === c ? 600 : 400,
+              }}
+            >
+              {c === 'all' ? 'ALL' : c.replace('CONF-', '')}
+            </button>
+          ))}
+          {!filtering && (
+            <button
+              className="ca-btn ca-btn-ghost ca-btn-sm"
+              style={{ fontSize: 10, marginLeft: 'auto' }}
+              onClick={() => setExpanded(allOpen ? new Set() : new Set(families.map(f => f.code)))}
+            >
+              {allOpen ? 'Collapse all' : 'Expand all'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {catalogRows.length === 0 ? (
+        <div style={{
+          padding: '20px 16px', border: '1px dashed var(--border)',
+          borderRadius: 8, fontSize: 12, color: 'var(--muted)', textAlign: 'center',
+        }}>
+          No default formulas yet.
+        </div>
+      ) : families.length === 0 ? (
+        <div style={{
+          padding: '20px 16px', border: '1px dashed var(--border)',
+          borderRadius: 8, fontSize: 12, color: 'var(--muted)', textAlign: 'center',
+        }}>
+          No formulas match {query.trim() ? <>“{query.trim()}”</> : 'this filter'}.
+        </div>
+      ) : (
+        <div className="ca-card" style={{ padding: 0, overflow: 'hidden' }}>
+          {families.map((fam, fi) => (
+            <div key={fam.code} style={{ borderTop: fi > 0 ? '1px solid var(--border)' : 'none' }}>
+              <button
+                onClick={() => !filtering && toggle(fam.code)}
+                aria-expanded={isOpen(fam)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '11px 16px', background: 'transparent', border: 'none',
+                  cursor: filtering ? 'default' : 'pointer', textAlign: 'left', color: 'var(--text)',
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"
+                  style={{
+                    transform: isOpen(fam) ? 'rotate(90deg)' : 'none',
+                    transition: 'transform 0.15s ease-out', flexShrink: 0,
+                    opacity: filtering ? 0.3 : 1,
+                  }}>
+                  <path d="M3 1l4 4-4 4" fill="none" stroke="var(--text-secondary)" strokeWidth="1.5" />
+                </svg>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: 'var(--muted)', width: 28, flexShrink: 0 }}>
+                  {fam.code}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{fam.name}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-secondary)', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap' }}>
+                  {fam.subs.size} subfamilies · {fam.count} formulas
+                  {fam.review > 0 && <span style={{ color: 'var(--accent3)' }}> · {fam.review} review</span>}
+                </span>
+              </button>
+
+              {isOpen(fam) && (
+                <table className="ca-table" style={{ margin: 0 }}>
+                  <tbody>
+                    {[...fam.subs.entries()].map(([sub, list]) => (
+                      <SubfamilyRows key={sub} sub={sub} list={list}
+                        canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} />
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {otherRows.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <FormulaSection
+            title="Other platform formulas"
+            subtitle="Hand-authored templates outside the catalog taxonomy"
+            rows={otherRows}
+            canEdit={canEdit}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubfamilyRows({ sub, list, canEdit, onEdit, onDelete }) {
+  return (
+    <>
+      <tr>
+        <td colSpan={canEdit ? 5 : 4} style={{
+          padding: '8px 16px 4px 44px', fontSize: 10, fontWeight: 600,
+          textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--muted)',
+          borderBottom: 'none', background: 'var(--neutral-bg-soft)',
+        }}>
+          {sub}
+        </td>
+      </tr>
+      {list.map(t => (
+        <tr key={t.id}>
+          <td style={{ paddingLeft: 44 }}>
+            <span style={{ fontWeight: 600, fontSize: 12 }}>{t.name}</span>
+          </td>
+          <td style={{ width: 130 }}>
+            <span style={{
+              fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
+              color: 'var(--text-secondary)', background: 'var(--surface2)',
+              padding: '2px 7px', borderRadius: 4, whiteSpace: 'nowrap',
+            }}>
+              {t.code}
+            </span>
+          </td>
+          <td style={{ width: 110 }}>
+            <ConfidenceBadge confidence={t.catalog_meta?.data_confidence} />
+          </td>
+          <td style={{ width: 150, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, whiteSpace: 'nowrap' }}>
+            <span style={{ color: t.catalog_meta?.coverage_tier === 'blocked' ? 'var(--accent2)' : 'var(--text-secondary)' }}>
+              {TIER_LABEL[t.catalog_meta?.coverage_tier] || '—'}
+            </span>
+            <span style={{ color: 'var(--muted)' }}>
+              {' '}· {t.catalog_meta?.region_count ?? 0} {t.catalog_meta?.region_count === 1 ? 'region' : 'regions'}
+            </span>
+          </td>
+          {canEdit && (
+            <td style={{ width: 140, textAlign: 'center' }}>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => onEdit(t)}>
+                  Edit
+                </button>
+                <button
+                  className="ca-btn ca-btn-ghost ca-btn-sm"
+                  style={{ color: 'var(--accent2)', borderColor: 'var(--accent2)' }}
+                  onClick={() => onDelete(t.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </td>
+          )}
+        </tr>
+      ))}
+    </>
   );
 }
 

@@ -44,16 +44,33 @@ def _first_team_id(db: Session, user_id: uuid.UUID) -> uuid.UUID | None:
 
 
 def _enrich_with_emails(db: Session, templates: list[FormulaTemplate]) -> list[FormulaTemplateOut]:
-    """Batch-load creator emails to avoid N+1 queries."""
+    """Batch-load creator emails + taxonomy names to avoid N+1 queries."""
+    from app.models.chemical_family import ChemicalFamily
+    from app.models.subfamily import Subfamily
+
     creator_ids = list({t.created_by for t in templates})
     email_map = {
         u.id: u.email
         for u in db.query(User).filter(User.id.in_(creator_ids)).all()
     } if creator_ids else {}
+    family_ids = list({t.family_id for t in templates if t.family_id is not None})
+    family_map = {
+        f.id: (f.code, f.name)
+        for f in db.query(ChemicalFamily).filter(ChemicalFamily.id.in_(family_ids)).all()
+    } if family_ids else {}
+    sub_ids = list({t.subfamily_id for t in templates if t.subfamily_id is not None})
+    sub_map = {
+        s.id: s.name
+        for s in db.query(Subfamily).filter(Subfamily.id.in_(sub_ids)).all()
+    } if sub_ids else {}
+
     result = []
     for t in templates:
         out = FormulaTemplateOut.model_validate(t)
         out.creator_email = email_map.get(t.created_by)
+        if t.family_id in family_map:
+            out.family_code, out.family_name = family_map[t.family_id]
+        out.subfamily_name = sub_map.get(t.subfamily_id)
         result.append(out)
     return result
 

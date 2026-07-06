@@ -34,6 +34,9 @@ class FormulaTemplateOut(BaseModel):
     code: str | None = None
     family_id: int | None = None
     subfamily_id: int | None = None
+    family_code: str | None = None
+    family_name: str | None = None
+    subfamily_name: str | None = None
     catalog_meta: dict | None = None
     description: str | None
     expression: str | None
