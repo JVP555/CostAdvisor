@@ -334,6 +334,33 @@ def test_delete_template_used_as_input_conflict(db, tenant_a, client_as):
         _cleanup(db, [parent.id])
 
 
+def test_mark_coverage_reviewed(db, tenant_a, tenant_b, client_as):
+    t = _mk_template(db, "review-me", tenant_a["user_id"], team_id=tenant_a["team_id"])
+    c = client_as(tenant_a)
+    try:
+        assert c.put(f"/api/formulas/{t.id}/coverage/Europe",
+                     json={"margin_pct": 9}).status_code == 200
+        # Simulate a seeded CONF-LOW placeholder combo
+        db.execute(text("""
+            UPDATE formula_region_coverage SET needs_review = true, data_confidence = 'CONF-LOW'
+            WHERE template_id = :t AND region = 'Europe'"""), {"t": str(t.id)})
+        db.commit()
+
+        r = c.post(f"/api/formulas/{t.id}/coverage/Europe/review")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["needs_review"] is False
+        assert body["reviewed_by"] and body["reviewed_at"]
+
+        # Another team can't review — 404 (RLS-hidden) or 403 (permission gate)
+        r = client_as(tenant_b).post(f"/api/formulas/{t.id}/coverage/Europe/review")
+        assert r.status_code in (403, 404)
+        # Unknown region → 404
+        assert c.post(f"/api/formulas/{t.id}/coverage/NA/review").status_code == 404
+    finally:
+        _cleanup(db, [t.id])
+
+
 def test_platform_formula_cannot_chain_team_formula(db, tenant_a, user_factory, client_as):
     sa = user_factory(is_super_admin=True)
     plat = _mk_template(db, f"plat-{uuid.uuid4().hex[:6]}", sa["user_id"])

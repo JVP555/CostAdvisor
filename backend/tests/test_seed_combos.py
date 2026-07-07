@@ -256,6 +256,37 @@ def test_api_replace_leaves_seeded_region_lines_alone(db, tenant_a, client_as):
     assert ("api line", None) in rows and ("seeded", "Europe") in rows
 
 
+def test_reseed_preserves_expert_review(db):
+    """A human sign-off (reviewed_at set) must survive a seed re-run — the
+    source carries no review state, so it must never clobber one."""
+    sc.run(db, dry_run=False, verbose=False)
+    db.commit()
+    combo = db.execute(text("""
+        SELECT fc.id::text FROM formula_region_coverage fc
+        JOIN formula_templates t ON t.id = fc.template_id
+        WHERE fc.needs_review LIMIT 1""")).scalar()
+    try:
+        db.execute(text("""
+            UPDATE formula_region_coverage
+            SET needs_review = false, reviewed_by = 'expert@test', reviewed_at = now()
+            WHERE id = :id"""), {"id": combo})
+        db.commit()
+
+        sc.run(db, dry_run=False, verbose=False)
+        db.commit()
+        row = db.execute(text("""
+            SELECT needs_review, reviewed_by FROM formula_region_coverage
+            WHERE id = :id"""), {"id": combo}).fetchone()
+        assert row[0] is False and row[1] == "expert@test"
+    finally:
+        # Restore the seeded state so other tests see the canonical 99 flags.
+        db.execute(text("""
+            UPDATE formula_region_coverage
+            SET needs_review = true, reviewed_by = NULL, reviewed_at = NULL
+            WHERE id = :id"""), {"id": combo})
+        db.commit()
+
+
 def test_ensure_regions_idempotent(db):
     assert sc.ensure_regions(db, dry_run=False) == 0  # already created by the load
     india = db.execute(text(

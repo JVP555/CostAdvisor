@@ -464,6 +464,11 @@ def run(db, dry_run: bool = False, verbose: bool = True) -> dict:
                 db.add(FormulaRegionCoverage(template_id=template.id,
                                              region=region_code, **target))
         else:
+            if row.reviewed_at is not None:
+                # An expert signed this combo off in-app; the source carries no
+                # review state of its own, so a re-run must not clobber it.
+                target.pop("needs_review")
+                target.pop("reviewed_by")
             changed = [k for k, v in target.items()
                        if (float(getattr(row, k)) if k == "margin_pct" and getattr(row, k) is not None
                            else getattr(row, k)) != v]

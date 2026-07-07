@@ -3,6 +3,7 @@ import { useAuth } from '../AuthContext';
 import { useToast } from '../components/Toast';
 import api from '../api';
 import exportCsv from '../utils/exportCsv';
+import FormulaDetailModal from '../components/FormulaDetailModal';
 
 // data_confidence → badge treatment. CONF-LOW is a placeholder pending expert
 // review — it must read as a caution, not as fact.
@@ -35,6 +36,7 @@ export default function Formulas() {
   const [canEditTeam, setCanEditTeam] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
+  const [detailTemplate, setDetailTemplate] = useState(null);
   const [commodities, setCommodities] = useState([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
@@ -48,7 +50,9 @@ export default function Formulas() {
       const [tmplRes, permRes, cmRes] = await Promise.all([
         api.get('/api/formulas/', { params: { team_id: activeTeamId } }),
         api.get('/api/formulas/can-edit-platform'),
-        api.get('/api/indexes', { params: { has_data: true } }),
+        // Full index list (not just has_data) — weighted lines may target
+        // catalog commodities that don't carry values yet.
+        api.get('/api/indexes'),
       ]);
       setTemplates(tmplRes.data);
       setCanEditPlatform(permRes.data.can_edit);
@@ -138,6 +142,7 @@ export default function Formulas() {
             canEdit={canEditPlatform}
             onEdit={openEdit}
             onDelete={id => setConfirmDeleteId(id)}
+            onOpen={setDetailTemplate}
           />
 
           <FormulaSection
@@ -147,6 +152,7 @@ export default function Formulas() {
             canEdit={canEditTeam}
             onEdit={openEdit}
             onDelete={id => setConfirmDeleteId(id)}
+            onOpen={setDetailTemplate}
           />
 
           {platformTemplates.length === 0 && teamTemplates.length === 0 && (
@@ -200,8 +206,19 @@ export default function Formulas() {
           canEditPlatform={canEditPlatform}
           canEditTeam={canEditTeam}
           commodities={commodities}
+          templates={templates}
           onSaved={handleSaved}
           onClose={() => { setShowModal(false); setEditingTemplate(null); }}
+          addToast={addToast}
+        />
+      )}
+
+      {detailTemplate && (
+        <FormulaDetailModal
+          template={detailTemplate}
+          activeTeamId={activeTeamId}
+          canEdit={detailTemplate.team_id ? canEditTeam : canEditPlatform}
+          onClose={() => setDetailTemplate(null)}
           addToast={addToast}
         />
       )}
@@ -220,7 +237,25 @@ function ConfidenceBadge({ confidence }) {
   );
 }
 
-function CatalogSection({ rows, canEdit, onEdit, onDelete }) {
+function NameButton({ template, onOpen }) {
+  return (
+    <button
+      onClick={() => onOpen(template)}
+      title="View weighted recipe & regional pricing"
+      style={{
+        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+        color: 'var(--text)', fontWeight: 600, fontSize: 12, textAlign: 'left',
+        fontFamily: 'inherit',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
+      onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
+    >
+      {template.name}
+    </button>
+  );
+}
+
+function CatalogSection({ rows, canEdit, onEdit, onDelete, onOpen }) {
   const [query, setQuery] = useState('');
   const [confFilter, setConfFilter] = useState('all');
   const [expanded, setExpanded] = useState(() => new Set());
@@ -397,7 +432,7 @@ function CatalogSection({ rows, canEdit, onEdit, onDelete }) {
                   <tbody>
                     {[...fam.subs.entries()].map(([sub, list]) => (
                       <SubfamilyRows key={sub} sub={sub} list={list}
-                        canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} />
+                        canEdit={canEdit} onEdit={onEdit} onDelete={onDelete} onOpen={onOpen} />
                     ))}
                   </tbody>
                 </table>
@@ -416,6 +451,7 @@ function CatalogSection({ rows, canEdit, onEdit, onDelete }) {
             canEdit={canEdit}
             onEdit={onEdit}
             onDelete={onDelete}
+            onOpen={onOpen}
           />
         </div>
       )}
@@ -423,7 +459,7 @@ function CatalogSection({ rows, canEdit, onEdit, onDelete }) {
   );
 }
 
-function SubfamilyRows({ sub, list, canEdit, onEdit, onDelete }) {
+function SubfamilyRows({ sub, list, canEdit, onEdit, onDelete, onOpen }) {
   return (
     <>
       <tr>
@@ -438,7 +474,7 @@ function SubfamilyRows({ sub, list, canEdit, onEdit, onDelete }) {
       {list.map(t => (
         <tr key={t.id}>
           <td style={{ paddingLeft: 44 }}>
-            <span style={{ fontWeight: 600, fontSize: 12 }}>{t.name}</span>
+            <NameButton template={t} onOpen={onOpen} />
           </td>
           <td style={{ width: 130 }}>
             <span style={{
@@ -482,7 +518,7 @@ function SubfamilyRows({ sub, list, canEdit, onEdit, onDelete }) {
   );
 }
 
-function FormulaSection({ title, subtitle, rows, canEdit, onEdit, onDelete }) {
+function FormulaSection({ title, subtitle, rows, canEdit, onEdit, onDelete, onOpen }) {
   if (rows.length === 0 && !canEdit) return null;
 
   const handleExport = () => {
@@ -534,7 +570,7 @@ function FormulaSection({ title, subtitle, rows, canEdit, onEdit, onDelete }) {
             <tbody>
               {rows.map(t => (
                 <tr key={t.id}>
-                  <td style={{ fontWeight: 600 }}>{t.name}</td>
+                  <td><NameButton template={t} onOpen={onOpen} /></td>
                   <td style={{ fontSize: 11, color: 'var(--muted)' }}>{t.description || '—'}</td>
                   <td style={{ textAlign: 'center', fontFamily: 'monospace', fontSize: 11 }}>
                     {t.variables ? Object.keys(t.variables).length : 0}
@@ -566,7 +602,7 @@ function FormulaSection({ title, subtitle, rows, canEdit, onEdit, onDelete }) {
   );
 }
 
-function FormulaModal({ template, activeTeamId, canEditPlatform, canEditTeam, commodities, onSaved, onClose, addToast }) {
+function FormulaModal({ template, activeTeamId, canEditPlatform, canEditTeam, commodities, templates, onSaved, onClose, addToast }) {
   const isNew = !!template?._new;
   // Default scope: platform-only users → platform; everyone else → team
   const defaultScope = !canEditTeam && canEditPlatform ? 'platform' : 'team';
@@ -579,7 +615,42 @@ function FormulaModal({ template, activeTeamId, canEditPlatform, canEditTeam, co
   const showScopeToggle = canEditPlatform && canEditTeam;
   const [expression, setExpression] = useState(isNew ? '' : (template?.expression || ''));
   const [vars, setVars] = useState(isNew ? {} : (template?.variables || {}));
+  const [mode, setMode] = useState('expression'); // 'expression' | 'weighted'
+  const [lines, setLines] = useState([]);
   const [saving, setSaving] = useState(false);
+
+  // Load the template-level (region-NULL) weighted lines when editing; a
+  // template that has lines but no expression opens in weighted mode.
+  useEffect(() => {
+    if (isNew) return;
+    let alive = true;
+    api.get(`/api/formulas/${template.id}/components`, { params: { team_id: activeTeamId } })
+      .then(res => {
+        if (!alive) return;
+        setLines(res.data.map(l => ({
+          name: l.name, component_type: l.component_type,
+          commodity_id: l.commodity_id, input_template_id: l.input_template_id,
+          weight_pct: l.weight_pct, is_proxy: l.is_proxy,
+        })));
+        if (res.data.length > 0 && !template.expression) setMode('weighted');
+      })
+      .catch(() => { /* lines stay empty; expression mode still works */ });
+    return () => { alive = false; };
+  }, [template?.id]);
+
+  const linesSum = lines.reduce((s, l) => s + (parseFloat(l.weight_pct) || 0), 0);
+  const sumOk = Math.abs(linesSum - 100) <= 0.01;
+
+  const updateLine = (i, patch) => {
+    setLines(prev => prev.map((l, idx) => idx === i ? { ...l, ...patch } : l));
+  };
+
+  const chainableTemplates = (templates || []).filter(t =>
+    t.id !== template?.id &&
+    // A platform formula may only chain platform inputs (the backend
+    // enforces this too — any team resolving it must not miss lines).
+    (scope === 'platform' ? !t.team_id : true)
+  );
 
   const detectVars = () => {
     const expr = expression.replace(/[[\]]/g, '').replace(/\s/g, '');
@@ -602,14 +673,27 @@ function FormulaModal({ template, activeTeamId, canEditPlatform, canEditTeam, co
 
   const handleSave = async () => {
     if (!name.trim()) { addToast('Name is required', 'error'); return; }
-    if (!expression.trim()) { addToast('Expression is required', 'error'); return; }
+    if (mode === 'expression' && !expression.trim() && lines.length === 0) {
+      addToast('Expression is required', 'error'); return;
+    }
+    if (mode === 'weighted') {
+      if (lines.length === 0) { addToast('Add at least one weighted line', 'error'); return; }
+      if (lines.some(l => !l.name.trim())) { addToast('Every line needs a name', 'error'); return; }
+      if (lines.some(l => l.component_type === 'index' && !l.commodity_id)) {
+        addToast('Index lines need a commodity index', 'error'); return;
+      }
+      if (lines.some(l => l.component_type === 'formula' && !l.input_template_id)) {
+        addToast('Formula lines need an input formula', 'error'); return;
+      }
+      if (!sumOk) { addToast(`Weights must sum to 100 (currently ${linesSum.toFixed(2)})`, 'error'); return; }
+    }
     setSaving(true);
     try {
       const payload = {
         team_id: scope === 'platform' ? null : activeTeamId,
         name: name.trim(),
         description: description.trim() || null,
-        expression: expression.trim(),
+        expression: expression.trim() || null,
         variables: Object.keys(vars).length > 0 ? vars : null,
       };
       let res;
@@ -617,6 +701,19 @@ function FormulaModal({ template, activeTeamId, canEditPlatform, canEditTeam, co
         res = await api.post('/api/formulas/', payload);
       } else {
         res = await api.put(`/api/formulas/${template.id}`, payload);
+      }
+      if (mode === 'weighted') {
+        await api.put(`/api/formulas/${res.data.id}/components`, {
+          components: lines.map((l, i) => ({
+            name: l.name.trim(),
+            component_type: l.component_type,
+            commodity_id: l.component_type === 'index' ? l.commodity_id : null,
+            input_template_id: l.component_type === 'formula' ? l.input_template_id : null,
+            weight_pct: parseFloat(l.weight_pct) || 0,
+            is_proxy: !!l.is_proxy,
+            sort_order: i,
+          })),
+        });
       }
       addToast(isNew ? 'Formula created' : 'Formula updated', 'success');
       onSaved(res.data);
@@ -683,6 +780,103 @@ function FormulaModal({ template, activeTeamId, canEditPlatform, canEditTeam, co
           )}
 
           <div>
+            <label className="ca-label">Defined by</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[['expression', 'Expression'], ['weighted', 'Weighted lines']].map(([m, label]) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  style={{
+                    padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+                    border: `1px solid ${mode === m ? 'var(--accent)' : 'var(--border)'}`,
+                    background: mode === m ? 'var(--accent)' : 'transparent',
+                    color: mode === m ? 'var(--on-accent)' : 'var(--text)',
+                    fontWeight: mode === m ? 600 : 400,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {mode === 'weighted' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                <label className="ca-label" style={{ marginBottom: 0 }}>Weighted lines *</label>
+                <span style={{
+                  fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600,
+                  color: lines.length === 0 ? 'var(--muted)' : sumOk ? 'var(--accent)' : 'var(--accent3)',
+                }}>
+                  Σ {linesSum.toFixed(2)}%
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
+                Each line explains a share of the cost — weights must sum to 100.
+                Mark a line proxy when it leans on a stand-in index.
+              </div>
+              {lines.map((l, i) => (
+                <div key={i} style={{
+                  display: 'grid', gridTemplateColumns: '1fr 82px 1fr 64px 24px 20px',
+                  gap: 6, marginBottom: 6, alignItems: 'center',
+                }}>
+                  <input className="ca-input" style={{ padding: '6px 8px', fontSize: 11 }}
+                    placeholder="Line name" value={l.name}
+                    onChange={e => updateLine(i, { name: e.target.value })} />
+                  <select className="ca-select" style={{ fontSize: 11, padding: '6px 6px' }}
+                    value={l.component_type}
+                    onChange={e => updateLine(i, {
+                      component_type: e.target.value, commodity_id: null, input_template_id: null,
+                    })}>
+                    <option value="index">Index</option>
+                    <option value="fixed">Fixed</option>
+                    <option value="formula">Formula</option>
+                  </select>
+                  {l.component_type === 'index' ? (
+                    <select className="ca-select" style={{ fontSize: 11, padding: '6px 6px' }}
+                      value={l.commodity_id ?? ''}
+                      onChange={e => updateLine(i, { commodity_id: parseInt(e.target.value) || null })}>
+                      <option value="">Select index…</option>
+                      {commodities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  ) : l.component_type === 'formula' ? (
+                    <select className="ca-select" style={{ fontSize: 11, padding: '6px 6px' }}
+                      value={l.input_template_id ?? ''}
+                      onChange={e => updateLine(i, { input_template_id: e.target.value || null })}>
+                      <option value="">Select formula…</option>
+                      {chainableTemplates.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}{t.code ? ` (${t.code})` : ''}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span style={{ fontSize: 10, color: 'var(--muted)', paddingLeft: 4 }}>
+                      flat share (margin / conversion)
+                    </span>
+                  )}
+                  <input className="ca-input" type="number" step="0.1" style={{ padding: '6px 8px', fontSize: 11 }}
+                    value={l.weight_pct}
+                    onChange={e => updateLine(i, { weight_pct: e.target.value })} />
+                  <input type="checkbox" checked={!!l.is_proxy} title="Proxy — stand-in index"
+                    onChange={e => updateLine(i, { is_proxy: e.target.checked })}
+                    style={{ accentColor: 'var(--accent3)', cursor: 'pointer' }} />
+                  <button onClick={() => setLines(prev => prev.filter((_, idx) => idx !== i))} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--accent2)', fontSize: 14, fontWeight: 700,
+                  }} aria-label={`Remove line ${l.name || i + 1}`}>×</button>
+                </div>
+              ))}
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 10 }}
+                onClick={() => setLines(prev => [...prev, {
+                  name: '', component_type: 'index', commodity_id: null,
+                  input_template_id: null, weight_pct: '', is_proxy: false,
+                }])}>
+                + Add line
+              </button>
+            </div>
+          )}
+
+          {mode === 'expression' && (
+          <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <label className="ca-label" style={{ marginBottom: 0 }}>Expression *</label>
               <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 10 }} onClick={detectVars}>
@@ -701,8 +895,9 @@ function FormulaModal({ template, activeTeamId, canEditPlatform, canEditTeam, co
               onChange={e => setExpression(e.target.value)}
             />
           </div>
+          )}
 
-          {Object.keys(vars).length > 0 && (
+          {mode === 'expression' && Object.keys(vars).length > 0 && (
             <div>
               <label className="ca-label">Variables</label>
               <div style={{ display: 'grid', gridTemplateColumns: '90px 80px 1fr 28px', gap: 6, marginBottom: 6 }}>

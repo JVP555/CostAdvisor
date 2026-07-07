@@ -1,4 +1,6 @@
 import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
@@ -421,6 +423,43 @@ def upsert_coverage(
                   "create" if created else "update", "formula_region_coverage",
                   f"{template_id}:{region}",
                   new_value={"base_price": data.base_price, "margin_pct": data.margin_pct})
+
+    out = FormulaCoverageOut.model_validate(row)
+    db.expunge(row)
+    db.commit()
+    return out
+
+
+@router.post("/{template_id}/coverage/{region}/review", response_model=FormulaCoverageOut)
+def mark_coverage_reviewed(
+    template_id: uuid.UUID,
+    region: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Expert sign-off on a combo: clears the CONF-LOW review flag and records
+    who reviewed it and when. The correction reasoning stays in
+    review_metadata for the audit trail."""
+    template = _get_visible_template(db, template_id)
+    _require_template_edit(db, current_user, template)
+
+    row = db.query(FormulaRegionCoverage).filter(
+        FormulaRegionCoverage.template_id == template_id,
+        FormulaRegionCoverage.region == region,
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="No coverage for this region")
+
+    row.needs_review = False
+    row.reviewed_by = current_user.email
+    row.reviewed_at = datetime.now(timezone.utc)
+    db.flush()
+
+    audit_team_id = template.team_id or _first_team_id(db, current_user.id)
+    if audit_team_id:
+        log_event(db, audit_team_id, current_user.id, "review", "formula_region_coverage",
+                  f"{template_id}:{region}",
+                  new_value={"reviewed_by": current_user.email})
 
     out = FormulaCoverageOut.model_validate(row)
     db.expunge(row)
