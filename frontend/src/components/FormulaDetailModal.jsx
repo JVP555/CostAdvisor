@@ -35,9 +35,14 @@ function Stat({ label, children }) {
  * pricing rows here.
  */
 export default function FormulaDetailModal({ template, activeTeamId, canEdit, onClose, addToast }) {
+  const now = new Date();
   const [coverage, setCoverage] = useState([]);
   const [region, setRegion] = useState(null);
   const [resolved, setResolved] = useState(null);
+  const [evalPeriod, setEvalPeriod] = useState({
+    year: now.getFullYear(), quarter: Math.floor(now.getMonth() / 3) + 1,
+  });
+  const [evaluation, setEvaluation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [resolving, setResolving] = useState(false);
   const [editingPricing, setEditingPricing] = useState(false);
@@ -84,6 +89,17 @@ export default function FormulaDetailModal({ template, activeTeamId, canEdit, on
     return () => { alive = false; };
   }, [region, template.id]);
 
+  useEffect(() => {
+    if (!region) return;
+    let alive = true;
+    api.get(`/api/formulas/${template.id}/evaluate`, {
+      params: { ...teamParam, region, year: evalPeriod.year, quarter: evalPeriod.quarter },
+    })
+      .then(res => { if (alive) setEvaluation(res.data); })
+      .catch(() => { if (alive) setEvaluation(null); });
+    return () => { alive = false; };
+  }, [region, template.id, evalPeriod, coverage]);
+
   const cov = coverage.find(c => c.region === region) || null;
   const meta = template.catalog_meta || {};
   const confidence = cov?.data_confidence || meta.data_confidence;
@@ -91,6 +107,10 @@ export default function FormulaDetailModal({ template, activeTeamId, canEdit, on
   const lines = resolved?.lines || [];
   const total = lines.reduce((s, l) => s + l.effective_weight_pct, 0);
   const linesRegion = lines.length > 0 ? lines[0].line_region : null;
+  const showEval = !!(evaluation?.evaluable);
+  const evalByComponent = showEval
+    ? Object.fromEntries(evaluation.lines.map(l => [l.component_id, l]))
+    : {};
 
   const refreshCoverage = async () => {
     const data = await loadCoverage(false);
@@ -378,6 +398,80 @@ export default function FormulaDetailModal({ template, activeTeamId, canEdit, on
               </div>
             )}
 
+            {/* Should-cost evaluation */}
+            <div style={{
+              background: 'var(--surface2)', borderRadius: 8, padding: '12px 14px', marginBottom: 14,
+              display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+            }}>
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--muted)', marginBottom: 3 }}>
+                  Should-cost
+                </div>
+                {evaluation?.evaluable && evaluation.should_cost != null ? (
+                  <div>
+                    <span style={{ ...mono, fontSize: 20, fontWeight: 700 }}>
+                      {evaluation.should_cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
+                    <span style={{ ...mono, fontSize: 12, color: 'var(--text-secondary)', marginLeft: 6 }}>
+                      {evaluation.currency || ''}
+                    </span>
+                  </div>
+                ) : evaluation?.evaluable ? (
+                  <div style={{ ...mono, fontSize: 13, color: 'var(--text-secondary)' }}>
+                    index only — no base price anchor
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    {evaluation?.reason || 'Not evaluable'}
+                    {canEdit && evaluation?.reason?.includes('base') && (
+                      <span> — set it under “Edit pricing”.</span>
+                    )}
+                  </div>
+                )}
+                {evaluation?.evaluable && (
+                  <div style={{ ...mono, fontSize: 10, marginTop: 3 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      index {evaluation.index_level_pct.toFixed(1)}
+                    </span>
+                    <span style={{
+                      marginLeft: 6,
+                      color: evaluation.index_level_pct > 100 ? 'var(--accent2)'
+                        : evaluation.index_level_pct < 100 ? 'var(--accent)' : 'var(--muted)',
+                    }}>
+                      {evaluation.index_level_pct === 100 ? '=' : (evaluation.index_level_pct > 100 ? '+' : '')}
+                      {(evaluation.index_level_pct - 100).toFixed(1)}%
+                    </span>
+                    <span style={{ color: 'var(--muted)' }}>
+                      {' '}vs base Q{evaluation.base_quarter} {evaluation.base_year}
+                    </span>
+                  </div>
+                )}
+                {evaluation?.data_gaps?.length > 0 && (
+                  <div title={evaluation.data_gaps.map(g => `${g.line}: ${g.reason}`).join('\n')}
+                    style={{ fontSize: 10, color: 'var(--accent3)', marginTop: 4 }}>
+                    ⚠ {evaluation.data_gaps.length} line{evaluation.data_gaps.length > 1 ? 's' : ''} without
+                    index data — riding flat
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <select className="ca-select" style={{ fontSize: 11, padding: '6px 8px', width: 'auto' }}
+                  aria-label="Evaluation quarter"
+                  value={evalPeriod.quarter}
+                  onChange={e => setEvalPeriod(p => ({ ...p, quarter: parseInt(e.target.value, 10) }))}>
+                  {[1, 2, 3, 4].map(q => <option key={q} value={q}>Q{q}</option>)}
+                </select>
+                <select className="ca-select" style={{ fontSize: 11, padding: '6px 8px', width: 'auto' }}
+                  aria-label="Evaluation year"
+                  value={evalPeriod.year}
+                  onChange={e => setEvalPeriod(p => ({ ...p, year: parseInt(e.target.value, 10) }))}>
+                  {Array.from({ length: now.getFullYear() + 2 - 2020 }, (_, i) => 2020 + i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {/* Resolved recipe */}
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--muted)' }}>
@@ -413,10 +507,18 @@ export default function FormulaDetailModal({ template, activeTeamId, canEdit, on
                       <th>Source</th>
                       <th style={{ textAlign: 'right' }}>Weight</th>
                       <th style={{ textAlign: 'right' }}>Effective</th>
+                      {showEval && <th style={{ textAlign: 'right' }}>× Index</th>}
+                      {showEval && (
+                        <th style={{ textAlign: 'right' }}>
+                          {evaluation.should_cost != null ? `Contribution ${evaluation.currency || ''}`.trim() : 'Contribution'}
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {lines.map(l => (
+                    {lines.map(l => {
+                      const ev = evalByComponent[l.component_id];
+                      return (
                       <tr key={l.component_id}>
                         <td style={{ paddingLeft: l.depth > 0 ? 28 : 10 }}>
                           <span style={{ fontSize: 12, fontWeight: l.depth === 0 ? 600 : 400 }}>
@@ -447,15 +549,52 @@ export default function FormulaDetailModal({ template, activeTeamId, canEdit, on
                         <td style={{ ...mono, fontSize: 11, textAlign: 'right' }}>
                           {l.effective_weight_pct.toFixed(2)}%
                         </td>
+                        {showEval && (
+                          <td style={{ ...mono, fontSize: 11, textAlign: 'right' }}
+                            title={ev && ev.base_value != null
+                              ? `${ev.base_value} → ${ev.current_value}` : undefined}>
+                            {ev ? (
+                              ev.has_data || l.component_type === 'fixed' ? (
+                                <span style={{
+                                  color: ev.ratio > 1 ? 'var(--accent2)'
+                                    : ev.ratio < 1 ? 'var(--accent)' : 'var(--text-secondary)',
+                                }}>
+                                  {ev.ratio.toFixed(3)}
+                                </span>
+                              ) : (
+                                <span title="No index data — line rides flat"
+                                  style={{ color: 'var(--accent3)' }}>flat</span>
+                              )
+                            ) : '—'}
+                          </td>
+                        )}
+                        {showEval && (
+                          <td style={{ ...mono, fontSize: 11, textAlign: 'right' }}>
+                            {ev
+                              ? (ev.contribution_abs != null
+                                ? ev.contribution_abs.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                : `${ev.contribution_pct.toFixed(2)}%`)
+                              : '—'}
+                          </td>
+                        )}
                       </tr>
-                    ))}
+                      );
+                    })}
                     <tr>
                       <td colSpan={3} style={{ fontSize: 11, fontWeight: 600, textAlign: 'right', color: 'var(--text-secondary)' }}>
-                        Σ effective{cov?.margin_pct != null ? ` (margin ${cov.margin_pct}% rides on top)` : ''}
+                        Σ{cov?.margin_pct != null ? ` (margin ${cov.margin_pct}% is a line above)` : ''}
                       </td>
                       <td style={{ ...mono, fontSize: 12, fontWeight: 700, textAlign: 'right' }}>
                         {total.toFixed(2)}%
                       </td>
+                      {showEval && <td />}
+                      {showEval && (
+                        <td style={{ ...mono, fontSize: 12, fontWeight: 700, textAlign: 'right' }}>
+                          {evaluation.should_cost != null
+                            ? evaluation.should_cost.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                            : `${evaluation.index_level_pct.toFixed(2)}%`}
+                        </td>
+                      )}
                     </tr>
                   </tbody>
                 </table>

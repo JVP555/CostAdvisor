@@ -4,6 +4,7 @@ import { useToast } from '../components/Toast';
 import api from '../api';
 import exportCsv from '../utils/exportCsv';
 import FormulaDetailModal from '../components/FormulaDetailModal';
+import FileUpload from '../components/FileUpload';
 
 // data_confidence → badge treatment. CONF-LOW is a placeholder pending expert
 // review — it must read as a caution, not as fact.
@@ -259,6 +260,7 @@ function CatalogSection({ rows, canEdit, onEdit, onDelete, onOpen }) {
   const [query, setQuery] = useState('');
   const [confFilter, setConfFilter] = useState('all');
   const [expanded, setExpanded] = useState(() => new Set());
+  const [showPriceImport, setShowPriceImport] = useState(false);
 
   const catalogRows = rows.filter(t => t.code);
   const otherRows = rows.filter(t => !t.code);
@@ -338,11 +340,46 @@ function CatalogSection({ rows, canEdit, onEdit, onDelete, onOpen }) {
           )}
         </div>
         {catalogRows.length > 0 && (
-          <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }} onClick={handleExport}>
-            Export CSV
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {canEdit && (
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }}
+                onClick={() => setShowPriceImport(v => !v)}>
+                Import Prices
+              </button>
+            )}
+            <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }} onClick={handleExport}>
+              Export CSV
+            </button>
+          </div>
         )}
       </div>
+
+      {showPriceImport && canEdit && (
+        <div style={{
+          border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px',
+          marginBottom: 12, background: 'var(--surface)',
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+            Import base-price anchors
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
+            Columns: formula, region, base_price — optional currency, base_period (Q1-2025), margin_pct.
+            Rows attach to existing combos only; recipes and review state are never touched.
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <FileUpload endpoint="/api/formulas/coverage/upload" />
+            <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 10 }}
+              onClick={() => exportCsv(
+                'coverage_price_template.csv',
+                ['formula', 'region', 'base_price', 'currency', 'base_period', 'margin_pct'],
+                [['OLE-FAC-SAT', 'Europe', '1250', 'EUR', 'Q1-2025', '9'],
+                 ['SUR-AES-3EO', 'NA', '1480', 'USD', 'Q1-2025', '']],
+              )}>
+              Download template
+            </button>
+          </div>
+        </div>
+      )}
 
       {catalogRows.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap' }}>

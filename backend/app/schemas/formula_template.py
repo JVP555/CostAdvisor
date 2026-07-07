@@ -172,3 +172,38 @@ class FormulaResolveOut(BaseModel):
     region_resolved: str | None
     coverage: FormulaCoverageOut | None
     lines: list[ResolvedLineOut]
+
+
+# ── Evaluation output (weighted should-cost) ─────────────────────────────────
+
+class EvaluatedLineOut(ResolvedLineOut):
+    commodity_name: str | None = None
+    base_value: float | None = None
+    current_value: float | None = None
+    ratio: float
+    has_data: bool
+    # Share of the rebased index level / absolute money this line explains;
+    # abs contributions sum exactly to the should-cost.
+    contribution_pct: float
+    contribution_abs: float | None = None
+
+
+class FormulaEvaluateOut(BaseModel):
+    template_id: uuid.UUID
+    region_requested: str
+    coverage_region: str | None
+    year: int
+    quarter: int
+    evaluable: bool
+    reason: str | None = None
+    base_price: float | None = None
+    currency: str | None = None
+    base_year: int | None = None
+    base_quarter: int | None = None
+    margin_pct: float | None = None
+    # 100.0 at the base period by construction (rebased to the recipe's own
+    # weight sum); should_cost = base_price × index_level/100.
+    index_level_pct: float | None = None
+    should_cost: float | None = None
+    lines: list[EvaluatedLineOut] = []
+    data_gaps: list[dict] = []

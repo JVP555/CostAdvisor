@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -27,11 +27,13 @@ from app.schemas.formula_template import (
     FormulaCoverageOut,
     FormulaResolveOut,
     ResolvedLineOut,
+    FormulaEvaluateOut,
 )
 from app.services.audit import log_event
 from app.services.formula_resolver import (
     FormulaChainError,
     assert_valid_chain_input,
+    evaluate_weighted_template,
     flatten_components,
     resolve_coverage,
 )
@@ -492,6 +494,106 @@ def delete_coverage(
     db.delete(row)
     db.commit()
     return {"status": "deleted"}
+
+
+@router.post("/coverage/upload")
+async def upload_coverage_prices(
+    file: UploadFile = File(...),
+    dry_run: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bulk base-price anchors for catalog combos. Update-only: a row must
+    match an existing (platform formula code, region) combo — a typo can't
+    mint a stray combo. Never touches recipes, confidence, or review state."""
+    require_platform_permission(db, current_user, "formulas.edit")
+
+    from app.services.file_parser import parse_coverage_price_upload
+    content = await file.read()
+    filename = file.filename or "upload"
+    try:
+        result = parse_coverage_price_upload(content, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    rows, errors = result["rows"], result["errors"]
+
+    templates = {t.code: t for t in db.query(FormulaTemplate).filter(
+        FormulaTemplate.team_id.is_(None), FormulaTemplate.code.isnot(None)).all()}
+    regions = {r.code for r in db.query(Region).all()}
+
+    updated = 0
+    for i, r in enumerate(rows):
+        row_num = i + 2  # best-effort: parse keeps source order for valid rows
+        template = templates.get(r["code"])
+        if template is None:
+            errors.append({"row": row_num, "message": f"Unknown formula code '{r['code']}'."})
+            continue
+        if r["region"] not in regions:
+            errors.append({"row": row_num, "message": f"Unknown region code '{r['region']}'."})
+            continue
+        cov = db.query(FormulaRegionCoverage).filter(
+            FormulaRegionCoverage.template_id == template.id,
+            FormulaRegionCoverage.region == r["region"],
+        ).first()
+        if cov is None:
+            errors.append({"row": row_num,
+                           "message": f"No combo for {r['code']} in {r['region']} — prices attach to existing combos."})
+            continue
+        updated += 1
+        if not dry_run:
+            cov.base_price = r["base_price"]
+            if r["currency"]:
+                cov.currency = r["currency"]
+            if r["base_year"]:
+                cov.base_year, cov.base_quarter = r["base_year"], r["base_quarter"]
+            if r["margin_pct"] is not None:
+                cov.margin_pct = r["margin_pct"]
+
+    if not dry_run and updated:
+        audit_team_id = _first_team_id(db, current_user.id)
+        if audit_team_id:
+            log_event(db, audit_team_id, current_user.id, "update", "formula_region_coverage",
+                      "bulk_price_upload", new_value={"filename": filename, "updated": updated})
+        db.commit()
+
+    return {"filename": filename, "rows_processed": updated, "errors": errors, "dry_run": dry_run}
+
+
+@router.get("/{template_id}/evaluate", response_model=FormulaEvaluateOut)
+def evaluate_formula(
+    template_id: uuid.UUID,
+    region: str,
+    year: int,
+    quarter: int,
+    team_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Deterministic weighted should-cost at (region, year, quarter): rebased
+    index level (100.0 at the combo's base period) and, when the combo carries
+    a base price, the money-denominated should-cost with per-line
+    contributions that sum to it exactly. Data gaps are explicit."""
+    require_permission(db, current_user, team_id, "formulas.view")
+    _get_visible_template(db, template_id, team_id)
+    if not (1 <= quarter <= 4) or not (2000 <= year <= 2100):
+        raise HTTPException(status_code=400, detail="Invalid period")
+
+    try:
+        result = evaluate_weighted_template(db, team_id, template_id, region, year, quarter)
+    except FormulaChainError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    commodity_ids = {l["commodity_id"] for l in result["lines"] if l["commodity_id"] is not None}
+    commodity_names = {
+        row.id: row.name
+        for row in db.query(CommodityIndex.id, CommodityIndex.name)
+        .filter(CommodityIndex.id.in_(commodity_ids)).all()
+    } if commodity_ids else {}
+    for l in result["lines"]:
+        l["commodity_name"] = commodity_names.get(l["commodity_id"])
+
+    return FormulaEvaluateOut(template_id=template_id, **result)
 
 
 @router.get("/{template_id}/resolve", response_model=FormulaResolveOut)

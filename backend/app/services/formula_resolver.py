@@ -170,3 +170,115 @@ def assert_valid_chain_input(
     flatten_components(
         db, input_template_id, _depth=1, _path=(parent_template_id,)
     )
+
+
+def evaluate_weighted_template(
+    db: Session,
+    team_id: uuid.UUID,
+    template_id: uuid.UUID,
+    region: str,
+    year: int,
+    quarter: int,
+) -> dict:
+    """Deterministically evaluate a weighted template at a period.
+
+    index_level_pct = 100 × Σ(effective_weight × ratio) / Σ(effective_weight),
+    where ratio is the resolved index value at (year, quarter) over its value
+    at the combo's base period. Rebasing to the recipe's own weight sum (the
+    catalog legitimately runs 99.9–110, margin lines included) makes the level
+    exactly 100.0 at the base period, so should_cost = base_price ×
+    index_level/100 evaluates to the anchored price at base by construction.
+
+    The catalog convention: margin is already a fixed line INSIDE the recipe,
+    so coverage.margin_pct is descriptive — applying it again here would
+    double-count it.
+
+    Index values resolve through get_single_index_value (team overrides →
+    exact region → GLOBAL → any → temporal carry-forward). A line whose index
+    has no value at all rides flat (ratio 1.0) and is reported in data_gaps —
+    explicit, never silent.
+    """
+    # Imported here: data_resolver pulls in the scraper registry, which the
+    # pure resolve/flatten callers (and their tests) shouldn't need to load.
+    from app.services.data_resolver import get_single_index_value
+
+    coverage, cov_region = resolve_coverage(db, template_id, region)
+    lines = flatten_components(db, template_id, region=region)
+
+    result = {
+        "region_requested": region,
+        "coverage_region": cov_region,
+        "year": year,
+        "quarter": quarter,
+        "evaluable": False,
+        "reason": None,
+        "base_price": float(coverage.base_price) if coverage and coverage.base_price is not None else None,
+        "currency": coverage.currency if coverage else None,
+        "base_year": coverage.base_year if coverage else None,
+        "base_quarter": coverage.base_quarter if coverage else None,
+        "margin_pct": float(coverage.margin_pct) if coverage and coverage.margin_pct is not None else None,
+        "index_level_pct": None,
+        "should_cost": None,
+        "lines": [],
+        "data_gaps": [],
+    }
+
+    if not lines:
+        result["reason"] = "no weighted lines"
+        return result
+    if coverage is None:
+        result["reason"] = "no regional pricing (coverage) for this formula"
+        return result
+    if coverage.base_year is None or coverage.base_quarter is None:
+        # Ratios need a reference period; the anchor is part of the combo's
+        # pricing definition, not something to guess.
+        result["reason"] = "coverage has no base period anchor"
+        return result
+
+    base_y, base_q = coverage.base_year, coverage.base_quarter
+    base_sum = sum(l["effective_weight_pct"] for l in lines)
+    if base_sum <= 0:
+        result["reason"] = "line weights sum to zero"
+        return result
+
+    weighted = 0.0
+    for line in lines:
+        eff = line["effective_weight_pct"]
+        entry = {
+            **{k: line[k] for k in ("component_id", "name", "component_type",
+                                    "commodity_id", "weight_pct",
+                                    "effective_weight_pct", "is_proxy", "depth",
+                                    "via_template_id", "line_region")},
+            "base_value": None, "current_value": None,
+            "ratio": 1.0, "has_data": line["component_type"] != "index",
+        }
+        if line["component_type"] == "index":
+            ref_val = get_single_index_value(db, team_id, line["commodity_id"], region, base_y, base_q)
+            cur_val = get_single_index_value(db, team_id, line["commodity_id"], region, year, quarter)
+            if ref_val and cur_val:
+                entry.update(base_value=ref_val, current_value=cur_val,
+                             ratio=cur_val / ref_val, has_data=True)
+            else:
+                result["data_gaps"].append({
+                    "line": line["name"],
+                    "commodity_id": line["commodity_id"],
+                    "reason": "no index value found — line rides flat (ratio 1.0)",
+                })
+        # Share of the (rebased) index level this line explains; abs
+        # contributions therefore sum exactly to the should-cost.
+        contribution_pct = 100.0 * eff * entry["ratio"] / base_sum
+        entry["contribution_pct"] = round(contribution_pct, 4)
+        entry["contribution_abs"] = (
+            round(result["base_price"] * contribution_pct / 100.0, 4)
+            if result["base_price"] is not None else None
+        )
+        result["lines"].append(entry)
+        weighted += eff * entry["ratio"]
+
+    result["evaluable"] = True
+    result["index_level_pct"] = round(100.0 * weighted / base_sum, 4)
+    if result["base_price"] is not None:
+        result["should_cost"] = round(result["base_price"] * weighted / base_sum, 4)
+    else:
+        result["reason"] = "no base price anchor — index level only"
+    return result
