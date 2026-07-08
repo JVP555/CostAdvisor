@@ -14,6 +14,14 @@ const TIER_LABEL = {
   free: 'free', good_proxy: 'good proxy', weak_proxy: 'weak proxy', blocked: 'blocked',
 };
 
+// Coverage tier = the worst retrieval tier among the recipe's index inputs.
+const TIER_TITLE = {
+  free: 'Every index input has a direct, free public feed (World Bank, EIA, Eurostat…)',
+  good_proxy: 'At least one input is derived via a reliable stand-in relationship (e.g. Brent + a stable spread) — directionally trustworthy, not the exact traded price',
+  weak_proxy: 'At least one input leans on a loose stand-in — treat movements as indicative only',
+  blocked: 'An input has no viable free source (subscription-only) — this formula cannot be priced without licensed data',
+};
+
 const mono = { fontFamily: "'JetBrains Mono', monospace" };
 
 function Stat({ label, children }) {
@@ -299,7 +307,10 @@ export default function FormulaDetailModal({ template, activeTeamId, canEdit, on
                   {cov.base_year ? `Q${cov.base_quarter} ${cov.base_year}` : '—'}
                 </Stat>
                 <Stat label="Coverage">
-                  <span style={{ color: cov.coverage_tier === 'blocked' ? 'var(--accent2)' : 'var(--text)' }}>
+                  <span
+                    title={TIER_TITLE[cov.coverage_tier]}
+                    style={{ color: cov.coverage_tier === 'blocked' ? 'var(--accent2)' : 'var(--text)' }}
+                  >
                     {TIER_LABEL[cov.coverage_tier] || '—'}
                   </span>
                 </Stat>

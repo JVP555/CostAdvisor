@@ -27,6 +27,15 @@ const TIER_LABEL = {
   free: 'free', good_proxy: 'good proxy', weak_proxy: 'weak proxy', blocked: 'blocked',
 };
 
+// Coverage tier = the worst retrieval tier among the recipe's index inputs —
+// a formula is only as strong as its weakest feed.
+const TIER_TITLE = {
+  free: 'Every index input has a direct, free public feed (World Bank, EIA, Eurostat…)',
+  good_proxy: 'At least one input is derived via a reliable stand-in relationship (e.g. Brent + a stable spread) — directionally trustworthy, not the exact traded price',
+  weak_proxy: 'At least one input leans on a loose stand-in — treat movements as indicative only',
+  blocked: 'An input has no viable free source (subscription-only) — this formula cannot be priced without licensed data',
+};
+
 export default function Formulas() {
   const { activeTeamId, user } = useAuth();
   const { addToast } = useToast();
@@ -247,9 +256,14 @@ function NameButton({ template, onOpen }) {
         background: 'none', border: 'none', padding: 0, cursor: 'pointer',
         color: 'var(--text)', fontWeight: 600, fontSize: 12, textAlign: 'left',
         fontFamily: 'inherit',
+        // Persistent muted underline: the name is the door to the recipe —
+        // it has to read as a link, not as plain text.
+        textDecoration: 'underline',
+        textDecorationColor: 'var(--border-light)',
+        textUnderlineOffset: 3,
       }}
-      onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline'; }}
-      onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none'; }}
+      onMouseEnter={e => { e.currentTarget.style.textDecorationColor = 'var(--accent)'; }}
+      onMouseLeave={e => { e.currentTarget.style.textDecorationColor = 'var(--border-light)'; }}
     >
       {template.name}
     </button>
@@ -526,7 +540,10 @@ function SubfamilyRows({ sub, list, canEdit, onEdit, onDelete, onOpen }) {
             <ConfidenceBadge confidence={t.catalog_meta?.data_confidence} />
           </td>
           <td style={{ width: 150, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, whiteSpace: 'nowrap' }}>
-            <span style={{ color: t.catalog_meta?.coverage_tier === 'blocked' ? 'var(--accent2)' : 'var(--text-secondary)' }}>
+            <span
+              title={TIER_TITLE[t.catalog_meta?.coverage_tier]}
+              style={{ color: t.catalog_meta?.coverage_tier === 'blocked' ? 'var(--accent2)' : 'var(--text-secondary)' }}
+            >
               {TIER_LABEL[t.catalog_meta?.coverage_tier] || '—'}
             </span>
             <span style={{ color: 'var(--muted)' }}>
