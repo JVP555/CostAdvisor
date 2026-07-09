@@ -27,6 +27,12 @@ class Product(Base):
     subfamily_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("subfamilies.id", ondelete="SET NULL"), nullable=True
     )
+    # The catalog formula this product is priced by (Scrum 58): cost models for
+    # a linked product auto-load the template at their region. NULL = not
+    # catalog-linked (hand-modelled or pre-catalog products).
+    formula_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("formula_templates.id", ondelete="SET NULL"), nullable=True
+    )
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     formula: Mapped[str | None] = mapped_column(String(64))
     active_content: Mapped[float | None] = mapped_column(Numeric(4, 3))

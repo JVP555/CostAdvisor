@@ -62,6 +62,10 @@ export default function CostModelBuilder() {
   // Formula template picker / saver
   const [formulaTemplates, setFormulaTemplates] = useState([]);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  // Last catalog template loaded into this model — persisted onto the product
+  // at save so future models for it auto-load the same recipe.
+  const loadedTemplateIdRef = useRef(null);
+  const autoLoadedTemplateRef = useRef(false);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [canEditPlatform, setCanEditPlatform] = useState(false);
   const templateDropdownRef = useRef(null);
@@ -113,7 +117,16 @@ export default function CostModelBuilder() {
     setFormula(p.formula || '');
     setUnit(p.unit || 'kg');
     setActiveContent(p.active_content ?? 0.65);
-  }, [products, location.state, costModelId]);
+    // A catalog-linked product auto-loads its recipe at this model's region
+    // (Scrum 58: "creating a product auto-loads the template by formula × region").
+    if (p.formula_template_id && formulaTemplates.length && !autoLoadedTemplateRef.current) {
+      const t = formulaTemplates.find(ft => ft.id === p.formula_template_id);
+      if (t) {
+        autoLoadedTemplateRef.current = true;
+        loadTemplateIntoModel(t);
+      }
+    }
+  }, [products, formulaTemplates, location.state, costModelId]);
 
   // Close template dropdown on outside click
   useEffect(() => {
@@ -255,8 +268,15 @@ export default function CostModelBuilder() {
           formula,
           active_content: activeContent,
           unit,
+          // Remember which catalog recipe priced this product, so its next
+          // cost model auto-loads the template at that model's region.
+          formula_template_id: loadedTemplateIdRef.current || null,
         });
         pid = data.id;
+      } else if (loadedTemplateIdRef.current) {
+        await api.put(`/api/products/${pid}`, {
+          formula_template_id: loadedTemplateIdRef.current,
+        });
       }
 
       let sid = supplierId || null;
@@ -375,6 +395,7 @@ export default function CostModelBuilder() {
         params: { team_id: activeTeamId, region },
       });
       const { lines, coverage: cov, region_resolved } = res.data;
+      loadedTemplateIdRef.current = t.id;
       if (lines.length > 0) {
         setFormulaMode('simple');
         setShowLandedCost(true);
