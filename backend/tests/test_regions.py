@@ -91,6 +91,51 @@ def test_orm_write_auto_registers_new_region(db):
         db.commit()
 
 
+def test_orm_write_canonicalizes_case_variant(db):
+    """A case-variant of an existing code ('EUROPE') is rewritten onto the
+    canonical row instead of minting a near-duplicate region."""
+    c = _temp_commodity(db)
+    try:
+        iv = IndexValue(commodity_id=c.id, region="EUROPE", year=2099, quarter=1, value=1.0, source="test")
+        db.add(iv)
+        db.commit()
+        stored = db.execute(text(
+            "SELECT region FROM index_values WHERE commodity_id = :c"), {"c": c.id}).scalar()
+        assert stored == "Europe"
+        assert db.query(Region).filter(Region.code == "EUROPE").first() is None
+    finally:
+        bypass_rls_var.set(True)
+        db.execute(text("DELETE FROM index_values WHERE commodity_id = :c"), {"c": c.id})
+        db.execute(text("DELETE FROM commodity_indexes WHERE id = :c"), {"c": c.id})
+        db.commit()
+
+
+def test_orm_write_rewrites_known_alias(db):
+    """The typo spellings the backfill once absorbed (EU, BLOBAL, …) are
+    rewritten to canonical instead of re-registering as regions."""
+    c = _temp_commodity(db)
+    try:
+        db.add(IndexValue(commodity_id=c.id, region="BLOBAL", year=2099, quarter=1, value=1.0, source="test"))
+        db.add(IndexValue(commodity_id=c.id, region="EU", year=2099, quarter=2, value=1.0, source="test"))
+        db.commit()
+        stored = {r[0] for r in db.execute(text(
+            "SELECT region FROM index_values WHERE commodity_id = :c"), {"c": c.id}).fetchall()}
+        assert stored == {"GLOBAL", "Europe"}
+        assert db.query(Region).filter(Region.code.in_(["BLOBAL", "EU"])).count() == 0
+    finally:
+        bypass_rls_var.set(True)
+        db.execute(text("DELETE FROM index_values WHERE commodity_id = :c"), {"c": c.id})
+        db.execute(text("DELETE FROM commodity_indexes WHERE id = :c"), {"c": c.id})
+        db.commit()
+
+
+def test_no_typo_regions_remain(db):
+    """The rgc2b3c4d5e6 merge removed the backfilled typo rows; the closed
+    vocabulary must stay closed."""
+    typos = ["EU", "eu", "ASIA", "INDIA", "BLOBAL", "GLOBSL"]
+    assert db.query(Region).filter(Region.code.in_(typos)).count() == 0
+
+
 # ── Admin CRUD ────────────────────────────────────────────────────────────────
 
 def test_create_subregion_as_child_no_migration(client_as, user_factory, db):

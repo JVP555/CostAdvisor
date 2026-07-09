@@ -11,7 +11,7 @@ get-or-create call into every handler (easy to miss one).
 This keeps "region is a row" true for new data too: a typed-in region becomes a
 top-level Region row an admin can later rename or re-parent via the CRUD API.
 """
-from sqlalchemy import event
+from sqlalchemy import event, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -29,6 +29,18 @@ _REGION_ATTRS: dict[type, tuple[str, ...]] = {
     FreightLane: ("origin_region", "destination_region"),
 }
 
+# Known stray spellings -> the canonical code. These once minted duplicate
+# Region rows through this safety net (merged back by the rgc2b3c4d5e6
+# migration); the alias rewrite stops them from ever coming back. Keys are
+# matched case-insensitively (upper()).
+_REGION_ALIASES: dict[str, str] = {
+    "EU": "Europe",
+    "ASIA": "Asia",
+    "INDIA": "India",
+    "BLOBAL": "GLOBAL",
+    "GLOBSL": "GLOBAL",
+}
+
 
 def get_or_create_region(db: Session, code: str) -> Region:
     """Return the Region for `code`, creating a top-level one if it doesn't exist."""
@@ -40,8 +52,8 @@ def get_or_create_region(db: Session, code: str) -> Region:
     return region
 
 
-def _codes_in_flush(session: Session) -> set[str]:
-    codes: set[str] = set()
+def _region_refs_in_flush(session: Session) -> list[tuple[object, str, str]]:
+    refs: list[tuple[object, str, str]] = []
     for obj in list(session.new) + list(session.dirty):
         attrs = _REGION_ATTRS.get(type(obj))
         if not attrs:
@@ -49,22 +61,57 @@ def _codes_in_flush(session: Session) -> set[str]:
         for attr in attrs:
             value = getattr(obj, attr, None)
             if value:
-                codes.add(value)
-    return codes
+                refs.append((obj, attr, value))
+    return refs
 
 
 @event.listens_for(Session, "before_flush")
 def _ensure_regions_exist(session: Session, flush_context, instances) -> None:
-    codes = _codes_in_flush(session)
-    if not codes:
+    refs = _region_refs_in_flush(session)
+    if not refs:
         return
-    # Idempotent + race-safe. Executed on the live connection (not session.execute)
-    # so we don't trigger a re-entrant autoflush while already inside a flush.
-    # Rows the flush is about to insert reference regions.code, so these region
-    # rows must land first — running the INSERT here guarantees that ordering.
+
+    # Canonicalise before registering: an alias or a case-variant of an
+    # existing code is rewritten onto the canonical row instead of minting a
+    # near-duplicate region ('EUROPE' -> 'Europe', 'BLOBAL' -> 'GLOBAL').
+    # Queries run on the live connection (not session.execute) so we don't
+    # trigger a re-entrant autoflush while already inside a flush.
+    conn = session.connection()
+    candidates = {v for _, _, v in refs}
+    lowered = {c.lower() for c in candidates}
+    for _, alias_target in _REGION_ALIASES.items():
+        lowered.add(alias_target.lower())
+    existing = conn.execute(
+        text("SELECT code FROM regions WHERE lower(code) = ANY(:codes)"),
+        {"codes": list(lowered)},
+    ).scalars().all()
+    exact = set(existing)
+    by_lower = {c.lower(): c for c in existing}
+
+    def canonical(value: str) -> str:
+        if value in exact:
+            return value
+        alias = _REGION_ALIASES.get(value.upper())
+        if alias:
+            return by_lower.get(alias.lower(), alias)
+        return by_lower.get(value.lower(), value)
+
+    to_register: set[str] = set()
+    for obj, attr, value in refs:
+        canon = canonical(value)
+        if canon != value:
+            setattr(obj, attr, canon)
+        if canon not in exact:
+            to_register.add(canon)
+
+    if not to_register:
+        return
+    # Idempotent + race-safe. Rows the flush is about to insert reference
+    # regions.code, so these region rows must land first — running the INSERT
+    # here guarantees that ordering.
     stmt = (
         pg_insert(Region.__table__)
-        .values([{"code": c, "name": c} for c in sorted(codes)])
+        .values([{"code": c, "name": c} for c in sorted(to_register)])
         .on_conflict_do_nothing(index_elements=["code"])
     )
-    session.connection().execute(stmt)
+    conn.execute(stmt)
