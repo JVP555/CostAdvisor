@@ -411,119 +411,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
 
 ### Wave 2 — Catalog track & new journey IA (Scrums 55–68)
 
-<<<<<<< HEAD
 > Re-sequenced: the catalog track is now **Wave 2**. Scrums 55–60 are shipped; 61–68 (UI-1…UI-8) build the new 8-tab journey shell + tabs.
-=======
-- 🟡 **Scrum 19** — Automatic gap flagging (dashboard as portfolio triage screen ranked by money at stake)
-  - 🟢 Dashboard shows all products with a should-cost vs actual comparison in one view (`Dashboard.jsx` → `GET /api/portfolio/summary` in `routers/portfolio.py`)
-  - 🟢 Each row shows: product, supplier, should-cost, actual price, gap %, gap value (price × volume) (`Dashboard.jsx` table; gap = `latest_actual − current_sc`, exposure = `gap × total_vol`)
-  - 🟢 Rows sorted by absolute gap value descending — biggest opportunity first (default sort `exposure` desc, also sortable by gap%/should-cost)
-  - 🟡 Visual indicator (colour or bar) for gap severity (colour-coded gap% cell + IDX/DRIFT flag badges; no graded severity bar yet)
-  - 🟢 Clicking a row navigates to the cost model (View → `/cost-models/:id`, plus Evo/Brief actions)
-  - 🟢 **Monitor re-platform (new IA)** — `pages/workspace/MonitorArea.jsx` rebuilt from a hardcoded demo to real data: fetches the same `GET /api/portfolio/summary`, flat table ranked by exposure, derived status filter (Alert/Watch/On-track from `flag_price_drift`/`flag_index_moved`), graded severity bar (`DriftBar` on |gap %|), IDX/DRIFT flags, CSV export, and empty/loading/error/filtered-empty states. Reuses `exportCsv`, `useAuth().activeTeamId`, `formatApiError`. No backend change; `Dashboard.jsx` kept as-is (coexist). Trigger radar / priority matrix / alerts remain Wave 3.
-  - 🟢 **Scrum 63 (Monitor → new IA, mockup)** — rebuilt `MonitorArea` to the `costadvisor_mockup.html` IA: family-grouped collapsible table with per-group status badges, inline status (Alert/Watch/On-track/Formula-draft) + family filters + search, 4 stat tiles (products / should-costs live / estimated drift / awaiting invoice), gap·drift·exposure·invoice columns; draft products (no cost model) surface with "Complete formula". Wired to `/api/portfolio/summary` joined client-side with cost-models/products/families (same shape as `PortfolioArea`) — no new backend engine; trigger radar stays Wave 3. Verified live: all 4 endpoints + join keys confirmed against the dev DB.
-  - 🟡 **Audit note (this pass):** the triage Dashboard is live and real (not demo). What's left for 🟢: a graded severity bar and any category-level rollup.
-
-- 🔴 **Scrum 20** — Procurement Priority Matrix (portfolio view: volatility × spend exposure)
-  - 🔴 2×2 or scatter matrix: index volatility (x) vs spend exposure (y) per product/category
-  - 🔴 Quadrant labels: "monitor", "hedge", "act now", "low priority"
-  - 🔴 Volatility calculated from index movement over trailing 4 quarters
-  - 🔴 Spend exposure = should-cost × volume
-  - 🔴 Exportable as CSV and image
-  - 🟢 **Portfolio re-platform (product-centric)** — `workspace/PortfolioArea.jsx` rebuilt from a hardcoded demo to real data: one row per cost model + Draft rows for products with no cost model (every product visible), grouped by family/supplier/region, with search/status filters, stat tiles, CSV, and **index-evolved live should-cost** per row (`POST /api/costing/should-cost` at the current quarter, progressive fill). New product detail `workspace/ProductDetailArea.jsx` at `/portfolio/:costModelId` — live should-cost + breakdown + delta-since-starting-point, read-only formula display, and a **first-class starting-point editor** (base price / base quarter → `renegotiate`). `CostModelBuilder` preselects the product on the draft "Complete formula" flow (route state). No backend change.
-  - 🔴 **Audit note (this pass):** the product-centric Portfolio list + detail are now real. Still unbuilt for Scrum 20 proper: the volatility × spend-exposure **matrix** (2×2/scatter, quadrant labels, trailing-4Q volatility calc, image export).
-  - 🟢 **Scrum 62 (Portfolio → product-as-central-object, mockup IA)** — verified the pre-existing Portfolio re-platform satisfies every Scrum 62 acceptance criterion (lists products with live should-cost; a product opens to formula + starting point + live should-cost via `ProductDetailArea`; first-class starting-point editor; wired to the should-cost engine only). Aligned `PortfolioArea` stat tiles + group headers + "+ Add product" affordance to `costadvisor_mockup.html`. **Bug fixed:** `POST /cost-models/{id}/renegotiate` (the starting-point editor's Save) 500'd (`DetachedInstanceError` on `commodity_name`) for any component-based formula — it expunged the ORM object before FastAPI serialized the lazy `commodity` relationship; now builds `FormulaVersionOut` while session-bound (expire→validate→commit). Verified live against the dev DB (renegotiate 201 with 5 components incl. commodity names, idempotent). Hardened brittle `test_seed_combos` needs_review assertion (a real in-app expert sign-off legitimately drops the flagged count below 99; seeder preserves sign-offs). Full suite 123 passed.
-
-- 🟡 **Scrum 21** — Predictive index forecasting (directional, uncertainty-honest)
-  - 🟡 Each tracked index shows a trailing trend and a 2-quarter forward projection (`workspace/ForecastArea.jsx` UI exists with Base/Bear/Bull series — but values are hardcoded demo data; no forecast engine)
-  - 🔴 Projection uses simple trend extrapolation; confidence band shown (no algorithm in `costing_engine.py`/`services/`)
-  - 🔴 "Impact on my models" — shows projected should-cost change if forecast holds (demo rows only, no backend compute)
-  - 🟢 Clearly labelled as an estimate, not a guarantee (`ForecastArea.jsx` subtitle: "Illustrative — the forecast engine is a Wave-2 build")
-  - 🟡 **Intelligence page (`/intelligence`, new navbar item)** — product-centric "market & pricing intelligence" (modelled on `sample_idea/intelligence_mockup.html`). Landing: family-grouped product cards → per-card should-cost `Sparkline` + trend, lazy-loaded via IntersectionObserver from `/api/costing/evolution`. Detail `/intelligence/:costModelId` (one `/api/costing/brief` call), Tab 1 "Market & Pricing" wired read-only: should-cost **index** history (rebased base 100) + `MultiLineChart` **stub** forecast band (dashed, ±1.5%, `splitIndex`; clearly labelled illustrative — no forecast engine), index-component/driver decomposition table, stored (Redis-cached) AI narrative + forward signals, derived cycle-position + snapshot cards. Tab 2 "Product Intelligence" is a **flagged placeholder**. No backend change.
-  - 🔴 **Dependency (flagged):** expert-reviewed narrative / product-reference **persistence** — narratives are Redis-cached only (`services/ollama.py`, 7-day TTL), never DB-stored or reviewed. A `ProductIntelligence` / `NarrativeReview` model (product/cost-model ref, authored text, `reviewed_by`, `review_status`, `reviewed_at`) is the prerequisite for operational review tracking (Tab 2) and a real forecast engine.
-  - 🟡 **Audit note (this pass):** the Forecast area + Intelligence forecast band are still stubs; the forecast engine itself is net-new and unbuilt.
-
-- 🔴 **Scrum 22** — Opportunistic buy windows (spot vs contract signal)
-  - 🔴 Per-product signal: current should-cost vs 4-quarter average — "cheap now" or "expensive now"
-  - 🔴 Requires spot-price data stored at product level (extend pricing model)
-  - 🔴 Recommendation shown in cost model view and dashboard
-
-- 🟡 **Scrum 23** — Supplier benchmarking (who prices near should-cost, who pads margin)
-  - 🟡 Per-supplier view: average gap % across all products, trend over time (Suppliers CRUD + `GET /api/suppliers/{id}/purchase-history` returns per-product price/volume history — but no aggregated avg-gap% or trend computed yet)
-  - 🔴 Ranking table: suppliers ordered by how closely they track should-cost (no aggregation/ranking endpoint)
-  - 🟡 Visible to owner/admin only; seeds Wave 3 trust grading (export gated on `suppliers.export`, but no benchmarking view exists; no trust fields on `Supplier`)
-  - 🟡 **Audit note (this pass):** the data plumbing (suppliers + purchase history) exists; the benchmarking analytics/ranking layer does not.
-
-- 🔴 **Scrum 24** — Alerts (email & Slack on index moves, new gaps, buy windows)
-  - 🔴 User can subscribe to alerts per index or per product
-  - 🔴 Email alert sent when index moves > configurable threshold (e.g. ±5% in a quarter)
-  - 🔴 Email alert sent when a new gap exceeds a threshold
-  - 🔴 Slack webhook support (team-level setting)
-  - 🔴 Alert history visible in-app; alerts recorded in AuditLog
-
-- 🔴 **Scrum 25** — Intra-team collaboration (notes, flags, shared negotiation position)
-  - 🔴 Users can leave notes on a cost model (threaded, timestamped)
-  - 🔴 Flag a model as "in negotiation", "agreed", "under review"
-  - 🔴 Notes and flags visible to all team members; recorded in AuditLog
-  - 🔴 @mention teammate in a note triggers email notification
-  - 🔴 **Audit note (this pass):** no Note/Comment model and no flag-state field; a nullable `formula_versions.notes` column exists but is unused — not wired to any endpoint or UI.
-
-- 🔴 **Scrum 26** — Index-provider API integration (stretch — Fastmarkets, Argus, ICIS)
-  - 🔴 Team can configure an API key for a supported index provider
-  - 🔴 Nightly job pulls licensed index data and stores as IndexValue with source tag
-  - 🔴 Falls back to existing scraper/upload flow if provider API is unavailable
-  - 🔴 Not a wave blocker — only if provider APIs prove tractable
-
----
-
-### Wave 3
-
-- 🔴 **Scrum 27** — Multi-tiered "Lego" formulas (sub-models nested into parent models)
-  - 🔴 A FormulaVersion can reference another CostModel as a component
-  - 🔴 Costing engine resolves nested models recursively (guard against cycles)
-  - 🔴 UI shows nested breakdown: top-level components expand to reveal sub-model detail
-  - 🔴 Export and brief generation handle nested structure correctly
-
-- 🟡 **Scrum 28** — Complex mathematical formulas (non-linear, thresholds, conditional logic)
-  - 🔴 Formula components support: min/max bounds, step functions, yield/conversion factors (none of these exist on `FormulaComponent`)
-  - 🟢 Expression editor or structured form for defining non-linear relationships (advanced free-form expression mode shipped in Scrum 14b — UI editor + variable mapping)
-  - 🟡 Costing engine validates and evaluates complex expressions deterministically (`safe_eval_expr` evaluates arithmetic expressions safely — but only arithmetic; no thresholds/conditionals/bounds)
-  - 🔴 Pairs with Scrum 27 (Lego) — designed together
-  - 🟡 **Audit note (this pass):** 14b delivered the arithmetic-expression substrate; Scrum 28's *additional* non-linear/threshold/bounds/yield features are still unbuilt.
-
-- 🟡 **Scrum 29** — Negotiation aid system (guided advisor with auto-generated script and materials)
-  - 🔴 "Prepare negotiation" flow: enter known supplier position, get counter-argument suggestions (no flow/endpoint; `workspace/NegotiateArea.jsx` is a hardcoded mockup, not wired to an API)
-  - 🟡 Auto-generates talking points from the gap, drivers, and index movement (`services/narrative.py` produces rule-based + LLM talking points for the brief — but not as a distinct counter-argument advisor)
-  - 🔴 Produces a structured negotiation brief: your position, likely counter, recommended floor
-  - 🔴 Output exportable as PDF alongside the standard cost brief
-  - 🟡 **Audit note (this pass):** narrative generation is the only real piece; the guided advisor (position/counter/floor + script) is unbuilt and the Negotiate workspace page is demo-only.
-
-- 🔴 **Scrum 30** — Extract pricing from PDFs (supplier quotes and price lists)
-  - 🔴 User uploads a supplier PDF; system extracts product name, price, date, currency
-  - 🔴 Extracted data shown for review before committing to ActualPrice records
-  - 🔴 Handles tabular and free-text price formats; shows confidence per extracted value
-  - 🔴 Falls back gracefully — unrecognised formats prompt manual entry
-
-- 🔴 **Scrum 31** — Supplier trust & margin grading (reputation score from collected data)
-  - 🔴 Score computed from: gap trend, pricing volatility, response to index moves
-  - 🔴 Grade shown on supplier page and in negotiation brief
-  - 🔴 Built on Wave 2 benchmarking data (Scrum 23 prerequisite)
-  - 🔴 Score methodology documented and visible to user (not a black box)
-
-- 🔴 **Scrum 32** — AI cost modeler (retroactive estimation for products without decomposition)
-  - 🔴 User provides product name, sector, rough price — system suggests a likely component breakdown
-  - 🔴 Output is clearly labelled as an AI estimate; user refines before saving
-  - 🔴 Uses Ollama (llama3.1:8b) same as existing narrative service
-  - 🔴 Estimated components can be promoted to a real FormulaVersion
-
-- 🔴 **Scrum 33** — Multi-source index validation (cross-check values, flag anomalies)
-  - 🔴 When multiple sources cover the same index, system compares values
-  - 🔴 Flags when a value deviates > threshold from other sources
-  - 🔴 User can inspect source provenance per IndexValue
-  - 🔴 Anomalies visible in the Indexes page and surfaced in alerts (Scrum 24)
-
----
->>>>>>> d804f06 (feat(portfolio): Scrum 62 — product-as-central-object Portfolio + fix starting-point save)
 
 ### Scrum 55 — Catalog taxonomy & platform/team forking
 
@@ -720,6 +608,7 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🟡 Visual indicator (colour or bar) for gap severity (colour-coded gap% cell + IDX/DRIFT flag badges; no graded severity bar yet)
   - 🟢 Clicking a row navigates to the cost model (View → `/cost-models/:id`, plus Evo/Brief actions)
   - 🟢 **Monitor re-platform (new IA)** — `pages/workspace/MonitorArea.jsx` rebuilt from a hardcoded demo to real data: fetches the same `GET /api/portfolio/summary`, flat table ranked by exposure, derived status filter (Alert/Watch/On-track from `flag_price_drift`/`flag_index_moved`), graded severity bar (`DriftBar` on |gap %|), IDX/DRIFT flags, CSV export, and empty/loading/error/filtered-empty states. Reuses `exportCsv`, `useAuth().activeTeamId`, `formatApiError`. No backend change; `Dashboard.jsx` kept as-is (coexist). Trigger radar / priority matrix / alerts remain Wave 3.
+  - 🟢 **Scrum 63 (Monitor → new IA, mockup)** — rebuilt `MonitorArea` to the `costadvisor_mockup.html` IA: family-grouped collapsible table with per-group status badges, inline status (Alert/Watch/On-track/Formula-draft) + family filters + search, 4 stat tiles (products / should-costs live / estimated drift / awaiting invoice), gap·drift·exposure·invoice columns; draft products (no cost model) surface with "Complete formula". Wired to `/api/portfolio/summary` joined client-side with cost-models/products/families (same shape as `PortfolioArea`) — no new backend engine; trigger radar stays Wave 3. Verified live: all 4 endpoints + join keys confirmed against the dev DB.
   - 🟡 **Audit note (this pass):** the triage Dashboard is live and real (not demo). What's left for 🟢: a graded severity bar and any category-level rollup.
 
 - 🔴 **Scrum 20** — Procurement Priority Matrix (portfolio view: volatility × spend exposure)
@@ -730,15 +619,17 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🔴 Exportable as CSV and image
   - 🟢 **Portfolio re-platform (product-centric)** — `workspace/PortfolioArea.jsx` rebuilt from a hardcoded demo to real data: one row per cost model + Draft rows for products with no cost model (every product visible), grouped by family/supplier/region, with search/status filters, stat tiles, CSV, and **index-evolved live should-cost** per row (`POST /api/costing/should-cost` at the current quarter, progressive fill). New product detail `workspace/ProductDetailArea.jsx` at `/portfolio/:costModelId` — live should-cost + breakdown + delta-since-starting-point, read-only formula display, and a **first-class starting-point editor** (base price / base quarter → `renegotiate`). `CostModelBuilder` preselects the product on the draft "Complete formula" flow (route state). No backend change.
   - 🔴 **Audit note (this pass):** the product-centric Portfolio list + detail are now real. Still unbuilt for Scrum 20 proper: the volatility × spend-exposure **matrix** (2×2/scatter, quadrant labels, trailing-4Q volatility calc, image export).
+  - 🟢 **Scrum 62 (Portfolio → product-as-central-object, mockup IA)** — verified the pre-existing Portfolio re-platform satisfies every Scrum 62 acceptance criterion (lists products with live should-cost; a product opens to formula + starting point + live should-cost via `ProductDetailArea`; first-class starting-point editor; wired to the should-cost engine only). Aligned `PortfolioArea` stat tiles + group headers + "+ Add product" affordance to `costadvisor_mockup.html`. **Bug fixed:** `POST /cost-models/{id}/renegotiate` (the starting-point editor's Save) 500'd (`DetachedInstanceError` on `commodity_name`) for any component-based formula — it expunged the ORM object before FastAPI serialized the lazy `commodity` relationship; now builds `FormulaVersionOut` while session-bound (expire→validate→commit). Verified live against the dev DB (renegotiate 201 with 5 components incl. commodity names, idempotent). Hardened brittle `test_seed_combos` needs_review assertion (a real in-app expert sign-off legitimately drops the flagged count below 99; seeder preserves sign-offs). Full suite 123 passed.
 
 - 🟡 **Scrum 21** — Predictive index forecasting (directional, uncertainty-honest)
-  - 🟡 Each tracked index shows a trailing trend and a 2-quarter forward projection (`workspace/ForecastArea.jsx` UI exists with Base/Bear/Bull series — but values are hardcoded demo data; no forecast engine)
+  - 🟡 Each tracked index shows a trailing trend and a 2-quarter forward projection (`workspace/ForecastArea.jsx` shell rebuilt in Scrum 64 — see below; the forward-projection engine itself is still Wave 3)
   - 🔴 Projection uses simple trend extrapolation; confidence band shown (no algorithm in `costing_engine.py`/`services/`)
   - 🔴 "Impact on my models" — shows projected should-cost change if forecast holds (demo rows only, no backend compute)
   - 🟢 Clearly labelled as an estimate, not a guarantee (`ForecastArea.jsx` subtitle: "Illustrative — the forecast engine is a Wave-2 build")
   - 🟡 **Intelligence page (`/intelligence`, new navbar item)** — product-centric "market & pricing intelligence" (modelled on `sample_idea/intelligence_mockup.html`). Landing: family-grouped product cards → per-card should-cost `Sparkline` + trend, lazy-loaded via IntersectionObserver from `/api/costing/evolution`. Detail `/intelligence/:costModelId` (one `/api/costing/brief` call), Tab 1 "Market & Pricing" wired read-only: should-cost **index** history (rebased base 100) + `MultiLineChart` **stub** forecast band (dashed, ±1.5%, `splitIndex`; clearly labelled illustrative — no forecast engine), index-component/driver decomposition table, stored (Redis-cached) AI narrative + forward signals, derived cycle-position + snapshot cards. Tab 2 "Product Intelligence" is a **flagged placeholder**. No backend change.
   - 🔴 **Dependency (flagged):** expert-reviewed narrative / product-reference **persistence** — narratives are Redis-cached only (`services/ollama.py`, 7-day TTL), never DB-stored or reviewed. A `ProductIntelligence` / `NarrativeReview` model (product/cost-model ref, authored text, `reviewed_by`, `review_status`, `reviewed_at`) is the prerequisite for operational review tracking (Tab 2) and a real forecast engine.
-  - 🟡 **Audit note (this pass):** the Forecast area + Intelligence forecast band are still stubs; the forecast engine itself is net-new and unbuilt.
+  - 🟡 **Audit note (this pass):** the Intelligence forecast band is still an illustrative stub; the forecast engine itself is net-new and unbuilt.
+  - 🟢 **Scrum 64 (Forecast tab shell → new IA, honest stub)** — `ForecastArea` rebuilt to the new IA with real data, no fabricated forward numbers: a composite headline-commodity index (`GET /api/indexes/public-quarterly`, each series rebased to base 100 and averaged) charted as real history with an honest dashed ±1.5% forecast stub (no invented trajectory), stat cards (products / flagged / avg gap / exposure), a flat portfolio should-cost/actual/gap table from `GET /api/portfolio/summary`, and per-commodity QoQ index-movement cards. Forward-projection engine stays Wave 3 — see Scrum 64 (UI-4) below for full detail.
 
 - 🔴 **Scrum 22** — Opportunistic buy windows (spot vs contract signal)
   - 🔴 Per-product signal: current should-cost vs 4-quarter average — "cheap now" or "expensive now"
