@@ -518,90 +518,83 @@ The four blockers between the seeded catalog and a money-denominated, trustworth
 
 ---
 
-### Scrum 61 (UI-1) — Journey nav shell + Indexes tab (8 pts · committed core)
+### Scrum 61 (UI-1) — Journey nav shell + Indexes tab (8 pts · committed core) — 🟡
 
-First time the app is laid out the way a buyer actually works: raw public price feeds → supplier negotiation. The shell turns a pile of separate screens into one path; Indexes goes first because public feeds are the ground truth under every should-cost. A buyer only cares about the handful their products depend on (not all 158), so the tab auto-follows just those, with multi-year history (trend matters more than today's tick).
+First time the app is laid out the way a buyer actually works: raw public price feeds → supplier negotiation. Indexes goes first because public feeds are the ground truth under every should-cost. A buyer only cares about the handful their products depend on (not all 158), so the tab auto-follows just those, with multi-year history.
 
-- 🔴 8-tab journey nav shell + routing in journey order: **Indexes → Portfolio → Monitor → Forecast → Negotiate** + **Intelligence** + **Admin/Team**; deep links work
-- 🔴 Rebuild Indexes tab to the new mockup (coming): followed-index list + detail
-- 🔴 Auto-follow indexes used by a portfolio formula; manual add + manual create (manual values)
-- 🔴 Selectable history window (default 2–3 years)
-- 🔴 Wire to existing index endpoints only (no new engine)
-- 🟡 **Seeded by** `pages/workspace/IndexLibraryArea.jsx` (the single index+FX home) — needs re-fit into the 8-tab journey shell + new mockup; auto-follow is net-new
-- **Acceptance:** nav renders 8 tabs in journey order (deep links work); Indexes lists followed indexes, supports manual add/create, shows a selectable history window
+- 🔴 8-tab journey nav shell in journey order (Indexes → Portfolio → Monitor → Forecast → Negotiate + Intelligence + Admin/Team) — **NOT built**: current nav is the old flat nav (Dashboard/Formulas/Products/Suppliers) + the journey areas appended (11–12 tabs, old items first), not a consolidated journey shell (`Navbar.jsx:28-41`, `App.jsx:55-72`)
+- 🟢 Indexes tab list + detail (single index+FX home) — `IndexLibraryArea.jsx` lists every tracked index + all FX pairs; row → detail popup
+- 🟢 Manual add + manual create (manual values) — `AddIndexModal` creates a custom commodity + manual/fixed source; per-period values via cell-click override (`EditCellModal`)
+- 🔴 Auto-follow indexes used by a portfolio formula — mock only: the "In use" column is a MOCK placeholder (`IndexLibraryArea.jsx:303-304`); no follow-by-formula logic exists
+- 🟢 Selectable history window — detail popup exposes 1Y/2Y/3Y/5Y/All (`IndexPopupModal.jsx:121-123`); list itself fetches a fixed 2-yr span
+- 🟢 Wired to existing index endpoints only
+- **Remaining for 🟢:** the consolidated 8-tab journey shell + real auto-follow-by-formula (Indexes tab itself is done in the old IA)
 
-### Scrum 62 (UI-2) — Portfolio tab (8 pts · committed core)
+### Scrum 62 (UI-2) — Portfolio tab (8 pts · committed core) — 🟢 (pending journey-shell fit)
 
-A category manager thinks in **products they must buy well**, not indexes/formulas. Portfolio is their home base: every product they own, each with its own live should-cost they can act on. Today the product isn't the centre — formula + starting point float beside it. Making the product the object everything hangs off of turns a pile of indexes into a portfolio someone manages.
+The category manager thinks in **products they must buy well**. Portfolio is their home base: every product they own, each with its own live should-cost.
 
-- 🔴 Rebuild Portfolio with the **product as the central object** (formula + starting point + should-cost are its properties); should-cost always live
-- 🔴 Product detail opens to formula / starting point / live should-cost
-- 🔴 First-class starting-point editor per product
-- 🔴 Wire to existing should-cost engine outputs only
-- 🟡 **Seeded by** `workspace/PortfolioArea.jsx` (product-centric rebuild) + `workspace/ProductDetailArea.jsx` + its starting-point editor (Scrum 20 work) — needs re-fit to the new IA/mockup
-- **Acceptance:** Portfolio lists products with live should-cost; a product opens to formula + starting point + live should-cost
+- 🟢 Product as the central object — `PortfolioArea.jsx:7-13` (one row per cost-model + Draft rows for product-less products); formula version + starting point + should-cost as row properties
+- 🟢 Product detail (formula / starting point / live should-cost) — `ProductDetailArea.jsx:148-262` at `/portfolio/:costModelId`
+- 🟢 First-class starting-point editor — inline base-price/base-quarter editor → `renegotiate` (`ProductDetailArea.jsx:174-213, 66-99`)
+- 🟢 Live should-cost — both list + detail `POST /api/costing/should-cost` with a "live" badge (draft product rows show "—")
+- Note: built in the **old IA**; acceptance criteria met — only pending is re-fit into the new journey shell (Scrum 61) + any new mockup
 
-### Scrum 63 (UI-3) — Monitor tab (5 pts · committed core)
+### Scrum 63 (UI-3) — Monitor tab (5 pts · committed core) — 🟢 (pending journey-shell fit)
 
-Monitor answers the standing question: across everything I buy, **where am I overpaying right now**, before I negotiate. We already compute should-cost-vs-actual per product, but in the new journey those gaps have no shared home. A re-platform, not new brains — trigger-radar/priority-matrix/alerts are Wave 3.
+Where am I overpaying right now, across everything I buy, before I negotiate.
 
-- 🔴 Rebuild Monitor to the new IA, wired to existing gap / should-cost-vs-actual outputs
-- 🔴 Empty / loading states
-- 🔴 No new backend engine
-- 🟡 **Seeded by** `workspace/MonitorArea.jsx` (portfolio-summary re-platform, Scrum 19) — needs re-fit to the new IA
-- **Acceptance:** Monitor shows current should-cost-vs-actual gaps for the portfolio; no new engine
+- 🟢 Wired to real gap / should-cost-vs-actual outputs — `MonitorArea.jsx:47` `GET /api/portfolio/summary` (same source as Dashboard); renders current_should_cost / latest_actual / gap_pct / exposure
+- 🟢 Empty / loading / error states — all present (`MonitorArea.jsx:117-149`)
+- 🟢 No new backend engine
+- Note: REAL, not demo; only pending is re-fit into the new journey shell. Trigger-radar / priority-matrix / alerts remain Wave 3
 
-### Scrum 64 (UI-4) — Forecast tab (shell only) (5 pts · stretch)
+### Scrum 64 (UI-4) — Forecast tab (shell only) (5 pts · stretch) — 🟡
 
-The decision that matters is **buy now or wait / lock or hold** — which turns on where price is heading. Forecast sits between Monitor (today's number) and Negotiate. The projection engine is Wave 3; we stand its home up now with the forward part deliberately blank — a made-up forecast is worse than an honest "we don't know yet."
+Buy-now-or-wait turns on where price is heading. Stand the home up now; the projection engine is Wave 3, forward part deliberately blank — a made-up forecast is worse than honest "we don't know yet."
 
-- 🔴 Build the Forecast tab shell to the new IA
-- 🔴 Dotted-forward-line placeholder (toggle), **stubbed** — no fabricated numbers
-- 🔴 Wire index history (real) + stub the projection
-- 🟡 **Seeded by** `workspace/ForecastArea.jsx` (demo shell, Scrum 21) — replace hardcoded series with real index history, keep forward band stubbed
-- **Acceptance:** Forecast tab exists with its layout; the forward band is clearly stubbed/hidden until the engine lands
+- 🟢 Forecast layout exists — scenario/horizon toggles, KPI cards, multi-line chart, projection table (`ForecastArea.jsx:62-158`)
+- 🔴 **Forward band NOT honestly stubbed** — it shows **fabricated forecast figures** (BASE/BEAR/BULL €26.8M/€29.2M/€24.1M, per-product forward prices — hardcoded at `ForecastArea.jsx:11-14, 28-33, 56-59`), only labelled "Illustrative". The acceptance criterion "no fabricated forecast numbers" is **not** met — blank/hide the forward band
+- 🔴 Index history HARDCODED — static arrays, no API call (`ForecastArea.jsx:11, 35-41`); needs wiring to real index history
+- **Remaining for 🟢:** replace the demo constants with real index history + a genuinely stubbed/hidden forward band
 
-### Scrum 65 (UI-5) — Negotiate tab (5 pts · committed core)
+### Scrum 65 (UI-5) — Negotiate tab (5 pts · committed core) — 🔴
 
-Negotiate is where the journey pays off — a buyer walks into a supplier call with evidence, not gut feel. If the restructure leaves this behind, the journey dead-ends at "here's a gap." No new negotiation smarts in Wave 2; just land the existing **product → gap → exportable-brief** flow cleanly in the new IA (cheat-sheet / tornado / PDF extraction are Wave 3).
+Where the journey pays off — walk in with evidence. Land the existing product → gap → exportable-brief flow in the new IA (cheat-sheet / tornado / PDF extraction are Wave 3).
 
-- 🔴 Rebuild Negotiate to the new IA, wired to existing brief/export outputs
-- 🔴 Empty / loading states
-- 🔴 No new backend engine
-- 🟡 **Seeded by** `workspace/NegotiateArea.jsx` (currently a hardcoded mockup) + the real Brief/PDF-export flow (Scrum 15) — wire the real brief into the new IA
-- **Acceptance:** Negotiate renders the existing end-to-end flow (product → gap → exportable brief) in the new IA; no new engine
+- 🔴 Wired to existing brief/export — **NOT**: `NegotiateArea.jsx` is a hardcoded mockup (fixed context, all 8 phases are module constants `:8-78`); the three export buttons `:141-143` have **no onClick** — pure stubs; no `api` import. (A real brief endpoint exists at `costing.py:82` but this tab never calls it)
+- 🔴 Empty / loading states — none (no fetch)
+- **Remaining:** wire the real Brief/PDF-export flow (Scrum 15) into the new IA
 
-### Scrum 66 (UI-6) — Intelligence tab (shell) (5 pts · stretch)
+### Scrum 66 (UI-6) — Intelligence tab (shell) (5 pts · stretch) — 🟡
 
-Before a supplier call, the full read on a product — should-cost, how it moved, what's driving the market — lives in scattered spreadsheets + the buyer's head. Intelligence is the one per-product dossier they read before the call. Even read-only (forecast band stubbed, grading engine Wave 3), the shell hands them that brief and gives derived should-cost history + the researched narrative a real home.
+The one per-product dossier a buyer reads before a call.
 
-- 🔴 Build the Intelligence tab shell to the mockup (`docs/intelligence_mockup.html` is the working spec)
-- 🔴 Render derived history + stored narrative, **read-only**
-- 🔴 Stub the forecast band (Forecast engine empty)
-- 🔴 **Dependency:** the `expert_reviewed` checkbox needs **backend persistence** (currently in-memory only) before operational review tracking — a `ProductIntelligence`/`NarrativeReview` model
-- 🟡 **Seeded by** `IntelligenceArea` + `intelligence_mockup.html` (Scrum 21) — needs re-fit to the new shell
-- **Acceptance:** Intelligence renders the mockup's panels from derived/stored data; forecast band stubbed
+- 🟢 Renders derived history + stored narrative, read-only, from real endpoints — landing fetches `/api/cost-models` `/api/products` `/api/chemical-families` + per-card `POST /api/costing/evolution`; detail = one `POST /api/costing/brief` (`IntelligenceArea.jsx`, `IntelligenceDetailArea.jsx:47,174`)
+- 🟢 Forecast band stubbed (honest) — flat ±1.5% dashed continuation labelled "Forecast (stub) — illustrative, no engine yet" (`IntelligenceDetailArea.jsx:18-19,83,141`); no invented spot values
+- 🔴 **expert-reviewed persistence dependency** — narratives are **Redis-cached only** (7-day TTL, `ollama.py`), never DB-stored/reviewed; no `ProductIntelligence`/`NarrativeReview` model or `expert_reviewed` field. Tab 2 correctly flagged "Persistence pending"
+- Note: shell acceptance met (panels + stubbed forecast); the persistence layer + grading/signals engine are the unbuilt parts (Wave 3)
 
-### Scrum 67 (UI-7) — Admin tab (incl. Region management + proxy-index editor) (5 pts · committed core)
+### Scrum 67 (UI-7) — Admin tab (incl. Region management + proxy-index editor) (5 pts · committed core) — 🟡
 
-The back-office for the two things that quietly decide whether a should-cost holds up: **what region a price is for**, and **how we calculate the indexes we can only approximate**. Region needs a real home (the same product genuinely costs different money region to region). Every paywalled-index approximation must be human-adjustable — this is the one place an admin opens a proxied index and sets exactly how it's derived. Without it, anything leaning on that index quietly goes dark.
+Back-office for the two things that decide whether a should-cost holds up: which region a price is for, and how we calculate the indexes we can only approximate.
 
-- 🔴 Rebuild the Admin tab to the new IA (existing admin-console functions)
-- 🟡 Region management UI (add/edit, hierarchy-ready) — **already shipped** as the Admin → Regions screen (Scrum 56); fold into the new IA
-- 🔴 **Proxy-index calculation editor** — open a proxy index and edit its structured `proxy_logic` (base index, operation, spread, recalibration cadence) from DB-3/Scrum 57; **FD-1 (SCRUM-80) executes whatever is set here**. This is the `SCRUM-67` referenced throughout the code
-- 🔴 Permission-gated (super-admin)
-- **Acceptance:** Admin renders existing admin functions in the new IA; Region CRUD available; admins can view/edit each proxy index's `proxy_logic`
+- 🟢 Admin console in the new IA — `Admin.jsx` tabs: Users / Teams / Audit Log / Requests / Regions / Settings (Permissions·Plans·Roles·Demo Hosts)
+- 🟢 Region management UI (add/edit, hierarchy) — `RegionsTab` + `RegionFormModal` (indented tree, cycle guard) → `/api/regions` (shipped in Scrum 56)
+- 🔴 **Proxy-index calculation editor** — **NOT built**: zero `proxy_logic`/`base_index`/`recalibration` editor in the frontend, and **no backend PUT writes `commodity_indexes.proxy_logic`**. Exists only as model + validator + seed; explicitly deferred to "SCRUM-67" in code comments. FD-1 (SCRUM-80) will execute whatever this sets
+- 🟢 Permission-gated (super-admin) — `Admin.jsx:162`
+- **Remaining for 🟢:** the proxy-index `proxy_logic` editor (UI + backend write endpoint)
 
-### Scrum 68 (UI-8) — Team tab (incl. taxonomy fork management) (5 pts · stretch)
+### Scrum 68 (UI-8) — Team tab (incl. taxonomy fork management) (5 pts · stretch) — 🟡
 
-Every team wants a slightly different catalog — their own subfamily quirks, tweaked formulas, products they buy their own way. DB-1 (Scrum 55) built the fork machinery; until this tab exists there's nowhere to actually browse, pick, and manage what you've changed. Critically it always shows **platform-vs-team origin** — so when we push a shared-catalog improvement, a team knows exactly which of their edits are theirs to protect.
+Every team wants a slightly different catalog. Show platform-vs-team origin so a team knows which edits are theirs to protect.
 
-- 🔴 Rebuild the Team tab to the new IA (existing team-management functions)
-- 🔴 Taxonomy fork management UI (from DB-1/Scrum 55): view platform taxonomy, fork families/subfamilies into an editable team copy (`origin_id` preserved)
-- 🔴 Show platform-vs-team origin lineage
-- 🟢 **Backed by** the DB-1 fork endpoints/model (already shipped) — this is the missing UI
-- Reference: `sample_idea/scrum55/02-platform-vs-team.md` (how forking works)
-- **Acceptance:** Team tab renders existing team-management in the new IA; a team can fork a platform family/subfamily and edit the copy (origin preserved)
+- 🟢 Team management in the new IA — `Team.jsx` tabs: Teams / Requests / Activity Log / Settings (members, roles, invites)
+- 🔴 **Taxonomy fork management UI** — **NOT built**: zero frontend calls to `/fork`; the UI only reads taxonomy (`GET /api/chemical-families`). Backend fork endpoints are complete (`chemical_families.py:83`, `subfamilies.py:86`, Scrum 55/DB-1) — no UI drives them
+- 🔴 Platform-vs-team origin lineage in UI — `origin_id` exists only in the backend response; zero frontend usage
+- 🟢 **Backed by** the DB-1 fork endpoints/model (shipped) — this scrum is the missing UI
+- Reference: `sample_idea/scrum55/02-platform-vs-team.md`
+- **Remaining:** the fork/browse UI + origin-lineage display
 
 ---
 
