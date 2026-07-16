@@ -27,6 +27,14 @@ class CommodityIndexOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ProxyLogicUpdate(BaseModel):
+    """Admin edit of a commodity index's structured proxy_logic (Scrum 67).
+    `retrieval_status` optional — lets an admin promote a `blocked` index to
+    `good_proxy`/`weak_proxy` once a spec is set. FD-1 (SCRUM-80) executes the spec."""
+    proxy_logic: dict | None = None
+    retrieval_status: str | None = None
+
+
 class IndexValueOut(BaseModel):
     commodity_id: int
     commodity_name: str | None = None

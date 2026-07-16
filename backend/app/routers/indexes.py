@@ -24,7 +24,7 @@ from app.schemas.index_data import (
     TeamIndexSourceCreate, TeamIndexSourceOut, ScrapeNowResult,
     CellOverrideRequest, BulkOverrideRequest,
     FilterOptionsOut, IndexImpactItem, IndexImpactResponse,
-    IndexValuePublicOut, PublicQuarterPoint,
+    IndexValuePublicOut, PublicQuarterPoint, ProxyLogicUpdate,
 )
 from app.services.data_resolver import resolve_index_values
 from app.services.file_parser import parse_index_upload
@@ -106,6 +106,57 @@ def get_public_quarterly_indexes(
             prev=prev,
             qoq_pct=qoq,
         ))
+    return out
+
+
+@router.put("/{commodity_id}/proxy-logic", response_model=CommodityIndexOut)
+def update_proxy_logic(
+    commodity_id: int,
+    body: ProxyLogicUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Super-admin edits a commodity index's structured `proxy_logic` (Scrum 67 / SCRUM-67
+    in the code comments). FD-1 (SCRUM-80) executes whatever is set here to produce estimates.
+    Platform-level metadata (no tenant column) — super-admin gated, audit-logged."""
+    require_super_admin(current_user)
+    current_user_id_var.set(str(current_user.id))
+    bypass_rls_var.set(True)
+
+    from app.constants.index_metadata import validate_proxy_logic, RETRIEVAL_STATUSES
+
+    ci = db.query(CommodityIndex).filter(CommodityIndex.id == commodity_id).first()
+    if not ci:
+        raise HTTPException(status_code=404, detail="Commodity index not found")
+
+    try:
+        validated = validate_proxy_logic(body.proxy_logic)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    if body.retrieval_status is not None and body.retrieval_status not in RETRIEVAL_STATUSES:
+        raise HTTPException(status_code=422, detail=f"retrieval_status must be one of {list(RETRIEVAL_STATUSES)}")
+
+    old = {"proxy_logic": ci.proxy_logic, "retrieval_status": ci.retrieval_status}
+    ci.proxy_logic = validated
+    if body.retrieval_status is not None:
+        ci.retrieval_status = body.retrieval_status
+
+    # Build the response + capture fields BEFORE commit (transaction-local RLS GUCs reset on commit).
+    out = CommodityIndexOut.model_validate(ci)
+    name, new_status = ci.name, ci.retrieval_status
+    db.commit()
+
+    # Audit is best-effort: platform-level index metadata has no team, and audit_logs.team_id
+    # is NOT NULL with an FK to teams (the Scrum-10 platform-audit gap). Never fail the save on it.
+    try:
+        log_event(
+            db, uuid.UUID("00000000-0000-0000-0000-000000000000"), current_user.id,
+            "update", "index_proxy_logic", name,
+            previous_value=old, new_value={"proxy_logic": validated, "retrieval_status": new_status},
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
     return out
 
 
