@@ -549,14 +549,15 @@ Where am I overpaying right now, across everything I buy, before I negotiate.
 - 🟢 No new backend engine
 - Note: REAL, not demo; only pending is re-fit into the new journey shell. Trigger-radar / priority-matrix / alerts remain Wave 3
 
-### Scrum 64 (UI-4) — Forecast tab (shell only) (5 pts · stretch) — 🟡
+### Scrum 64 (UI-4) — Forecast tab (shell only) (5 pts · stretch) — 🟢
 
 Buy-now-or-wait turns on where price is heading. Stand the home up now; the projection engine is Wave 3, forward part deliberately blank — a made-up forecast is worse than honest "we don't know yet."
 
-- 🟢 Forecast layout exists — scenario/horizon toggles, KPI cards, multi-line chart, projection table (`ForecastArea.jsx:62-158`)
-- 🔴 **Forward band NOT honestly stubbed** — it shows **fabricated forecast figures** (BASE/BEAR/BULL €26.8M/€29.2M/€24.1M, per-product forward prices — hardcoded at `ForecastArea.jsx:11-14, 28-33, 56-59`), only labelled "Illustrative". The acceptance criterion "no fabricated forecast numbers" is **not** met — blank/hide the forward band
-- 🔴 Index history HARDCODED — static arrays, no API call (`ForecastArea.jsx:11, 35-41`); needs wiring to real index history
-- **Remaining for 🟢:** replace the demo constants with real index history + a genuinely stubbed/hidden forward band
+- 🟢 Forecast layout exists — KPI cards, multi-line chart, portfolio table, index-movement cards (`ForecastArea.jsx`)
+- 🟢 **No fabricated forward numbers** — all hardcoded BASE/BEAR/BULL / projected-KPI / per-product forward constants removed; the forward band is an honest dashed ±1.5% stub (IntelligenceDetailArea pattern), clearly labelled, `splitIndex` at the last real quarter
+- 🟢 Index history REAL — composite of headline commodities from `GET /api/indexes/public-quarterly` (each rebased to 100, averaged); table present-values + KPIs from `GET /api/portfolio/summary`; assumption cards show each index's real latest QoQ %
+- 🟢 React key-prop warning fixed (flat table keyed by `cost_model_id`); loading/empty/error states
+- Note: the real forward-projection engine is Wave 3 (out of scope for "shell only")
 
 ### Scrum 65 (UI-5) — Negotiate tab (5 pts · committed core) — 🔴
 
@@ -575,26 +576,24 @@ The one per-product dossier a buyer reads before a call.
 - 🔴 **expert-reviewed persistence dependency** — narratives are **Redis-cached only** (7-day TTL, `ollama.py`), never DB-stored/reviewed; no `ProductIntelligence`/`NarrativeReview` model or `expert_reviewed` field. Tab 2 correctly flagged "Persistence pending"
 - Note: shell acceptance met (panels + stubbed forecast); the persistence layer + grading/signals engine are the unbuilt parts (Wave 3)
 
-### Scrum 67 (UI-7) — Admin tab (incl. Region management + proxy-index editor) (5 pts · committed core) — 🟡
+### Scrum 67 (UI-7) — Admin tab (incl. Region management + proxy-index editor) (5 pts · committed core) — 🟢
 
 Back-office for the two things that decide whether a should-cost holds up: which region a price is for, and how we calculate the indexes we can only approximate.
 
-- 🟢 Admin console in the new IA — `Admin.jsx` tabs: Users / Teams / Audit Log / Requests / Regions / Settings (Permissions·Plans·Roles·Demo Hosts)
-- 🟢 Region management UI (add/edit, hierarchy) — `RegionsTab` + `RegionFormModal` (indented tree, cycle guard) → `/api/regions` (shipped in Scrum 56)
-- 🔴 **Proxy-index calculation editor** — **NOT built**: zero `proxy_logic`/`base_index`/`recalibration` editor in the frontend, and **no backend PUT writes `commodity_indexes.proxy_logic`**. Exists only as model + validator + seed; explicitly deferred to "SCRUM-67" in code comments. FD-1 (SCRUM-80) will execute whatever this sets
+- 🟢 Admin console in the new IA — `Admin.jsx` tabs: Users / Teams / Audit Log / Requests / Regions / **Proxy Indexes** / Settings
+- 🟢 Region management UI (add/edit, hierarchy) — `RegionsTab` + `RegionFormModal` → `/api/regions` (Scrum 56)
+- 🟢 **Proxy-index calculation editor** — `PUT /api/indexes/{id}/proxy-logic` (super-admin, `validate_proxy_logic`, ValueError→422, optional `retrieval_status` promotion, best-effort audit) + Admin "Proxy Indexes" tab (`ProxyIndexesTab`) listing proxies (good/weak/blocked or has spec) + `ProxyLogicFormModal` (base_index/operation/spread/spread_unit/recalibration/retrieval_status/note). Tests `test_index_proxy_logic.py` (4). FD-1 (SCRUM-80) executes what this sets
 - 🟢 Permission-gated (super-admin) — `Admin.jsx:162`
-- **Remaining for 🟢:** the proxy-index `proxy_logic` editor (UI + backend write endpoint)
 
-### Scrum 68 (UI-8) — Team tab (incl. taxonomy fork management) (5 pts · stretch) — 🟡
+### Scrum 68 (UI-8) — Team tab (incl. taxonomy fork management) (5 pts · stretch) — 🟢
 
 Every team wants a slightly different catalog. Show platform-vs-team origin so a team knows which edits are theirs to protect.
 
-- 🟢 Team management in the new IA — `Team.jsx` tabs: Teams / Requests / Activity Log / Settings (members, roles, invites)
-- 🔴 **Taxonomy fork management UI** — **NOT built**: zero frontend calls to `/fork`; the UI only reads taxonomy (`GET /api/chemical-families`). Backend fork endpoints are complete (`chemical_families.py:83`, `subfamilies.py:86`, Scrum 55/DB-1) — no UI drives them
-- 🔴 Platform-vs-team origin lineage in UI — `origin_id` exists only in the backend response; zero frontend usage
-- 🟢 **Backed by** the DB-1 fork endpoints/model (shipped) — this scrum is the missing UI
+- 🟢 Team management in the new IA — `Team.jsx` tabs: Teams / Requests / Activity Log / **Catalog** / Settings
+- 🟢 **Taxonomy fork management UI** — `TaxonomyTab` in `Team.jsx`: indented family→subfamily tree from `GET /api/chemical-families`+`/api/subfamilies` (team_id-scoped); "+ Fork" on platform rows (hidden once forked) → confirm → `POST …/{id}/fork`; 409/403 via `formatApiError`; server enforces `products.edit`
+- 🟢 Platform-vs-team origin lineage in UI — `OriginChip` (Platform / Team fork ← origin name); a platform row shows its team fork once created
+- 🟢 **Backed by** the DB-1 fork endpoints/model (Scrum 55)
 - Reference: `sample_idea/scrum55/02-platform-vs-team.md`
-- **Remaining:** the fork/browse UI + origin-lineage display
 
 ---
 
