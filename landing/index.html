@@ -645,7 +645,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <div class="nav-actions">
       <button class="btn btn-primary" onclick="openDemoModal()">Schedule Demo</button>
       <button class="btn btn-ghost" onclick="openAccessModal()">Request Access</button>
-      <a class="btn btn-ghost js-signin" href="https://app.costadvisor.org">Sign in</a>
+      <a class="btn btn-ghost js-signin" href="https://api.costadvisor.org/auth/login">Sign in</a>
     </div>
     <button class="nav-burger" id="lpBurger" aria-label="Open menu" aria-expanded="false">☰</button>
   </div>
@@ -656,7 +656,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <a href="#security">Security</a>
     <a href="javascript:void(0)" onclick="openDemoModal()" style="color:var(--blue);font-weight:600">Schedule a Demo →</a>
     <a href="#cta">Request Access</a>
-    <a class="js-signin" href="https://app.costadvisor.org">Sign in</a>
+    <a class="js-signin" href="https://api.costadvisor.org/auth/login">Sign in</a>
   </div>
 </nav>
 
@@ -1387,7 +1387,8 @@ const APP_URL = window.location.hostname.includes('dev.')
   : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:5173'
     : 'https://app.costadvisor.org';
-document.querySelectorAll('.js-signin').forEach(a => { a.href = APP_URL; });
+// Sign-in kicks off the Google OAuth flow directly at the API's /auth/login (host-aware).
+document.querySelectorAll('.js-signin').forEach(a => { a.href = `${API_URL}/auth/login`; });
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
