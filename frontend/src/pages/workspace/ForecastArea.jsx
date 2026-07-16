@@ -1,159 +1,178 @@
-import { useState } from 'react';
-import { MultiLineChart, GroupHeader, useOpenSet } from './wsCharts';
+import { useState, useEffect } from 'react';
+import api, { formatApiError } from '../../api';
+import { useAuth } from '../../AuthContext';
+import { qLabel } from '../../utils/quarters';
+import exportCsv from '../../utils/exportCsv';
+import { MultiLineChart } from './wsCharts';
 
-/* Forecast area — re-skin of the mockup's "Cost forecast" view. Demo data;
- * the forecast engine itself is net-new (Wave 2), so values are illustrative. */
+/* Forecast area (Scrum 64 — "shell only").
+ * REAL data, no fabricated forward numbers:
+ *  - chart: a composite commodity index (headline feeds from /api/indexes/public-quarterly,
+ *    each rebased to base 100 and averaged) as real history, then an HONEST dashed ±band stub
+ *    (the same pattern as IntelligenceDetailArea) — no invented trajectory.
+ *  - table + KPIs: present-day should-cost / gap from /api/portfolio/summary (the Monitor source).
+ *  - assumption cards: each headline index's REAL latest QoQ %.
+ * The forward-projection engine is Wave 3; the dashed segment is clearly labelled a stub. */
 
-const X = ['Q1 24', 'Q2 24', 'Q3 24', 'Q4 24', 'Q1 25', 'Q2 25', 'Q3 25', 'Q4 25', 'Q1 26', 'Q2 26', 'Q3 26', 'Q4 26', 'Q1 27', 'Q2 27'];
-const SPLIT = 9; // Q2 26 = end of history
+const FORECAST_STEPS = 2;      // quarters of stub past the last real quarter
+const FORECAST_BAND = 0.015;   // ±1.5% illustrative band
 
-// €M annual-spend-equivalent series
-const ACTUAL =   [30.1, 30.4, 29.8, 29.2, 28.9, 28.7, 28.6, 28.5, 28.4, 28.4, null, null, null, null];
-const BASE =     [30.1, 30.4, 29.8, 29.2, 28.9, 28.7, 28.6, 28.5, 28.4, 28.4, 27.9, 27.4, 27.0, 26.8];
-const BEAR =     [null, null, null, null, null, null, null, null, null, 28.4, 28.7, 28.9, 29.1, 29.2];
-const BULL =     [null, null, null, null, null, null, null, null, null, 28.4, 27.1, 26.0, 24.9, 24.1];
-
-const CASES = [
-  { key: 'base', label: 'Base case' },
-  { key: 'bear', label: 'Bear case' },
-  { key: 'bull', label: 'Bull case' },
-];
-
-const FAMILIES = [
-  { key: 'surfactants', label: 'Surfactants' },
-  { key: 'solvents', label: 'Solvents' },
-  { key: 'resins', label: 'Resins & polymers' },
-];
-
-const PROJECTIONS = [
-  { ref: 'CA-SURF-001', product: 'LABS Surfactant', family: 'surfactants', vol: '1,200 t', now: '€1,584', q3: '€1,548', q4: '€1,515', q1: '€1,489', q2: '€1,470', change: '−7.2%', changeUp: false, impact: '−€137K', driver: 'Benzene & naphtha softening' },
-  { ref: 'CA-SOLV-001', product: 'Ethylene oxide', family: 'solvents', vol: '480 t', now: '€962', q3: '€974', q4: '€982', q1: '€988', q2: '€995', change: '+3.4%', changeUp: true, impact: '+€16K', driver: 'Ethylene mild recovery' },
-  { ref: 'CA-SOLV-002', product: 'Caustic soda', family: 'solvents', vol: '2,100 t', now: '€338', q3: '€333', q4: '€330', q1: '€328', q2: '€326', change: '−3.6%', changeUp: false, impact: '−€25K', driver: 'Energy softening' },
-  { ref: 'CA-RESI-001', product: 'Styrene monomer', family: 'resins', vol: '900 t', now: '€842', q3: '€828', q4: '€818', q1: '€810', q2: '€805', change: '−4.4%', changeUp: false, impact: '−€33K', driver: 'Benzene softening' },
-];
-
-const ASSUMPTIONS = [
-  { name: 'Benzene (ICIS EU)', val: '−3% / qtr', note: 'continued softening', color: 'var(--accent)' },
-  { name: 'Naphtha (Platts)', val: '−1% / qtr', note: 'tracking crude', color: 'var(--accent)' },
-  { name: 'Ethylene (ICIS EU)', val: '+1% / qtr', note: 'mild recovery', color: 'var(--accent3)' },
-  { name: 'Energy (Eurostat)', val: '−1% / qtr', note: 'easing', color: 'var(--accent)' },
-  { name: 'EU CPI', val: '+1.2% / qtr', note: 'persistent inflation', color: 'var(--accent3)' },
-];
+function nextQuarters(year, quarter, n) {
+  const out = []; let y = year, q = quarter;
+  for (let i = 0; i < n; i++) { q += 1; if (q > 4) { q = 1; y += 1; } out.push(qLabel(y, q)); }
+  return out;
+}
 
 export default function ForecastArea() {
-  const [activeCase, setActiveCase] = useState('base');
-  const [horizon, setHorizon] = useState('8q');
-  const [openSet, toggle] = useOpenSet(FAMILIES.map(f => f.key));
+  const { activeTeamId } = useAuth();
+  const [models, setModels] = useState([]);
+  const [indices, setIndices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  useEffect(() => {
+    if (!activeTeamId) return;
+    setLoading(true); setError(null);
+    Promise.all([
+      api.get('/api/portfolio/summary', { params: { team_id: activeTeamId } }),
+      api.get('/api/indexes/public-quarterly', { params: { limit: 12 } }),
+    ])
+      .then(([sum, idx]) => { setModels(sum.data.models || []); setIndices(idx.data || []); })
+      .catch(err => setError(formatApiError(err)))
+      .finally(() => setLoading(false));
+  }, [activeTeamId]);
+
+  // ── Composite commodity index (real history) + honest forward stub ──
+  const keyed = new Map();
+  indices.forEach(ix => (ix.points || []).forEach(p => keyed.set(`${p.year}-${p.quarter}`, { year: p.year, quarter: p.quarter })));
+  const timeline = [...keyed.values()].sort((a, b) => a.year - b.year || a.quarter - b.quarter).slice(-12);
+  const rebased = indices.map(ix => {
+    const first = (ix.points || []).find(p => p.value != null)?.value;
+    const m = new Map();
+    if (first) (ix.points || []).forEach(p => { if (p.value != null) m.set(`${p.year}-${p.quarter}`, (p.value / first) * 100); });
+    return m;
+  });
+  const composite = timeline.map(t => {
+    const vals = rebased.map(m => m.get(`${t.year}-${t.quarter}`)).filter(v => v != null);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  });
+  const N = timeline.length;
+  const last = N ? timeline[N - 1] : null;
+  const lastVal = [...composite].reverse().find(v => v != null) ?? null;
+  const fLabels = last ? nextQuarters(last.year, last.quarter, FORECAST_STEPS) : [];
+  const pad = Array(FORECAST_STEPS).fill(null);
+  const at = (i, v) => { const a = Array(N + FORECAST_STEPS).fill(null); a[i] = v; return a; };
+  const stub = (mult) => { const a = at(N - 1, lastVal); for (let i = 0; i < FORECAST_STEPS; i++) a[N + i] = lastVal * mult; return a; };
+  const hasStub = lastVal != null && N >= 2;
+
+  const xLabels = [...timeline.map(t => qLabel(t.year, t.quarter)), ...fLabels];
   const series = [
-    { name: 'Actual spend', color: 'var(--accent2)', values: ACTUAL, dashed: false },
-    { name: 'Should-cost (base)', color: 'var(--accent)', values: BASE, dashed: false },
-    { name: 'Bear', color: 'var(--accent3)', values: BEAR, dashed: true },
-    { name: 'Bull', color: 'var(--accent4)', values: BULL, dashed: true },
+    { name: 'Commodity index (base 100)', color: 'var(--accent)', values: [...composite, ...pad] },
+    ...(hasStub ? [
+      { name: 'Forecast (stub)', color: 'var(--accent3)', values: stub(1), dashed: true },
+      { color: 'var(--muted)', values: stub(1 + FORECAST_BAND), dashed: true },
+      { color: 'var(--muted)', values: stub(1 - FORECAST_BAND), dashed: true },
+    ] : []),
   ];
 
+  // ── Real present-day KPIs from the portfolio ──
+  const flagged = models.filter(m => m.flag_price_drift || m.flag_index_moved).length;
+  const gaps = models.map(m => m.gap_pct).filter(v => v != null);
+  const avgGap = gaps.length ? gaps.reduce((a, b) => a + Math.abs(b), 0) / gaps.length : null;
+  const totalExposure = models.reduce((a, m) => a + Math.abs(m.cumulative_impact || 0), 0);
   const stats = [
-    { lbl: 'Current annual spend', val: '€28.4M', color: 'var(--text)', bg: 'var(--neutral-bg)' },
-    { lbl: 'Projected (base)', val: '€26.8M', sub: '−5.6%', color: 'var(--accent)', bg: 'var(--success-bg)', case: 'base' },
-    { lbl: 'Projected (bear)', val: '€29.2M', sub: '+2.8%', color: 'var(--accent3)', bg: 'var(--warn-bg)', case: 'bear' },
-    { lbl: 'Projected (bull)', val: '€24.1M', sub: '−15.1%', color: 'var(--accent4)', bg: 'var(--info-bg)', case: 'bull' },
+    { lbl: 'Products tracked', val: String(models.length), color: 'var(--text)', bg: 'var(--neutral-bg)' },
+    { lbl: 'Flagged (drift / index)', val: String(flagged), color: flagged ? 'var(--accent3)' : 'var(--text)', bg: flagged ? 'var(--warn-bg)' : 'var(--neutral-bg)' },
+    { lbl: 'Avg |gap|', val: avgGap != null ? `${avgGap.toFixed(1)}%` : '—', color: 'var(--accent)', bg: 'var(--neutral-bg)' },
+    { lbl: 'Total exposure', val: totalExposure ? Math.round(totalExposure).toLocaleString() : '—', color: 'var(--accent2)', bg: 'var(--neutral-bg)' },
   ];
+
+  const doExport = () => exportCsv(
+    'forecast-portfolio.csv',
+    ['Reference', 'Product', 'Supplier', 'Region', 'Should-cost', 'Actual price', 'Gap %'],
+    models.map(m => [
+      m.product_reference || '', m.product_name, m.supplier_name || '', m.region,
+      m.current_should_cost, m.latest_actual_price ?? '', m.gap_pct ?? '',
+    ]),
+  );
+
+  if (loading) return <div className="ca-page ca-fade-in"><div style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div></div>;
+  if (error) return <div className="ca-page ca-fade-in"><div className="ca-card" style={{ color: 'var(--accent2)' }}>Error: {error}</div></div>;
 
   return (
     <div className="ca-page ca-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
         <div>
           <div className="ca-h1">Cost forecast</div>
-          <p className="ca-subtitle">Forward should-cost under Base / Bear / Bull index assumptions. Illustrative — the forecast engine is a Wave-2 build.</p>
+          <p className="ca-subtitle">Real commodity-index history and current portfolio should-cost. The forward projection engine is a Wave-3 build — the dashed band is an illustrative ±1.5% stub, not a prediction.</p>
         </div>
-        <button className="ca-btn ca-btn-ghost">↓ Export report</button>
+        <button className="ca-btn ca-btn-ghost" onClick={doExport} disabled={!models.length}>↓ Export</button>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '14px 0' }}>
-        {CASES.map(c => (
-          <button key={c.key} className={`ca-btn ca-btn-sm ${activeCase === c.key ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setActiveCase(c.key)}>{c.label}</button>
-        ))}
-        <span style={{ width: 1, height: 20, background: 'var(--border)' }} />
-        {[['4q', '4 quarters'], ['8q', '8 quarters']].map(([k, l]) => (
-          <button key={k} className={`ca-btn ca-btn-sm ${horizon === k ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setHorizon(k)}>{l}</button>
-        ))}
-        <button className="ca-btn ca-btn-sm ca-btn-ghost" style={{ marginLeft: 'auto' }}>↓ Excel</button>
-      </div>
-
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 16, margin: '16px 0', flexWrap: 'wrap' }}>
         {stats.map(s => (
-          <div key={s.lbl} className="ca-card ca-metric" style={{ flex: '1 1 180px', background: s.bg, outline: s.case === activeCase ? `1px solid ${s.color}` : 'none' }}>
+          <div key={s.lbl} className="ca-card ca-metric" style={{ flex: '1 1 180px', background: s.bg }}>
             <div className="ca-metric-val" style={{ color: s.color }}>{s.val}</div>
-            <div className="ca-metric-lbl">{s.lbl}{s.sub ? ` · ${s.sub}` : ''}</div>
+            <div className="ca-metric-lbl">{s.lbl}</div>
           </div>
         ))}
       </div>
 
       <div className="ca-card" style={{ marginBottom: 20 }}>
-        <div className="ca-card-title">Annual spend — actual vs forecast scenarios</div>
-        <MultiLineChart series={series} xLabels={X} splitIndex={SPLIT} splitLabel="Forecast" height={220} />
+        <div className="ca-card-title">Commodity index — history &amp; forecast stub</div>
+        {N >= 2
+          ? <MultiLineChart series={series} xLabels={xLabels} refValue={100} refLabel="base 100" splitIndex={hasStub ? N : null} splitLabel="Forecast" height={220} />
+          : <div style={{ padding: 20, color: 'var(--muted)' }}>Not enough index history to chart yet.</div>}
+        {hasStub && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>Dashed segment past “Forecast” is an illustrative ±1.5% stub — no forecast engine yet.</p>}
       </div>
 
       <div className="ca-card" style={{ marginBottom: 20 }}>
-        <div className="ca-scroll-x">
-          <table className="ca-table">
-            <thead>
-              <tr>
-                <th></th><th>Ref</th><th>Product</th><th className="right">Vol/yr</th><th className="right">Now</th>
-                <th className="right">Q3 26</th><th className="right">Q4 26</th><th className="right">Q1 27</th><th className="right">Q2 27</th>
-                <th className="right">12M change</th><th className="right">12M impact</th><th>Key driver</th>
-              </tr>
-            </thead>
-            <tbody>
-              {FAMILIES.map(fam => {
-                const fr = PROJECTIONS.filter(p => p.family === fam.key);
-                if (!fr.length) return null;
-                const open = openSet.has(fam.key);
-                return (
-                  <>
-                    <tr key={fam.key}><td colSpan={12} style={{ padding: 0 }}><GroupHeader label={fam.label} count={fr.length} open={open} onToggle={() => toggle(fam.key)} /></td></tr>
-                    {open && fr.map(p => (
-                      <tr key={p.ref}>
-                        <td></td>
-                        <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{p.ref}</td>
-                        <td style={{ fontWeight: 600 }}>{p.product}</td>
-                        <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{p.vol}</td>
-                        <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{p.now}</td>
-                        <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, background: 'var(--neutral-bg)' }}>{p.q3}</td>
-                        <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{p.q4}</td>
-                        <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{p.q1}</td>
-                        <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{p.q2}</td>
-                        <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", color: p.changeUp ? 'var(--accent3)' : 'var(--accent)' }}>{p.change}</td>
-                        <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", color: p.changeUp ? 'var(--accent3)' : 'var(--accent)' }}>{p.impact}</td>
-                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{p.driver}</td>
-                      </tr>
-                    ))}
-                  </>
-                );
-              })}
-              <tr style={{ background: 'var(--success-bg)' }}>
-                <td></td><td></td><td style={{ fontWeight: 700 }}>Portfolio total</td>
-                <td colSpan={6}></td>
-                <td className="right" style={{ fontWeight: 700, color: 'var(--accent)' }}>−5.6%</td>
-                <td className="right" style={{ fontWeight: 700, color: 'var(--accent)' }}>−€1.6M</td>
-                <td></td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="ca-card-title">Portfolio — current should-cost vs price</div>
+        {models.length ? (
+          <div className="ca-scroll-x">
+            <table className="ca-table">
+              <thead>
+                <tr>
+                  <th>Ref</th><th>Product</th><th>Supplier</th><th>Region</th>
+                  <th className="right">Should-cost</th><th className="right">Actual</th><th className="right">Gap %</th><th className="right">Forecast</th>
+                </tr>
+              </thead>
+              <tbody>
+                {models.map(m => (
+                  <tr key={m.cost_model_id}>
+                    <td style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{m.product_reference}</td>
+                    <td style={{ fontWeight: 600 }}>{m.product_name}</td>
+                    <td>{m.supplier_name || '—'}</td>
+                    <td>{m.region}</td>
+                    <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{m.current_should_cost?.toLocaleString()}</td>
+                    <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{m.latest_actual_price != null ? m.latest_actual_price.toLocaleString() : '—'}</td>
+                    <td className="right" style={{ fontFamily: "'JetBrains Mono', monospace", color: m.gap_pct == null ? 'var(--muted)' : m.gap_pct > 0 ? 'var(--accent2)' : 'var(--accent)' }}>{m.gap_pct != null ? `${m.gap_pct > 0 ? '+' : ''}${m.gap_pct}%` : '—'}</td>
+                    <td className="right" style={{ color: 'var(--muted)', fontSize: 11 }}>— · Wave 3</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <div style={{ padding: 20, color: 'var(--muted)' }}>No cost models yet — build one to see forecast inputs.</div>}
+      </div>
+
+      {indices.length > 0 && <>
+        <div className="ca-h2">Index movement <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>(latest quarter-over-quarter, real)</span></div>
+        <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
+          {indices.map(a => {
+            const up = (a.qoq_pct ?? 0) >= 0;
+            return (
+              <div key={a.commodity_name} className="ca-card" style={{ flex: '1 1 160px' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{a.commodity_name}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: a.qoq_pct == null ? 'var(--muted)' : up ? 'var(--accent3)' : 'var(--accent)', margin: '4px 0' }}>
+                  {a.qoq_pct != null ? `${up ? '+' : ''}${a.qoq_pct.toFixed(1)}%` : '—'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>{a.latest != null ? `${a.latest.toLocaleString()} ${a.unit || ''}` : ''} · {a.region}</div>
+              </div>
+            );
+          })}
         </div>
-      </div>
-
-      <div className="ca-h2">Index assumptions <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>(base case)</span></div>
-      <div style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap' }}>
-        {ASSUMPTIONS.map(a => (
-          <div key={a.name} className="ca-card" style={{ flex: '1 1 160px' }}>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{a.name}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: a.color, margin: '4px 0' }}>{a.val}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{a.note}</div>
-          </div>
-        ))}
-      </div>
-      <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 12 }}>Bear / Bull scenarios apply ±15% to commodity-index trajectories.</p>
+      </>}
     </div>
   );
 }
