@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -10,7 +11,7 @@ from app.models.subfamily import Subfamily
 from app.models.chemical_family import ChemicalFamily
 from app.models.team import TeamMembership
 from app.routers.auth import get_current_user
-from app.schemas.subfamily import SubfamilyCreate, SubfamilyForkRequest, SubfamilyOut
+from app.schemas.subfamily import SubfamilyCreate, SubfamilyForkRequest, SubfamilyUpdate, SubfamilyOut
 from app.services.audit import log_event
 from app.services.permissions import require_permission
 
@@ -125,6 +126,44 @@ def fork_subfamily(
     db.expunge(fork)
     db.commit()
     return fork
+
+
+@router.put("/{subfamily_id}", response_model=SubfamilyOut)
+def update_subfamily(
+    subfamily_id: int,
+    data: SubfamilyUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Rename/edit a subfamily — a team's own fork, or (super-admin) the platform row."""
+    sub = db.query(Subfamily).filter(Subfamily.id == subfamily_id).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subfamily not found")
+
+    if sub.team_id is None:
+        require_super_admin(current_user)
+    else:
+        require_permission(db, current_user, sub.team_id, "products.edit")
+
+    previous = {"name": sub.name, "code": sub.code}
+    if data.name is not None:
+        sub.name = data.name
+    if "code" in data.model_fields_set:
+        sub.code = data.code
+
+    audit_team_id = sub.team_id or _first_team_id(db, current_user.id)
+    if audit_team_id:
+        log_event(db, audit_team_id, current_user.id, "update", "subfamily",
+                  str(sub.id), previous_value=previous, new_value={"name": sub.name, "code": sub.code})
+
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A subfamily with that name or code already exists in this scope")
+    db.expunge(sub)
+    db.commit()
+    return sub
 
 
 @router.delete("/{subfamily_id}")

@@ -16,6 +16,11 @@ class SubfamilyForkRequest(BaseModel):
     team_id: uuid.UUID
 
 
+class SubfamilyUpdate(BaseModel):
+    name: str | None = None
+    code: str | None = None
+
+
 class SubfamilyOut(BaseModel):
     id: int
     family_id: int

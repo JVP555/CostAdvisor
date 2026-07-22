@@ -9,9 +9,12 @@ from app.models.user import User
 from app.models.chemical_family import ChemicalFamily
 from app.models.team import TeamMembership
 from app.routers.auth import get_current_user
+from sqlalchemy.exc import IntegrityError
+
 from app.schemas.chemical_family import (
     ChemicalFamilyCreate,
     ChemicalFamilyForkRequest,
+    ChemicalFamilyUpdate,
     ChemicalFamilyOut,
 )
 from app.services.audit import log_event
@@ -123,6 +126,51 @@ def fork_family(
     db.expunge(fork)
     db.commit()
     return fork
+
+
+@router.put("/{family_id}", response_model=ChemicalFamilyOut)
+def update_family(
+    family_id: int,
+    data: ChemicalFamilyUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Rename/edit a family — a team's own fork, or (super-admin) the platform row.
+
+    This is the point of forking: origin_id keeps resolving to the platform
+    original for formula/index purposes even after the team renames or
+    re-codes their private copy.
+    """
+    family = db.query(ChemicalFamily).filter(ChemicalFamily.id == family_id).first()
+    if not family:
+        raise HTTPException(status_code=404, detail="Chemical family not found")
+
+    if family.team_id is None:
+        require_super_admin(current_user)
+    else:
+        require_permission(db, current_user, family.team_id, "products.edit")
+
+    previous = {"name": family.name, "code": family.code}
+    if data.name is not None:
+        family.name = data.name
+    if "code" in data.model_fields_set:
+        family.code = data.code
+    if "custom_attribute_schema" in data.model_fields_set:
+        family.custom_attribute_schema = data.custom_attribute_schema
+
+    audit_team_id = family.team_id or _first_team_id(db, current_user.id)
+    if audit_team_id:
+        log_event(db, audit_team_id, current_user.id, "update", "chemical_family",
+                  str(family.id), previous_value=previous, new_value={"name": family.name, "code": family.code})
+
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A family with that name or code already exists in this scope")
+    db.expunge(family)
+    db.commit()
+    return family
 
 
 @router.delete("/{family_id}")

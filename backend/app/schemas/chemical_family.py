@@ -16,6 +16,12 @@ class ChemicalFamilyForkRequest(BaseModel):
     team_id: uuid.UUID
 
 
+class ChemicalFamilyUpdate(BaseModel):
+    name: str | None = None
+    code: str | None = None
+    custom_attribute_schema: list[dict] | None = None
+
+
 class ChemicalFamilyOut(BaseModel):
     id: int
     name: str

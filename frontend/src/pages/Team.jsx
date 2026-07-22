@@ -75,6 +75,7 @@ function TaxonomyTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null); // `${kind}-${id}` while a fork is in flight
+  const [editing, setEditing] = useState(null); // { kind, row } — the team's own fork being renamed
 
   const load = () => {
     if (!activeTeamId) return;
@@ -114,11 +115,24 @@ function TaxonomyTab() {
     }
   };
 
-  const ForkCell = ({ kind, row, fork: existing }) => existing
-    ? <OriginChip kind="fork" from={row.name} />
-    : <button className="ca-btn ca-btn-sm ca-btn-ghost" disabled={busy === `${kind}-${row.id}`} onClick={() => fork(kind, row)}>
-        {busy === `${kind}-${row.id}` ? 'Forking…' : '+ Fork'}
-      </button>;
+  const saveEdit = async ({ name, code }) => {
+    const { kind, row } = editing;
+    const url = kind === 'family' ? `/api/chemical-families/${row.id}` : `/api/subfamilies/${row.id}`;
+    await api.put(url, { name, code });
+    setEditing(null);
+    load();
+  };
+
+  const ForkCell = ({ kind, row, fork: existing }) => existing ? (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <OriginChip kind="fork" from={row.name} />
+      <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={() => setEditing({ kind, row: existing })}>Edit</button>
+    </div>
+  ) : (
+    <button className="ca-btn ca-btn-sm ca-btn-ghost" disabled={busy === `${kind}-${row.id}`} onClick={() => fork(kind, row)}>
+      {busy === `${kind}-${row.id}` ? 'Forking…' : '+ Fork'}
+    </button>
+  );
 
   if (loading) return <div style={{ padding: 20, color: 'var(--muted)' }}>Loading catalog…</div>;
   if (error) return <div className="ca-card" style={{ color: 'var(--accent2)' }}>Error: {error}</div>;
@@ -162,6 +176,68 @@ function TaxonomyTab() {
             })}
           </tbody>
         </table>
+      </div>
+      {editing && (
+        <EditForkModal
+          kind={editing.kind}
+          row={editing.row}
+          onClose={() => setEditing(null)}
+          onSave={saveEdit}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditForkModal({ kind, row, onClose, onSave }) {
+  const [name, setName] = useState(row.name);
+  const [code, setCode] = useState(row.code || '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSave = async () => {
+    if (!name.trim()) { setError('Name is required.'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave({ name: name.trim(), code: code.trim() || null });
+    } catch (err) {
+      setError(formatApiError(err));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 300,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="ca-card" style={{ width: 420, maxWidth: '92vw', padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Edit your {kind === 'family' ? 'family' : 'subfamily'} copy</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--muted)', lineHeight: 1 }}>×</button>
+        </div>
+
+        <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 0, marginBottom: 16 }}>
+          This only changes your team's copy — the platform original stays as-is, and your fork keeps its link back to it.
+        </p>
+
+        <label className="ca-label">Name</label>
+        <input className="ca-input" value={name} onChange={e => { setName(e.target.value); setError(null); }} style={{ marginBottom: 14 }} />
+
+        <label className="ca-label">Code</label>
+        <input className="ca-input" value={code} onChange={e => setCode(e.target.value)} placeholder="optional" style={{ marginBottom: 4 }} />
+
+        {error && (
+          <div style={{ marginTop: 14, padding: '8px 12px', borderRadius: 6, fontSize: 11, background: 'var(--accent2-dim)', color: 'var(--accent2)' }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+          <button className="ca-btn ca-btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="ca-btn ca-btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+        </div>
       </div>
     </div>
   );

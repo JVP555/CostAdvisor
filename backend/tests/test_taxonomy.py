@@ -159,6 +159,85 @@ def test_fork_into_foreign_team_forbidden(client_as, tenant_a, tenant_b, db):
         _cleanup_platform(db, [plat.id])
 
 
+# ── Edit endpoint (rename/re-code a fork) ─────────────────────────────────────
+
+def test_team_can_edit_own_family_fork(client_as, tenant_a, db):
+    plat = ChemicalFamily(name=f"PLAT-{uuid.uuid4().hex[:6]}", code="F20")
+    db.add(plat)
+    db.commit()
+    try:
+        c = client_as(tenant_a)
+        fork = c.post(f"/api/chemical-families/{plat.id}/fork",
+                      json={"team_id": str(tenant_a["team_id"])}).json()
+        r = c.put(f"/api/chemical-families/{fork['id']}", json={"name": "Renamed by team", "code": "F20-A"})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["name"] == "Renamed by team"
+        assert body["code"] == "F20-A"
+        assert body["origin_id"] == plat.id   # rename doesn't break the origin link
+
+        # The platform original is untouched.
+        bypass_rls_var.set(True)
+        origin = db.query(ChemicalFamily).filter(ChemicalFamily.id == plat.id).first()
+        assert origin.name != "Renamed by team"
+    finally:
+        bypass_rls_var.set(True)
+        db.execute(text("DELETE FROM chemical_families WHERE team_id = :t"), {"t": str(tenant_a["team_id"])})
+        db.commit()
+        _cleanup_platform(db, [plat.id])
+
+
+def test_team_cannot_edit_platform_family(client_as, tenant_a, db):
+    plat = ChemicalFamily(name=f"PLAT-{uuid.uuid4().hex[:6]}")
+    db.add(plat)
+    db.commit()
+    try:
+        c = client_as(tenant_a)
+        r = c.put(f"/api/chemical-families/{plat.id}", json={"name": "Hijacked"})
+        assert r.status_code == 403
+    finally:
+        _cleanup_platform(db, [plat.id])
+
+
+def test_team_cannot_edit_another_teams_fork(client_as, tenant_a, tenant_b, db):
+    plat = ChemicalFamily(name=f"PLAT-{uuid.uuid4().hex[:6]}")
+    db.add(plat)
+    db.flush()
+    a_fork = ChemicalFamily(name="A-fork", team_id=tenant_a["team_id"], origin_id=plat.id)
+    db.add(a_fork)
+    db.commit()
+    try:
+        c = client_as(tenant_b)
+        r = c.put(f"/api/chemical-families/{a_fork.id}", json={"name": "Hijacked"})
+        assert r.status_code == 403
+    finally:
+        bypass_rls_var.set(True)
+        db.execute(text("DELETE FROM chemical_families WHERE team_id = :t"), {"t": str(tenant_a["team_id"])})
+        db.commit()
+        _cleanup_platform(db, [plat.id])
+
+
+def test_team_can_edit_own_subfamily_fork(client_as, tenant_a, db):
+    fam = ChemicalFamily(name=f"PLAT-{uuid.uuid4().hex[:6]}")
+    db.add(fam)
+    db.flush()
+    sub = Subfamily(family_id=fam.id, name="plat-sub", code="S20")
+    db.add(sub)
+    db.commit()
+    try:
+        c = client_as(tenant_a)
+        fork = c.post(f"/api/subfamilies/{sub.id}/fork",
+                      json={"team_id": str(tenant_a["team_id"])}).json()
+        r = c.put(f"/api/subfamilies/{fork['id']}", json={"name": "Renamed sub"})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["name"] == "Renamed sub"
+        assert body["origin_id"] == sub.id
+        assert body["code"] == "S20"   # untouched field survives a partial update
+    finally:
+        _cleanup_platform(db, [fam.id])
+
+
 def test_fork_subfamily_creates_team_copy(client_as, tenant_a, db):
     fam = ChemicalFamily(name=f"PLAT-{uuid.uuid4().hex[:6]}")
     db.add(fam)

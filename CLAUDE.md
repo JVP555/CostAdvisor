@@ -596,6 +596,7 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
 - 🟢 Team management in the new IA — `Team.jsx` tabs: Teams / Requests / Activity Log / **Catalog** / Settings
 - 🟢 **Taxonomy fork management UI** — `TaxonomyTab` in `Team.jsx`: indented family→subfamily tree from `GET /api/chemical-families`+`/api/subfamilies` (team_id-scoped); "+ Fork" on platform rows (hidden once forked) → confirm → `POST …/{id}/fork`; 409/403 via `formatApiError`; server enforces `products.edit`
 - 🟢 Platform-vs-team origin lineage in UI — `OriginChip` (Platform / Team fork ← origin name); a platform row shows its team fork once created
+- 🟢 **Edit the forked copy** — Scrum 55/DB-1 modeled `origin_id` specifically so a fork could be renamed without breaking platform resolution, but no rename endpoint or UI existed until now. Added `PUT /api/chemical-families/{id}` + `PUT /api/subfamilies/{id}` (team's own fork via `products.edit`, or a platform row via super-admin; 409 on a scope-unique name/code clash) and an `EditForkModal` in `TaxonomyTab` (name + code) reachable from an "Edit" button next to a forked row's origin chip. Tests: `test_taxonomy.py` now 12 (4 new — team edits its own fork/origin_id intact, 403 on a platform row, 403 on another team's fork, partial-update leaves untouched fields). Full suite 131 passed
 - 🟢 **Backed by** the DB-1 fork endpoints/model (Scrum 55)
 - Reference: `sample_idea/scrum55/02-platform-vs-team.md`
 
