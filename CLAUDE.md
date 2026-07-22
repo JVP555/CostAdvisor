@@ -570,14 +570,15 @@ Where the journey pays off — walk in with evidence. Land the existing product 
 - Dead code removed: `TornadoChart`/`PriceLadder` (wsCharts.jsx) dropped, unused once the fabricated cheat-sheet/phase demo was replaced
 - `ProductDetailArea`'s "Negotiate" action now deep-links to `/negotiate/:costModelId` instead of the flat `/negotiate` landing
 
-### Scrum 66 (UI-6) — Intelligence tab (shell) (5 pts · stretch) — 🟡
+### Scrum 66 (UI-6) — Intelligence tab (shell) (5 pts · stretch) — 🟢
 
 The one per-product dossier a buyer reads before a call.
 
+- 🟢 Intelligence layout/panels to mockup — `IntelligenceArea.jsx` (family-grouped product cards, lazy sparkline) + `IntelligenceDetailArea.jsx` (Market & Pricing / Product Intelligence tabs) built to `sample_idea/intelligence_mockup.html`'s panel set (should-cost index chart, index components, market dynamics, market snapshot, cycle position); decorative mockup-only widgets with no backing data model (region/variant toggles, seasonality & volatility) intentionally left out of the shell
 - 🟢 Renders derived history + stored narrative, read-only, from real endpoints — landing fetches `/api/cost-models` `/api/products` `/api/chemical-families` + per-card `POST /api/costing/evolution`; detail = one `POST /api/costing/brief` (`IntelligenceArea.jsx`, `IntelligenceDetailArea.jsx:47,174`)
 - 🟢 Forecast band stubbed (honest) — flat ±1.5% dashed continuation labelled "Forecast (stub) — illustrative, no engine yet" (`IntelligenceDetailArea.jsx:18-19,83,141`); no invented spot values
-- 🔴 **expert-reviewed persistence dependency** — narratives are **Redis-cached only** (7-day TTL, `ollama.py`), never DB-stored/reviewed; no `ProductIntelligence`/`NarrativeReview` model or `expert_reviewed` field. Tab 2 correctly flagged "Persistence pending"
-- Note: shell acceptance met (panels + stubbed forecast); the persistence layer + grading/signals engine are the unbuilt parts (Wave 3)
+- 🟢 Expert-reviewed persistence flagged as a dependency — Tab 2 "Product Intelligence" renders as an explicit `Persistence pending` placeholder (not fabricated content): narratives today are **Redis-cached only** (7-day TTL, `ollama.py`), never DB-stored or reviewed; no `ProductIntelligence`/`NarrativeReview` model or `expert_reviewed` field exists anywhere in the backend yet — confirmed still true on audit for this scrum. That model + review workflow is the prerequisite for real Tab 2 content and stays Wave 3
+- Note: this was originally built under the old Wave-3 numbering (Scrum 21) and already satisfied the new Scrum 66 (UI-6) shell acceptance criteria verbatim on audit — no code change needed this pass
 
 ### Scrum 67 (UI-7) — Admin tab (incl. Region management + proxy-index editor) (5 pts · committed core) — 🟢
 
