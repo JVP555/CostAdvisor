@@ -187,9 +187,24 @@ def test_load_completeness_and_idempotency(db):
 def test_conf_low_flagged_and_correction_log_attached(db):
     sc.run(db, dry_run=False, verbose=False)
     db.commit()
+    # Every CONF-LOW combo loads flagged for review — unless a human has since
+    # signed it off in-app (the seeder preserves those sign-offs, so a real
+    # review legitimately drops the flagged count below 99). The stable
+    # invariant: all 99 CONF-LOW are either still flagged or already reviewed,
+    # and nothing outside CONF-LOW is ever flagged.
+    conf_low = db.execute(text(
+        "SELECT count(*) FROM formula_region_coverage WHERE data_confidence = 'CONF-LOW'")).scalar()
     flagged = db.execute(text(
         "SELECT count(*) FROM formula_region_coverage WHERE needs_review")).scalar()
-    assert flagged == 99
+    reviewed_low = db.execute(text(
+        "SELECT count(*) FROM formula_region_coverage "
+        "WHERE data_confidence = 'CONF-LOW' AND reviewed_at IS NOT NULL")).scalar()
+    non_low_flagged = db.execute(text(
+        "SELECT count(*) FROM formula_region_coverage "
+        "WHERE needs_review AND data_confidence <> 'CONF-LOW'")).scalar()
+    assert conf_low == 99
+    assert flagged + reviewed_low == 99
+    assert non_low_flagged == 0
     # Every OLE-FAC-SAT combo carries its correction-plan entry for the reviewer.
     metas = db.execute(text("""
         SELECT fc.review_metadata FROM formula_region_coverage fc

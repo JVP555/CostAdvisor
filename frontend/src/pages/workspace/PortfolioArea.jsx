@@ -156,12 +156,14 @@ export default function PortfolioArea() {
   const toggleGroup = (key) => setClosed(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
 
   const supplierCount = new Set(costModels.map(cm => cm.supplier_name).filter(Boolean)).size;
+  const regionCount = new Set(costModels.map(cm => cm.region).filter(Boolean)).size;
   const draftCount = rows.filter(r => r.status === 'draft').length;
+  // Mockup g4: Total products / Formulas complete / Draft formulas / Suppliers.
   const stats = [
-    { val: products.length, lbl: 'Products', sub: `Across ${new Set(rows.map(r => r.familyLabel)).size} families` },
-    { val: costModels.length, lbl: 'Cost models', sub: 'Should-cost live' },
-    { val: draftCount, lbl: 'Draft products', sub: draftCount ? 'Action needed' : 'All modelled' },
-    { val: supplierCount, lbl: 'Suppliers', sub: 'Tracked' },
+    { val: products.length, lbl: 'Total products', sub: `Across ${new Set(rows.map(r => r.familyLabel)).size} families` },
+    { val: costModels.length, lbl: 'Formulas complete', sub: 'Should-cost live' },
+    { val: draftCount, lbl: 'Draft formulas', sub: draftCount ? 'Action needed' : 'All modelled' },
+    { val: supplierCount, lbl: 'Suppliers', sub: `Across ${regionCount || 0} region${regionCount === 1 ? '' : 's'}` },
   ];
 
   const filterBtn = (active) => (active ? 'ca-btn ca-btn-primary ca-btn-sm' : 'ca-btn ca-btn-ghost ca-btn-sm');
@@ -204,7 +206,9 @@ export default function PortfolioArea() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {filtered.length > 0 && <button className="ca-btn ca-btn-ghost" onClick={exportRows}>Export CSV</button>}
-          <button className="ca-btn ca-btn-primary" onClick={() => navigate('/cost-models/new')}>+ New cost model</button>
+          <button className="ca-btn ca-btn-ghost" onClick={() => navigate('/cost-models/new')}>+ New cost model</button>
+          {/* Product-centric primary action (mockup): the product is the thing you add first. */}
+          <button className="ca-btn ca-btn-primary" onClick={() => navigate('/products')}>+ Add product</button>
         </div>
       </div>
 
@@ -287,7 +291,7 @@ export default function PortfolioArea() {
                               <span style={{ fontSize: 11, display: 'inline-block', transition: 'transform .15s', transform: open ? 'none' : 'rotate(-90deg)' }}>▾</span>
                               {group.label}
                               <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--muted)' }}>
-                                {group.rows.length} {group.rows.length === 1 ? 'row' : 'rows'} · {completeCount} live
+                                {group.rows.length} {group.rows.length === 1 ? 'product' : 'products'} · {completeCount} {completeCount === 1 ? 'formula' : 'formulas'} complete
                               </span>
                             </div>
                           </td>
