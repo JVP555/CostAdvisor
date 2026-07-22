@@ -6,11 +6,17 @@ its orphan IDX-CPO-CN were already excluded upstream — we still guard against
 the orphan reappearing) and loads:
 
 - 22 families           -> chemical_families   (platform rows; key: code, name fallback)
-- 91 subfamilies        -> subfamilies         (platform rows; key: family + name)
-- 257 formula shells    -> formula_templates   (platform rows; key: code = formula_id;
+- 143 subfamilies       -> subfamilies         (platform rows; key: family + name)
+- 367 formula shells    -> formula_templates   (platform rows; key: code = formula_id;
                                                  weighted components are SEED-2)
-- 158 index feeds       -> commodity_indexes   (region-agnostic reconciliation
+- 187 index feeds       -> commodity_indexes   (region-agnostic reconciliation
                                                  reused from seed_index_metadata)
+
+Counts reflect the 2026-07 refreshed workbook. SEED-2 (Scrum 60 combos) is NOT
+rebuilt against it — its weighted-recipe source (db_formula_combinations.html)
+still carries the older 257-formula / 676-combo drop, so 80 of those formula
+IDs no longer exist as shells here. That inconsistency is accepted until a
+matching combos drop lands (see jvpdocs / the Scrum 59/60 notes).
 
 Idempotent: every row is matched by its stable key and updated in place — run
 twice and no row counts change; update one source value and only that row
@@ -45,10 +51,14 @@ import seed_index_metadata as sim
 
 DEFAULT_DIR = Path(__file__).resolve().parents[1] / "sample_idea" / "scrum59"
 
-# Reference-drop totals (Read me tab). Drift is a warning, not an error — the
-# source keeps getting better and counts will move; structure breaking is what
-# hard-fails.
-EXPECTED = {"families": 22, "subfamilies": 91, "formulas": 257, "feeds": 158, "combos": 676}
+# Reference-drop totals. Drift is a warning, not an error — the source keeps
+# getting better and counts will move; structure breaking is what hard-fails.
+# Updated to the 2026-07 refreshed workbook (22 families / 143 subfamilies /
+# 367 formulas / 1135 region-combos / 187 feeds). NB: that workbook's own
+# "Read me" tab still shows the older 22/91/257/676/158 totals — the data sheets
+# were expanded but the summary tab wasn't regenerated, so a Read-me/data
+# mismatch is expected and surfaces only as count-drift warnings.
+EXPECTED = {"families": 22, "subfamilies": 143, "formulas": 367, "feeds": 187, "combos": 1135}
 
 # The retired index_list.html carried this orphan code that exists nowhere
 # else; if it ever shows up in a drop, someone re-exported from the dead list.
@@ -113,6 +123,15 @@ def parse_workbook(xlsx_path: Path) -> dict:
         })
 
     hdr, rows = _sheet_rows(wb, "Formulas")
+
+    def col(r, *names):
+        """First present column value among `names` (tolerates the old vs 2026-07
+        Formulas layout, which renamed Form/Coverage and dropped Data confidence)."""
+        for n in names:
+            if n in hdr:
+                return r[hdr[n]]
+        return None
+
     formulas: list[dict] = []
     for r in rows:
         fcode, _ = parse_family_cell(r[hdr["Family"]])
@@ -120,20 +139,23 @@ def parse_workbook(xlsx_path: Path) -> dict:
             "code": str(r[hdr["Formula ID"]]).strip(),
             "name": str(r[hdr["Name"]]).strip(),
             "family_code": fcode,
-            "form": r[hdr["Form (from ID)"]],
-            "coverage_tier": r[hdr["Coverage tier"]],
-            "data_confidence": r[hdr["Data confidence"]],
-            "region_count": r[hdr["# Regions"]] or 0,
+            "form": col(r, "Form(s)", "Form (from ID)"),
+            "coverage_tier": col(r, "Coverage (derived)", "Coverage tier"),
+            "data_confidence": col(r, "Data confidence"),   # dropped in 2026-07 sheet -> None
+            "region_count": col(r, "# Regions") or 0,
         })
 
-    # Feeds via the Scrum 57 reader (same workbook shape), plus the per-feed
-    # formula back-references this loader join-validates on.
+    # Feeds via the Scrum 57 reader (same workbook shape). The 2026-07 sheet
+    # dropped the per-feed "Formulas using it" list, so the feed->formula join
+    # can't be expressed from it; leave used_by empty (validate() skips the join
+    # checks when no feed carries link data — see there).
     feeds = sim._read_feeds(xlsx_path)
     hdr, rows = _sheet_rows(wb, "Indexes")
+    has_used_by = "Formulas using it" in hdr
     for feed, r in zip(feeds, rows):
-        used_by = r[hdr["Formulas using it"]]
+        used_by = r[hdr["Formulas using it"]] if has_used_by else None
         feed["used_by"] = [s.strip() for s in str(used_by).split(",") if s.strip()] if used_by else []
-        feed["used_by_count"] = r[hdr["# Formulas"]] or 0
+        feed["used_by_count"] = (r[hdr["# Formulas"]] or 0) if "# Formulas" in hdr else 0
 
     wb.close()
     return {"families": families, "subfamilies": subfamilies, "formulas": formulas, "feeds": feeds}
@@ -174,19 +196,27 @@ def validate(parsed: dict) -> tuple[list[str], list[str]]:
 
     # Join validation both ways: a feed pricing a formula we don't have is a
     # bad reference; a formula no feed prices can never be priced — shout now.
+    # Only runs when the source actually expresses the feed->formula links: the
+    # 2026-07 workbook dropped the "Formulas using it" column, so used_by is
+    # empty everywhere and there's nothing to cross-check (the link is asserted
+    # by SEED-2's combos instead). Skipping avoids a false "all formulas unpriced".
     known = set(formula_codes)
-    referenced: set[str] = set()
-    for feed in feeds:
-        unknown = [c for c in feed["used_by"] if c not in known]
-        if unknown:
-            errors.append(f"{feed['index_id']} references unknown formula(s): {', '.join(sorted(unknown))}")
-        if feed["used_by_count"] != len(feed["used_by"]):
-            warnings.append(f"{feed['index_id']}: '# Formulas' says {feed['used_by_count']} "
-                            f"but lists {len(feed['used_by'])}")
-        referenced.update(feed["used_by"])
-    unpriced = sorted(known - referenced)
-    if unpriced:
-        errors.append(f"{len(unpriced)} formula(s) not priced by any index feed: {', '.join(unpriced)}")
+    if any(feed["used_by"] for feed in feeds):
+        referenced: set[str] = set()
+        for feed in feeds:
+            unknown = [c for c in feed["used_by"] if c not in known]
+            if unknown:
+                errors.append(f"{feed['index_id']} references unknown formula(s): {', '.join(sorted(unknown))}")
+            if feed["used_by_count"] != len(feed["used_by"]):
+                warnings.append(f"{feed['index_id']}: '# Formulas' says {feed['used_by_count']} "
+                                f"but lists {len(feed['used_by'])}")
+            referenced.update(feed["used_by"])
+        unpriced = sorted(known - referenced)
+        if unpriced:
+            errors.append(f"{len(unpriced)} formula(s) not priced by any index feed: {', '.join(unpriced)}")
+    else:
+        warnings.append("Feed→formula links absent from this workbook "
+                        "(no 'Formulas using it' column) — join-validation skipped.")
 
     # Count drift vs the reference drop (informational)
     combos = sum(f["region_count"] for f in formulas)
@@ -348,18 +378,20 @@ def load_indexes(db, feeds: list[dict], dry_run: bool) -> Tally:
     tally = Tally()
     commodities = sim.build_commodities(feeds)
     for name, meta in commodities.items():
-        # Bad vocab fails loudly (same guard as seed_index_metadata).
-        assert meta["access_tier"] in sim.ACCESS_TIERS, meta["access_tier"]
-        assert meta["frequency"] in sim.FREQUENCIES, meta["frequency"]
-        assert meta["role"] in sim.ROLES, meta["role"]
+        # Bad vocab fails loudly (same guard as seed_index_metadata). None is
+        # tolerated for access_tier/role/frequency — the 2026-07 sheet dropped
+        # those columns, so they arrive empty and the existing value is kept.
+        assert meta["access_tier"] is None or meta["access_tier"] in sim.ACCESS_TIERS, meta["access_tier"]
+        assert meta["frequency"] is None or meta["frequency"] in sim.FREQUENCIES, meta["frequency"]
+        assert meta["role"] is None or meta["role"] in sim.ROLES, meta["role"]
         assert meta["retrieval_status"] in sim.RETRIEVAL_STATUSES, meta["retrieval_status"]
 
         ci = db.query(CommodityIndex).filter(func.lower(CommodityIndex.name) == name.lower()).first()
         target = {
             "category": meta["category"] or (ci.category if ci else None),
-            "access_tier": meta["access_tier"],
+            "access_tier": meta["access_tier"] or (ci.access_tier if ci else None),
             "frequency": meta["frequency"] or (ci.frequency if ci else None),
-            "role": meta["role"],
+            "role": meta["role"] or (ci.role if ci else None),
             "retrieval_status": meta["retrieval_status"],
             "free_source_name": meta["free_source_name"],
             "free_source_url": meta["free_source_url"],

@@ -237,9 +237,15 @@ def load_sources() -> tuple[list[dict], dict, dict]:
 
 def feed_code_map() -> dict[str, str]:
     """Line codes join the feeds as IDX-<code>: map code -> base commodity name
-    (the Scrum 57 region-agnostic reconciliation key)."""
-    feeds = sim._read_feeds(sim.DEFAULT_XLSX if not (SCRUM60_DIR / "seed-data-reference.xlsx").exists()
-                            else SCRUM60_DIR / "seed-data-reference.xlsx")
+    (the Scrum 57 region-agnostic reconciliation key).
+
+    Reads the ORIGINAL Scrum-57 feed roster (scrum57/seed-data-reference.xlsx),
+    NOT the refreshed 2026-07 workbook. SEED-2's combos source
+    (db_formula_combinations.html) is unchanged and still uses the old IDX-<code>
+    feed scheme; the new workbook dropped the IDX- prefix and reshaped the feeds,
+    so reading it here would resolve zero line codes. Scrum 60 stays on the old
+    roster until a matching combos drop lands (see jvpdocs)."""
+    feeds = sim._read_feeds(sim.DEFAULT_XLSX)
     out = {}
     for f in feeds:
         fid = str(f["index_id"])

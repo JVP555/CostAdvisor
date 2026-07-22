@@ -36,6 +36,54 @@ DEFAULT_XLSX = Path(__file__).resolve().parents[1] / "sample_idea" / "scrum57" /
 # regions disagree. Broadest signal first, then the major markets.
 REGION_PRIORITY = ["Global", "EU", "NA", "APAC", "CN", "IN", "LA", "MEA"]
 
+# ── New-workbook (2026-07 reference) support ──────────────────────────────────
+# The refreshed workbook (scrum59/scrum60 copies) replaced the Scrum-57 "Indexes"
+# sheet with a region-specific proxy model: codes like "LCI-NA", "ELEC-EU",
+# "BZ-CN"; region baked into the code as a trailing token; Access/Use columns
+# dropped; Direct/Proxy + Swap priority stand in for retrieval status. We detect
+# the format by header and remap onto the existing feed-dict shape so the rest of
+# the pipeline (build_commodities + the loaders) is unchanged. See jvpdocs.
+
+# Trailing code tokens that mean "region", not part of the commodity name.
+NEW_REGION_TOKENS = {
+    "NA", "EU", "CN", "APAC", "IN", "MEA", "LA", "US", "NWE", "ASIA",
+    "LME", "GLB", "GLOBAL", "WB", "SG", "MB", "ROW", "JP", "KR", "PPI",
+}
+
+# Free-text frequencies in the new sheet → the canonical FREQUENCIES vocabulary.
+# Anything compound/unknown becomes "Irregular" rather than crashing the enum
+# assert; a blank stays None (loaders preserve the existing value).
+_FREQ_MAP = {
+    "daily": "Daily", "weekly": "Weekly", "monthly": "Monthly",
+    "quarterly": "Quarterly", "annual": "Annual",
+}
+
+
+def _normalize_frequency(v):
+    if v is None:
+        return None
+    s = str(v).strip()
+    if not s or s.lower() in ("none", "unknown"):
+        return None
+    return _FREQ_MAP.get(s.lower(), "Irregular")
+
+
+def _new_base_and_region(code: str) -> tuple[str, str]:
+    """'LCI-NA' -> ('LCI', 'NA'); 'BRENT' -> ('BRENT', 'GLOBAL').
+
+    Region is the trailing token when it's a known region marker; the remaining
+    prefix is the region-agnostic commodity key (region lives on index_values,
+    not the index, exactly as in the Scrum-57 reconciliation)."""
+    parts = str(code).strip().split("-")
+    if len(parts) > 1 and parts[-1].upper() in NEW_REGION_TOKENS:
+        region = parts[-1].upper()
+        base = "-".join(parts[:-1])
+        # Emit "Global" (title case) to match REGION_PRIORITY + the old-format
+        # convention, so the broadest-signal-first representative tie-break in
+        # pick_representative() actually matches GLOBAL feeds.
+        return base, ("Global" if region in ("GLB", "GLOBAL") else region)
+    return str(code).strip(), "Global"
+
 
 def base_name(name: str) -> str:
     """Strip the ' · Region' label a feed name carries → the base commodity name."""
@@ -62,12 +110,21 @@ def pick_representative(feeds: list[dict]) -> dict:
 
 
 def _read_feeds(xlsx_path: Path) -> list[dict]:
+    """Read the Indexes sheet into normalized feed dicts, auto-detecting the
+    old Scrum-57 layout ('Index ID' …) vs the 2026-07 refreshed layout
+    ('Index (type-code)' …). Both produce the same dict shape."""
     wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
     rows = list(wb["Indexes"].iter_rows(values_only=True))
-    hdr = rows[0]
+    hdr = list(rows[0])
+    data = [r for r in rows[1:] if any(v is not None for v in r)]
+    return (_read_feeds_new(hdr, data) if "Index (type-code)" in hdr
+            else _read_feeds_old(hdr, data))
+
+
+def _read_feeds_old(hdr: list, data: list) -> list[dict]:
     idx = {name: i for i, name in enumerate(hdr)}
     feeds = []
-    for r in rows[1:]:
+    for r in data:
         def g(col):
             v = r[idx[col]]
             return None if v is None else (v.strip() if isinstance(v, str) else v)
@@ -84,6 +141,56 @@ def _read_feeds(xlsx_path: Path) -> list[dict]:
             "free_source": g("Free source"),
             "free_source_url": g("Free source URL"),
             "proxy": g("Proxy logic"),
+        })
+    return feeds
+
+
+# The 2026-07 sheet dropped a free source/retrieval column and instead flags each
+# feed direct-vs-proxy with a swap-priority rank. Map that onto our retrieval
+# vocabulary: direct feed = the real number is free; an A-ranked proxy is a solid
+# approximation, B/C ranks are rougher. The two ore feedstocks stay hard-blocked.
+_NEW_BLOCKED_CODES = {"ILM-MB", "RUT-MB"}
+
+
+def _new_retrieval(code: str, direct_proxy, swap) -> str:
+    if str(code).strip().upper() in _NEW_BLOCKED_CODES:
+        return "blocked"
+    if str(direct_proxy).strip().lower() == "direct":
+        return "free"
+    return "good_proxy" if str(swap).strip().upper() == "A" else "weak_proxy"
+
+
+def _read_feeds_new(hdr: list, data: list) -> list[dict]:
+    idx = {name: i for i, name in enumerate(hdr) if name is not None}
+    feeds = []
+    for r in data:
+        def g(col):
+            v = r[idx[col]] if col in idx else None
+            return None if v is None else (v.strip() if isinstance(v, str) else v)
+        code = g("Index (type-code)")
+        base, region = _new_base_and_region(code)
+        retrieval = _new_retrieval(code, g("Direct/Proxy"), g("Swap priority"))
+        # `How we source it` carries the analyst prose explaining a proxy; keep it
+        # only for proxied feeds (it becomes proxy_logic.note downstream).
+        proxy_note = g("How we source it") if retrieval in ("good_proxy", "weak_proxy", "blocked") else None
+        # New `Category` is a free-text descriptor ("Benzene · … · 7 regions");
+        # take the leading token as the coarse category, matching the old enum's
+        # spirit without forcing it (category is nullable and preserved on load).
+        cat = g("Category")
+        category = str(cat).split("·")[0].strip() if cat else None
+        feeds.append({
+            "index_id": code,
+            "name": g("What it is") or base,
+            "base": base,
+            "category": category if category and category.lower() != "none" else None,
+            "region": region,
+            "access": None,          # no Access column in the new sheet
+            "frequency": _normalize_frequency(g("Frequency")),
+            "role": None,            # no Use column in the new sheet
+            "retrieval": retrieval,
+            "free_source": g("Source"),
+            "free_source_url": None,  # no URL column in the new sheet
+            "proxy": proxy_note,
         })
     return feeds
 
@@ -117,9 +224,12 @@ def load(db, xlsx_path: Path = DEFAULT_XLSX) -> dict:
     created = updated = 0
     for name, meta in commodities.items():
         # Sanity-check vocab so bad reference data fails loudly rather than silently.
-        assert meta["access_tier"] in ACCESS_TIERS, meta["access_tier"]
-        assert meta["frequency"] in FREQUENCIES, meta["frequency"]
-        assert meta["role"] in ROLES, meta["role"]
+        # None is tolerated: the refreshed workbook carries no Access/Use columns,
+        # so access_tier/role legitimately arrive empty and the existing value
+        # (if any) is preserved rather than clobbered.
+        assert meta["access_tier"] is None or meta["access_tier"] in ACCESS_TIERS, meta["access_tier"]
+        assert meta["frequency"] is None or meta["frequency"] in FREQUENCIES, meta["frequency"]
+        assert meta["role"] is None or meta["role"] in ROLES, meta["role"]
         assert meta["retrieval_status"] in RETRIEVAL_STATUSES, meta["retrieval_status"]
 
         ci = db.query(CommodityIndex).filter(func.lower(CommodityIndex.name) == name.lower()).first()
@@ -130,9 +240,9 @@ def load(db, xlsx_path: Path = DEFAULT_XLSX) -> dict:
         else:
             updated += 1
         ci.category = meta["category"] or ci.category
-        ci.access_tier = meta["access_tier"]
+        ci.access_tier = meta["access_tier"] or ci.access_tier
         ci.frequency = meta["frequency"] or ci.frequency
-        ci.role = meta["role"]
+        ci.role = meta["role"] or ci.role
         ci.retrieval_status = meta["retrieval_status"]
         ci.free_source_name = meta["free_source_name"]
         ci.free_source_url = meta["free_source_url"]

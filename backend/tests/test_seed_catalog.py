@@ -93,10 +93,12 @@ def test_real_workbook_join_validates_clean():
     parsed = sc.parse_workbook(sc.resolve_workbook())
     errors, _ = sc.validate(parsed)
     assert errors == []
+    # 2026-07 refreshed workbook. NB the Read-me tab still shows the old
+    # 22/91/257/158 totals (not regenerated) — the data sheets are authoritative.
     assert len(parsed["families"]) == 22
-    assert len(parsed["subfamilies"]) == 91
-    assert len(parsed["formulas"]) == 257
-    assert len(parsed["feeds"]) == 158
+    assert len(parsed["subfamilies"]) == 143
+    assert len(parsed["formulas"]) == 367
+    assert len(parsed["feeds"]) == 187
 
 
 # ── End-to-end idempotency against the dev DB ─────────────────────────────────
@@ -149,15 +151,18 @@ def test_formula_shells_carry_taxonomy_and_meta(db):
     db.commit()
     row = db.execute(text("""
         SELECT t.name, cf.code, t.catalog_meta->>'data_confidence',
-               t.catalog_meta->>'form', t.expression
+               t.catalog_meta->>'form', t.catalog_meta->>'coverage_tier', t.expression
         FROM formula_templates t JOIN chemical_families cf ON cf.id = t.family_id
         WHERE t.code = 'OLE-FAC-SAT' AND t.team_id IS NULL""")).fetchone()
     assert row is not None
-    name, fam_code, confidence, form, expression = row
+    name, fam_code, confidence, form, coverage, expression = row
     assert name == "Fatty acids saturated C16/C18"
     assert fam_code == "F01"
-    assert confidence == "CONF-HIGH"
-    assert form == "SAT"
+    # 2026-07 sheet dropped the Data-confidence column and reshaped Form/Coverage:
+    # form is now a physical descriptor, coverage a derived P-tier.
+    assert confidence is None
+    assert form == "Liquid/flake"
+    assert coverage == "P3 (proxy-heavy some)"
     assert expression is None  # weighted components are SEED-2, not a fake expression
 
 
