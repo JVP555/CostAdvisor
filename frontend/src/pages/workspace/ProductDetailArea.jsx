@@ -266,7 +266,7 @@ export default function ProductDetailArea() {
         <button className="ca-btn ca-btn-ghost" onClick={() => navigate(`/cost-models/${costModelId}/evolution`)}>Evolution</button>
         <button className="ca-btn ca-btn-ghost" onClick={() => navigate(`/cost-models/${costModelId}/brief`)}>Brief</button>
         <button className="ca-btn ca-btn-ghost" onClick={() => navigate(`/cost-models/${costModelId}/squeeze`)}>Squeeze</button>
-        <button className="ca-btn ca-btn-ghost" onClick={() => navigate('/negotiate')}>Negotiate</button>
+        <button className="ca-btn ca-btn-ghost" onClick={() => navigate(`/negotiate/${costModelId}`)}>Negotiate</button>
       </div>
     </div>
   );

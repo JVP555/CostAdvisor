@@ -91,29 +91,6 @@ export function MultiLineChart({
   );
 }
 
-/* ── TornadoChart — symmetric ±impact bars from a centre line ───────── */
-export function TornadoChart({ rows = [], upColor = 'var(--accent2)', downColor = 'var(--accent)' }) {
-  const maxAbs = Math.max(...rows.map(r => Math.abs(r.value)), 1);
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {rows.map((r, i) => {
-        const w = (Math.abs(r.value) / maxAbs) * 46; // % of half-width
-        return (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 120, fontSize: 11, color: 'var(--text-secondary)', textAlign: 'right' }}>{r.label}</div>
-            <div style={{ flex: 1, position: 'relative', height: 18, background: 'var(--surface2)', borderRadius: 4 }}>
-              <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'var(--border-light)' }} />
-              <div style={{ position: 'absolute', right: '50%', top: 3, height: 12, width: `${w}%`, background: downColor, borderRadius: '3px 0 0 3px', opacity: 0.85 }} />
-              <div style={{ position: 'absolute', left: '50%', top: 3, height: 12, width: `${w}%`, background: upColor, borderRadius: '0 3px 3px 0', opacity: 0.85 }} />
-            </div>
-            <div style={{ width: 70, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>±{Math.abs(r.value)}{r.suffix || ''}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /* ── DriftBar — small horizontal magnitude bar ──────────────────────── */
 export function DriftBar({ value = 0, max = 100, color = 'var(--accent2)', width = 90 }) {
   const pct = Math.max(0, Math.min(100, (Math.abs(value) / (max || 1)) * 100));
@@ -130,30 +107,6 @@ export function StackedBar({ segments = [], height = 14 }) {
     <div style={{ display: 'flex', height, borderRadius: 4, overflow: 'hidden', background: 'var(--surface2)' }}>
       {segments.map((s, i) => (
         <div key={i} title={s.label} style={{ width: `${s.pct}%`, background: s.color || 'var(--accent)', height: '100%' }} />
-      ))}
-    </div>
-  );
-}
-
-/* ── PriceLadder — open / target / walk-away rungs ──────────────────── */
-export function PriceLadder({ rungs = [] }) {
-  const tone = { open: 'var(--accent)', target: 'var(--text-secondary)', walk: 'var(--accent2)' };
-  const bg = { open: 'var(--success-bg)', target: 'var(--neutral-bg)', walk: 'var(--danger-bg)' };
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {rungs.map((r, i) => (
-        <div key={i} style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '10px 14px', borderRadius: 'var(--radius)',
-          background: bg[r.tone] || 'var(--neutral-bg)',
-          borderLeft: `3px solid ${tone[r.tone] || 'var(--border)'}`,
-        }}>
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-            {r.sub && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{r.sub}</div>}
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: tone[r.tone] || 'var(--text)' }}>{r.value}</div>
-        </div>
       ))}
     </div>
   );

@@ -559,13 +559,16 @@ Buy-now-or-wait turns on where price is heading. Stand the home up now; the proj
 - 🟢 React key-prop warning fixed (flat table keyed by `cost_model_id`); loading/empty/error states
 - Note: the real forward-projection engine is Wave 3 (out of scope for "shell only")
 
-### Scrum 65 (UI-5) — Negotiate tab (5 pts · committed core) — 🔴
+### Scrum 65 (UI-5) — Negotiate tab (5 pts · committed core) — 🟢
 
 Where the journey pays off — walk in with evidence. Land the existing product → gap → exportable-brief flow in the new IA (cheat-sheet / tornado / PDF extraction are Wave 3).
 
-- 🔴 Wired to existing brief/export — **NOT**: `NegotiateArea.jsx` is a hardcoded mockup (fixed context, all 8 phases are module constants `:8-78`); the three export buttons `:141-143` have **no onClick** — pure stubs; no `api` import. (A real brief endpoint exists at `costing.py:82` but this tab never calls it)
-- 🔴 Empty / loading states — none (no fetch)
-- **Remaining:** wire the real Brief/PDF-export flow (Scrum 15) into the new IA
+- 🟢 Negotiate layout to new IA — `NegotiateArea.jsx` rebuilt from the hardcoded 8-phase mockup (fixed Sasol/LABS demo context, no `api` import) into a real landing: every product ranked by exposure (reusing the `GET /api/portfolio/summary` join pattern from Monitor/Portfolio), draft products surfaced with "Complete formula". Row → `/negotiate/:costModelId`
+- 🟢 Wire to existing brief/export — new `NegotiateDetailArea.jsx` calls the same `POST /api/costing/brief` Brief.jsx/Intelligence already use; verdict, total impact, `EvoChart` should-cost-vs-actual, decomposition waterfall, drivers table and narrative are the same computation, styled in the new IA. Export PDF reuses Brief.jsx's exact `window.print()` + title-swap mechanism and the shared print CSS (`.ca-print-page`/`.ca-no-print`/`.ca-print-only`) — no new export path
+- 🟢 Empty / loading states — landing: loading/error/no-products states, per-row "Complete formula" CTA for products without a cost model; detail: loading/error, and a dedicated empty state when `evolution` comes back empty (no formula yet) linking to the cost model builder
+- 🟢 No new backend engine — only pre-existing endpoints (`/api/portfolio/summary`, `/api/cost-models`, `/api/products`, `/api/costing/brief`) are called
+- Dead code removed: `TornadoChart`/`PriceLadder` (wsCharts.jsx) dropped, unused once the fabricated cheat-sheet/phase demo was replaced
+- `ProductDetailArea`'s "Negotiate" action now deep-links to `/negotiate/:costModelId` instead of the flat `/negotiate` landing
 
 ### Scrum 66 (UI-6) — Intelligence tab (shell) (5 pts · stretch) — 🟡
 
