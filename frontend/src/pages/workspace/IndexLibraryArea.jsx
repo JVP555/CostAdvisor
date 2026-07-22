@@ -31,9 +31,12 @@ export default function IndexLibraryArea() {
   const [regionsOpt, setRegionsOpt] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [costModels, setCostModels] = useState([]); // team's cost models, for auto-follow
+
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [regionFilter, setRegionFilter] = useState('all');
+  const [followedOnly, setFollowedOnly] = useState(false);
   const [popupRow, setPopupRow] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [collapsed, toggleCollapsed] = useOpenSet([]); // keys present = collapsed group
@@ -52,12 +55,14 @@ export default function IndexLibraryArea() {
       const now = new Date();
       const toY = now.getFullYear(), toQ = Math.ceil((now.getMonth() + 1) / 3);
       const params = { team_id: activeTeamId, from_year: toY - 2, from_quarter: toQ, to_year: toY, to_quarter: toQ };
-      const [valRes, comRes, srcRes] = await Promise.all([
+      const [valRes, comRes, srcRes, cmRes] = await Promise.all([
         api.get('/api/indexes/values', { params }),
         api.get('/api/indexes'),
         api.get('/api/indexes/sources', { params: { team_id: activeTeamId } }),
+        api.get('/api/cost-models', { params: { team_id: activeTeamId } }),
       ]);
       setData(valRes.data); setCommodities(comRes.data); setSources(srcRes.data);
+      setCostModels(cmRes.data || []);
       try {
         const f = await api.get('/api/indexes/filter-options', { params: { team_id: activeTeamId } });
         setRegionsOpt(f.data.regions || []);
@@ -92,6 +97,22 @@ export default function IndexLibraryArea() {
     commodities.forEach(c => m.set(c.id, c));
     return m;
   }, [commodities]);
+
+  // Auto-follow: commodities actually referenced by one of the team's current
+  // formulas (simple-mode components, or advanced-mode index variables) —
+  // the real signal behind "In use", not a stand-in for it.
+  const usedCommodityIds = useMemo(() => {
+    const s = new Set();
+    costModels.forEach(cm => {
+      const fv = cm.formula_versions?.[0];
+      if (!fv) return;
+      (fv.components || []).forEach(c => { if (c.commodity_id != null) s.add(c.commodity_id); });
+      Object.values(fv.variables || {}).forEach(v => {
+        if (v?.type === 'index' && v.commodity_id != null) s.add(v.commodity_id);
+      });
+    });
+    return s;
+  }, [costModels]);
 
   const periods = useMemo(() => {
     const set = new Set();
@@ -202,8 +223,14 @@ export default function IndexLibraryArea() {
   }, [rows]);
   const regionList = useMemo(() => regionsOpt.length ? regionsOpt : [...new Set(rows.map(r => r.reg))].sort(), [regionsOpt, rows]);
 
+  // "Followed" = actually in use by a formula, OR the team has real data or a
+  // configured source for it — i.e. anything besides an untouched catalog
+  // placeholder row the team has never engaged with.
+  const isFollowed = (r) => usedCommodityIds.has(r.commodity_id) || r.latest != null || !!findSource(r.commodity_id, r.reg);
+
   const matches = (r) =>
     (regionFilter === 'all' || r.reg === regionFilter) &&
+    (!followedOnly || isFollowed(r)) &&
     (!search || `${r.mat} ${r.meta.provider || ''}`.toLowerCase().includes(search.toLowerCase()));
 
   // Export the currently-visible rows (respects type/region/search filters), in display order.
@@ -214,7 +241,7 @@ export default function IndexLibraryArea() {
       if (typeFilter !== 'all' && typeFilter !== cat.key) return;
       rows.filter(r => (r.meta.category || 'Other') === cat.key && matches(r)).forEach(r => {
         out.push([
-          findSource(r.commodity_id, r.reg) ? 'Yes' : 'No',
+          usedCommodityIds.has(r.commodity_id) ? 'Yes' : 'No',
           r.mat,
           r.meta.category || '',
           r.meta.provider || '',
@@ -264,6 +291,10 @@ export default function IndexLibraryArea() {
         {regionList.map(rg => (
           <button key={rg} className={`ca-btn ca-btn-sm ${regionFilter === rg ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setRegionFilter(rg)}>{rg}</button>
         ))}
+        <span style={{ width: 1, height: 20, background: 'var(--border)' }} />
+        <button className={`ca-btn ca-btn-sm ${followedOnly ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setFollowedOnly(f => !f)} title="Only indexes used by a portfolio formula, with real data, or with a configured source">
+          Followed only
+        </button>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleExport} disabled={!rows.length}>Export CSV</button>
           <button className="ca-btn ca-btn-sm ca-btn-primary" onClick={() => setShowAddModal(true)}>+ Add Index</button>
@@ -300,8 +331,9 @@ export default function IndexLibraryArea() {
                       </td></tr>
                       {open && catRows.map(r => {
                         const up = r.delta != null && r.delta >= 0;
-                        // In use — MOCK placeholder for now (TODO: wire to /api/indexes/{id}/impact)
-                        const inUse = findSource(r.commodity_id, r.reg) ? 'Yes' : '—';
+                        // In use — real signal: referenced by a component/variable on one
+                        // of the team's current formulas (see usedCommodityIds above).
+                        const inUse = usedCommodityIds.has(r.commodity_id) ? 'Yes' : '—';
                         return (
                           <tr key={`${r.mat}-${r.reg}`} style={{ cursor: 'pointer' }} onClick={() => setPopupRow(r)}>
                             <td><span className="ca-badge" style={{ background: inUse === 'Yes' ? 'var(--success-bg)' : 'var(--neutral-bg)', color: inUse === 'Yes' ? 'var(--accent)' : 'var(--muted)' }}>{inUse}</span></td>

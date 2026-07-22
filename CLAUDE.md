@@ -518,19 +518,19 @@ The four blockers between the seeded catalog and a money-denominated, trustworth
 
 ---
 
-### Scrum 61 (UI-1) — Journey nav shell + Indexes tab (8 pts · committed core) — 🟡
+### Scrum 61 (UI-1) — Journey nav shell + Indexes tab (8 pts · committed core) — 🟢
 
 First time the app is laid out the way a buyer actually works: raw public price feeds → supplier negotiation. Indexes goes first because public feeds are the ground truth under every should-cost. A buyer only cares about the handful their products depend on (not all 158), so the tab auto-follows just those, with multi-year history.
 
-- 🔴 8-tab journey nav shell in journey order (Indexes → Portfolio → Monitor → Forecast → Negotiate + Intelligence + Admin/Team) — **NOT built**: current nav is the old flat nav (Dashboard/Formulas/Products/Suppliers) + the journey areas appended (11–12 tabs, old items first), not a consolidated journey shell (`Navbar.jsx:28-41`, `App.jsx:55-72`)
+- 🟢 8-tab journey nav shell in journey order — `Navbar.jsx` primary tab row consolidated to exactly Indexes (`/index-library`) → Portfolio → Monitor → Forecast → Negotiate → Intelligence → Team → Admin (super-admin only), replacing the old flat Dashboard/Formulas/Products/Suppliers-first nav. Deep links unchanged (same routes, `App.jsx` untouched) so nothing 404s. Dashboard/Products/Suppliers/Formulas dropped from the persistent tab row but kept one click away in the account (avatar) menu under a "More" section — Portfolio's "+ Add product" and other existing contextual links into them still work, so nothing becomes a dead end
 - 🟢 Indexes tab list + detail (single index+FX home) — `IndexLibraryArea.jsx` lists every tracked index + all FX pairs; row → detail popup
 - 🟢 Manual add + manual create (manual values) — `AddIndexModal` creates a custom commodity + manual/fixed source; per-period values via cell-click override (`EditCellModal`)
-- 🔴 Auto-follow indexes used by a portfolio formula — mock only: the "In use" column is a MOCK placeholder (`IndexLibraryArea.jsx:303-304`); no follow-by-formula logic exists
+- 🟢 Auto-follow indexes used by a portfolio formula — the "In use" column (list + CSV export) is now real: `IndexLibraryArea.jsx` fetches `GET /api/cost-models` and derives `usedCommodityIds` from each cost model's current formula (`formula_versions[0]`) — simple-mode `components[].commodity_id` and advanced-mode index `variables`. A new "Followed only" filter toggle (default off, so Scrum 17's "every tracked index visible" behaviour is unchanged) narrows the list to auto-followed + has-data + has-a-source rows, satisfying "lists followed indexes" without hiding the full catalog by default
 - 🟢 Selectable history window — detail popup exposes 1Y/2Y/3Y/5Y/All (`IndexPopupModal.jsx:121-123`); list itself fetches a fixed 2-yr span
-- 🟢 Wired to existing index endpoints only
-- **Remaining for 🟢:** the consolidated 8-tab journey shell + real auto-follow-by-formula (Indexes tab itself is done in the old IA)
+- 🟢 Wired to existing index endpoints only — no new backend engine; auto-follow reuses the existing `/api/cost-models` list response, no new endpoint
+- Verified: `npm run build` clean; backend untouched so the full 131-test suite is unaffected. Not visually verified in a browser this pass (no browser tool available this session) — code-reviewed against the exact schema shapes (`FormulaVersionOut.components`/`.variables`) other pages already rely on
 
-### Scrum 62 (UI-2) — Portfolio tab (8 pts · committed core) — 🟢 (pending journey-shell fit)
+### Scrum 62 (UI-2) — Portfolio tab (8 pts · committed core) — 🟢
 
 The category manager thinks in **products they must buy well**. Portfolio is their home base: every product they own, each with its own live should-cost.
 
@@ -538,16 +538,16 @@ The category manager thinks in **products they must buy well**. Portfolio is the
 - 🟢 Product detail (formula / starting point / live should-cost) — `ProductDetailArea.jsx:148-262` at `/portfolio/:costModelId`
 - 🟢 First-class starting-point editor — inline base-price/base-quarter editor → `renegotiate` (`ProductDetailArea.jsx:174-213, 66-99`)
 - 🟢 Live should-cost — both list + detail `POST /api/costing/should-cost` with a "live" badge (draft product rows show "—")
-- Note: built in the **old IA**; acceptance criteria met — only pending is re-fit into the new journey shell (Scrum 61) + any new mockup
+- Note: built in the **old IA**; now sits behind the Scrum 61 journey-shell tab it was always meant for
 
-### Scrum 63 (UI-3) — Monitor tab (5 pts · committed core) — 🟢 (pending journey-shell fit)
+### Scrum 63 (UI-3) — Monitor tab (5 pts · committed core) — 🟢
 
 Where am I overpaying right now, across everything I buy, before I negotiate.
 
 - 🟢 Wired to real gap / should-cost-vs-actual outputs — `MonitorArea.jsx:47` `GET /api/portfolio/summary` (same source as Dashboard); renders current_should_cost / latest_actual / gap_pct / exposure
 - 🟢 Empty / loading / error states — all present (`MonitorArea.jsx:117-149`)
 - 🟢 No new backend engine
-- Note: REAL, not demo; only pending is re-fit into the new journey shell. Trigger-radar / priority-matrix / alerts remain Wave 3
+- Note: REAL, not demo; now sits behind the Scrum 61 journey-shell tab. Trigger-radar / priority-matrix / alerts remain Wave 3
 
 ### Scrum 64 (UI-4) — Forecast tab (shell only) (5 pts · stretch) — 🟢
 
