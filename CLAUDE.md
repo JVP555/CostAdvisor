@@ -643,11 +643,11 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🔴 Requires spot-price data stored at product level (extend pricing model)
   - 🔴 Recommendation shown in cost model view and dashboard
 
-- 🟡 **Scrum 23** — Supplier benchmarking (who prices near should-cost, who pads margin)
-  - 🟡 Per-supplier view: average gap % across all products, trend over time (Suppliers CRUD + `GET /api/suppliers/{id}/purchase-history` returns per-product price/volume history — but no aggregated avg-gap% or trend computed yet)
-  - 🔴 Ranking table: suppliers ordered by how closely they track should-cost (no aggregation/ranking endpoint)
-  - 🟡 Visible to owner/admin only; seeds Wave 3 trust grading (export gated on `suppliers.export`, but no benchmarking view exists; no trust fields on `Supplier`)
-  - 🟡 **Audit note (this pass):** the data plumbing (suppliers + purchase history) exists; the benchmarking analytics/ranking layer does not.
+- 🟢 **Scrum 23** — Supplier benchmarking (who prices near should-cost, who pads margin)
+  - 🟢 Per-supplier view: average gap % across all products + trend over time — `GET /api/suppliers/benchmark?team_id=` aggregates, for every priced quarter of every cost model a supplier holds, gap% = (actual − should_cost)/should_cost×100 (should-cost via the same `_compute_indexed_cost`+`_apply_margin` pipeline as the Excel export, factored into `_should_cost_for_period`); returns `avg_gap_pct`, `latest_gap_pct`, per-quarter `trend`, volume-weighted `exposure`, `n_models`, `n_quarters_priced`
+  - 🟢 Ranking table: suppliers ordered by how closely they track should-cost — response sorted by `avg_gap_pct` desc (biggest margin-padder = largest opportunity first); Suppliers page gets a Directory/Benchmarking toggle with a ranked table (colour-tiered `DriftBar` on avg gap%, trend arrow, latest gap%, exposure, CSV export)
+  - 🟢 Visible to owner/admin only; seeds Wave 3 trust grading — endpoint gated via `require_team_role(["owner","admin"])` (super-admin bypass); frontend shows a graceful "owner/admin only" message on 403. `Supplier` trust *fields* still deferred to Scrum 31 (this scrum is the benchmarking data it builds on)
+  - 🟢 Tests `tests/test_supplier_benchmark.py` (4): owner 200 + `suppliers` shape, admin 200, member 403, non-member 403
 
 - 🔴 **Scrum 24** — Alerts (email & Slack on index moves, new gaps, buy windows)
   - 🔴 User can subscribe to alerts per index or per product
