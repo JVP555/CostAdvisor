@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import exportCsv from '../utils/exportCsv';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
 import { DriftBar } from './workspace/wsCharts';
+import PriorityMatrix from '../components/PriorityMatrix';
 
 // Severity colour tier mirrors the Monitor triage screen: price drift = alert,
 // index moved = watch, otherwise on-track.
@@ -19,6 +20,9 @@ export default function Dashboard() {
   const [sortKey, setSortKey] = useState('exposure');
   const [sortDir, setSortDir] = useState('desc');
   const [view, setView] = useState('table');
+  const [matrix, setMatrix] = useState(null);
+  const [matrixLoading, setMatrixLoading] = useState(false);
+  const [matrixErr, setMatrixErr] = useState(null);
 
   const fetchPortfolio = () => {
     if (!activeTeamId) return;
@@ -30,6 +34,18 @@ export default function Dashboard() {
   };
 
   useEffect(fetchPortfolio, [activeTeamId]);
+
+  // Priority matrix (Scrum 20) — lazy-fetched on first open of the Matrix view.
+  useEffect(() => {
+    if (view !== 'matrix' || !activeTeamId || matrix !== null || matrixLoading) return;
+    setMatrixLoading(true);
+    setMatrixErr(null);
+    api.get('/api/portfolio/priority-matrix', { params: { team_id: activeTeamId } })
+      .then(res => setMatrix(res.data))
+      .catch(err => setMatrixErr(formatApiError(err)))
+      .finally(() => setMatrixLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, activeTeamId]);
 
   const confirm = useConfirm();
   const showAlert = useAlert();
@@ -93,6 +109,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button className={`ca-btn ${view === 'table' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setView('table')}>Table</button>
           <button className={`ca-btn ${view === 'cards' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setView('cards')}>Cards</button>
+          <button className={`ca-btn ${view === 'matrix' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setView('matrix')}>Matrix</button>
           <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => portfolio && exportCsv(
             'portfolio.csv',
             ['Supplier', 'Product Family', 'Product Reference', 'Region', 'Currency', 'Should-Cost', 'Actual', 'Gap %', 'Exposure', 'Index Flag', 'Drift Flag'],
@@ -103,7 +120,9 @@ export default function Dashboard() {
       </div>
       <p className="ca-subtitle">Q{Math.ceil((new Date().getMonth() + 1) / 3)} {new Date().getFullYear()} &mdash; All cost models for your team, ranked by exposure.</p>
 
-      {loading ? (
+      {view === 'matrix' ? (
+        <PriorityMatrix data={matrix} loading={matrixLoading} error={matrixErr} />
+      ) : loading ? (
         <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
       ) : !portfolio || portfolio.models.length === 0 ? (
         <div className="ca-card" style={{ textAlign: 'center', padding: 48 }}>

@@ -1,3 +1,4 @@
+import statistics
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -9,7 +10,8 @@ from app.models.cost_model import CostModel
 from app.models.price_data import ActualPrice
 from app.models.actual_volume import ActualVolume
 from app.routers.auth import get_current_user
-from app.services.costing_engine import calculate_should_cost
+from app.schemas.costing import EvolutionRequest
+from app.services.costing_engine import calculate_should_cost, calculate_evolution
 from app.services.fx_converter import convert_price
 from app.services.permissions import require_permission
 
@@ -164,4 +166,123 @@ def portfolio_summary(
             largest_single_exposure=round(largest_exposure, 2),
             largest_exposure_model_id=largest_exposure_id,
         ),
+    )
+
+
+# ── Scrum 20: Procurement Priority Matrix (volatility × spend exposure) ───────
+
+class PriorityMatrixItem(BaseModel):
+    cost_model_id: uuid.UUID
+    product_name: str
+    supplier_name: str | None
+    region: str
+    currency: str
+    current_should_cost: float
+    volatility_pct: float       # stdev of QoQ % change in should-cost over trailing quarters
+    spend_exposure: float       # should-cost × trailing-4Q volume, in reporting currency
+    has_volume: bool
+    quadrant: str               # act_now | hedge | monitor | low_priority
+
+
+class PriorityMatrixResponse(BaseModel):
+    items: list[PriorityMatrixItem]
+    reporting_currency: str
+    volatility_threshold: float
+    exposure_threshold: float
+
+
+def _quadrant(vol: float, exp: float, vol_thr: float, exp_thr: float) -> str:
+    hi_vol, hi_exp = vol >= vol_thr, exp >= exp_thr
+    if hi_vol and hi_exp:
+        return "act_now"       # volatile AND big spend — negotiate/hedge now
+    if not hi_vol and hi_exp:
+        return "hedge"         # stable but big spend — lock in a contract
+    if hi_vol and not hi_exp:
+        return "monitor"       # volatile but small spend — keep watching
+    return "low_priority"      # stable + small spend
+
+
+@router.get("/priority-matrix", response_model=PriorityMatrixResponse)
+def priority_matrix(
+    team_id: uuid.UUID,
+    reporting_currency: str = "USD",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Score every product on index volatility (x) vs spend exposure (y) so a
+    buyer can triage the portfolio into act-now / hedge / monitor / low-priority.
+
+    Volatility = stdev of quarter-on-quarter % change in the should-cost over the
+    trailing quarters (should-cost tracks the indices, so this is index-driven
+    volatility). Spend exposure = current should-cost × trailing-4-quarter volume,
+    converted to the reporting currency for cross-product comparability."""
+    require_permission(db, current_user, team_id, "costing.view")
+
+    cost_models = db.query(CostModel).filter(CostModel.team_id == team_id).all()
+    rows = []
+    for cm in cost_models:
+        fv = cm.current_formula
+        if not fv:
+            continue
+        current_sc = calculate_should_cost(db, cm).should_cost
+
+        # Should-cost series over the default trailing range → QoQ volatility.
+        evo = calculate_evolution(db, cm, EvolutionRequest(cost_model_id=cm.id))
+        series = [p.theoretical for p in evo.periods if p.theoretical]
+        changes = [
+            (series[i] / series[i - 1] - 1) * 100
+            for i in range(1, len(series)) if series[i - 1]
+        ]
+        # trailing 4 QoQ changes; pstdev of <2 points is 0 (flat / insufficient history)
+        recent = changes[-4:]
+        volatility = statistics.pstdev(recent) if len(recent) >= 2 else 0.0
+
+        # Spend exposure = should-cost × trailing-4Q volume, in reporting currency.
+        vols = (
+            db.query(ActualVolume)
+            .filter(ActualVolume.cost_model_id == cm.id)
+            .order_by(ActualVolume.year.desc(), ActualVolume.quarter.desc())
+            .limit(4)
+            .all()
+        )
+        trailing_vol = sum(float(v.volume) for v in vols)
+        has_volume = trailing_vol > 0
+        sc_reporting = current_sc
+        if cm.currency != reporting_currency:
+            try:
+                from app.services.costing_engine import _default_period_range
+                _, _, to_y, to_q = _default_period_range(db, cm)
+                sc_reporting = convert_price(db, current_sc, cm.currency, reporting_currency, to_y, to_q, team_id=team_id)
+            except Exception:
+                sc_reporting = current_sc
+        spend_exposure = sc_reporting * trailing_vol
+
+        rows.append({
+            "cost_model_id": cm.id,
+            "product_name": cm.product.name,
+            "supplier_name": cm.supplier.name if cm.supplier else None,
+            "region": cm.region,
+            "currency": cm.currency,
+            "current_should_cost": round(current_sc, 4),
+            "volatility_pct": round(volatility, 3),
+            "spend_exposure": round(spend_exposure, 2),
+            "has_volume": has_volume,
+        })
+
+    # Thresholds = median of each axis (across products with real spend for the
+    # exposure axis) so the 2×2 splits this portfolio, not an arbitrary constant.
+    vol_vals = [r["volatility_pct"] for r in rows]
+    exp_vals = [r["spend_exposure"] for r in rows if r["has_volume"]]
+    vol_thr = statistics.median(vol_vals) if vol_vals else 0.0
+    exp_thr = statistics.median(exp_vals) if exp_vals else 0.0
+
+    items = [
+        PriorityMatrixItem(**r, quadrant=_quadrant(r["volatility_pct"], r["spend_exposure"], vol_thr, exp_thr))
+        for r in rows
+    ]
+    return PriorityMatrixResponse(
+        items=items,
+        reporting_currency=reporting_currency,
+        volatility_threshold=round(vol_thr, 3),
+        exposure_threshold=round(exp_thr, 2),
     )
