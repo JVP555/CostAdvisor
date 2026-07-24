@@ -679,12 +679,12 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🔴 UI shows nested breakdown: top-level components expand to reveal sub-model detail
   - 🔴 Export and brief generation handle nested structure correctly
 
-- 🟡 **Scrum 28** — Complex mathematical formulas (non-linear, thresholds, conditional logic)
-  - 🔴 Formula components support: min/max bounds, step functions, yield/conversion factors (none of these exist on `FormulaComponent`)
-  - 🟢 Expression editor or structured form for defining non-linear relationships (advanced free-form expression mode shipped in Scrum 14b — UI editor + variable mapping)
-  - 🟡 Costing engine validates and evaluates complex expressions deterministically (`safe_eval_expr` evaluates arithmetic expressions safely — but only arithmetic; no thresholds/conditionals/bounds)
-  - 🔴 Pairs with Scrum 27 (Lego) — designed together
-  - 🟡 **Audit note (this pass):** 14b delivered the arithmetic-expression substrate; Scrum 28's *additional* non-linear/threshold/bounds/yield features are still unbuilt.
+- 🟢 **Scrum 28** — Complex mathematical formulas (non-linear, thresholds, conditional logic)
+  - 🟢 Formula components support: min/max bounds, step functions, yield/conversion factors — expressed through the advanced expression evaluator (not new `FormulaComponent` columns): `safe_eval_expr` now whitelists `min`/`max`/`abs`/`round`/`clamp(x,lo,hi)`/`step(x,threshold,below,above)`, so bounds/step/yield factors are written inline (e.g. `clamp(0.75*ACN+FC, 0, 900)`, `step(ACN,100,0,1)`)
+  - 🟢 Expression editor or structured form for defining non-linear relationships (advanced free-form expression mode shipped in Scrum 14b — UI editor + variable mapping; `detectVars` now excludes the reserved function names via `utils/formulaFns.js` so `min`/`max`/etc. aren't treated as variables)
+  - 🟢 Costing engine validates and evaluates complex expressions deterministically — `_eval_node` extended with whitelisted `Call` (fixed function set, no attrs/kwargs), `IfExp` ternary, `Compare` (incl. chained `a<b<c`), and `BoolOp` (`and`/`or`) + `Mod`/`Not`; conditional/threshold logic like `ACN if ACN < 100 else 100` now evaluates. Injection stays blocked (unknown calls / attribute access / builtins → `ValueError`)
+  - 🔴 Pairs with Scrum 27 (Lego) — designed together (Lego nesting is still Scrum 27)
+  - 🟢 Tests `tests/test_safe_eval.py` (8): baseline arithmetic unchanged, min/max/abs/round, clamp bounds, step, ternary/chained/boolean thresholds, mod, injection + unknown-call + undefined-var all raise
 
 - 🟡 **Scrum 29** — Negotiation aid system (guided advisor with auto-generated script and materials)
   - 🔴 "Prepare negotiation" flow: enter known supplier position, get counter-argument suggestions (no flow/endpoint; `workspace/NegotiateArea.jsx` is a hardcoded mockup, not wired to an API)
