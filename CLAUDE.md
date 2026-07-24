@@ -703,7 +703,7 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
 - 🔴 **Scrum 31** — Supplier trust & margin grading (reputation score from collected data)
   - 🔴 Score computed from: gap trend, pricing volatility, response to index moves
   - 🔴 Grade shown on supplier page and in negotiation brief
-  - 🔴 Built on Wave 2 benchmarking data (Scrum 23 prerequisite)
+  - 🔴 Built on Wave 2 benchmarking data (Scrum 23 prerequisite) — **prerequisite now met**: `GET /api/suppliers/benchmark` (avg gap% / trend / exposure per supplier) shipped in Scrum 23, so the scoring inputs (gap trend, volatility, exposure) already exist; remaining work is the score formula + `Supplier` grade fields + methodology doc + badge UI
   - 🔴 Score methodology documented and visible to user (not a black box)
 
 - 🔴 **Scrum 32** — AI cost modeler (retroactive estimation for products without decomposition)
