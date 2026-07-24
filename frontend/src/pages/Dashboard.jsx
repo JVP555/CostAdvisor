@@ -4,6 +4,12 @@ import api, { formatApiError } from '../api';
 import { useAuth } from '../AuthContext';
 import exportCsv from '../utils/exportCsv';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
+import { DriftBar } from './workspace/wsCharts';
+
+// Severity colour tier mirrors the Monitor triage screen: price drift = alert,
+// index moved = watch, otherwise on-track.
+const severityColor = (m) =>
+  m.flag_price_drift ? 'var(--accent2)' : m.flag_index_moved ? 'var(--accent3)' : 'var(--accent)';
 
 export default function Dashboard() {
   const { activeTeamId } = useAuth();
@@ -70,6 +76,10 @@ export default function Dashboard() {
     return sortDir === 'asc' ? va - vb : vb - va;
   }) : [];
 
+  // Shared scale so the severity bars are comparable across rows (min 25% so a
+  // portfolio with only small gaps doesn't render every bar near-full).
+  const maxAbsGap = Math.max(25, ...sortedModels.map(m => Math.abs(m.gap_pct || 0)));
+
   const SortHeader = ({ label, field }) => (
     <th className="center" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort(field)}>
       {label} {sortKey === field ? (sortDir === 'asc' ? '\u25B2' : '\u25BC') : ''}
@@ -119,6 +129,7 @@ export default function Dashboard() {
                       <SortHeader label="Should-Cost" field="should_cost" />
                       <th className="center">Actual</th>
                       <SortHeader label="Gap %" field="gap_pct" />
+                      <th>Severity</th>
                       <SortHeader label="Exposure" field="exposure" />
                       <th className="center">Flags</th>
                       <th className="center">Actions</th>
@@ -141,6 +152,11 @@ export default function Dashboard() {
                           </td>
                           <td className="center" style={{ color: m.gap_pct > 0 ? 'var(--accent2)' : m.gap_pct < 0 ? 'var(--accent)' : 'var(--muted)' }}>
                             {m.gap_pct !== null ? `${m.gap_pct > 0 ? '+' : ''}${m.gap_pct.toFixed(1)}%` : '\u2014'}
+                          </td>
+                          <td>
+                            {m.gap_pct !== null
+                              ? <DriftBar value={Math.abs(m.gap_pct)} max={maxAbsGap} color={severityColor(m)} />
+                              : <span style={{ color: 'var(--muted)' }}>{'\u2014'}</span>}
                           </td>
                           <td className="center" style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
                             ${exposure.toLocaleString()}
