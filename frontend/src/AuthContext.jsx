@@ -92,7 +92,9 @@ export function AuthProvider({ children }) {
     setUser(null);
     setTeams([]);
     setActiveTeamId(null);
-    window.location.href = 'http://localhost:3333';
+    // Relative path so logout lands on the login page in every environment
+    // (matches the /login and /dashboard redirects in api.js) — not a hardcoded host.
+    window.location.href = '/login';
   };
 
   return (
