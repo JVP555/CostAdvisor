@@ -6,6 +6,7 @@ import exportCsv from '../utils/exportCsv';
 import { useConfirm, useAlert } from '../components/ConfirmDialog';
 import { DriftBar } from './workspace/wsCharts';
 import PriorityMatrix from '../components/PriorityMatrix';
+import BuyWindows from '../components/BuyWindows';
 
 // Severity colour tier mirrors the Monitor triage screen: price drift = alert,
 // index moved = watch, otherwise on-track.
@@ -23,6 +24,9 @@ export default function Dashboard() {
   const [matrix, setMatrix] = useState(null);
   const [matrixLoading, setMatrixLoading] = useState(false);
   const [matrixErr, setMatrixErr] = useState(null);
+  const [buy, setBuy] = useState(null);
+  const [buyLoading, setBuyLoading] = useState(false);
+  const [buyErr, setBuyErr] = useState(null);
 
   const fetchPortfolio = () => {
     if (!activeTeamId) return;
@@ -44,6 +48,18 @@ export default function Dashboard() {
       .then(res => setMatrix(res.data))
       .catch(err => setMatrixErr(formatApiError(err)))
       .finally(() => setMatrixLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, activeTeamId]);
+
+  // Buy windows (Scrum 22) — lazy-fetched on first open of the Buy Windows view.
+  useEffect(() => {
+    if (view !== 'buy' || !activeTeamId || buy !== null || buyLoading) return;
+    setBuyLoading(true);
+    setBuyErr(null);
+    api.get('/api/portfolio/buy-windows', { params: { team_id: activeTeamId } })
+      .then(res => setBuy(res.data))
+      .catch(err => setBuyErr(formatApiError(err)))
+      .finally(() => setBuyLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, activeTeamId]);
 
@@ -110,6 +126,7 @@ export default function Dashboard() {
           <button className={`ca-btn ${view === 'table' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setView('table')}>Table</button>
           <button className={`ca-btn ${view === 'cards' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setView('cards')}>Cards</button>
           <button className={`ca-btn ${view === 'matrix' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setView('matrix')}>Matrix</button>
+          <button className={`ca-btn ${view === 'buy' ? 'ca-btn-primary' : 'ca-btn-ghost'}`} onClick={() => setView('buy')}>Buy Windows</button>
           <button className="ca-btn ca-btn-ghost ca-btn-sm" onClick={() => portfolio && exportCsv(
             'portfolio.csv',
             ['Supplier', 'Product Family', 'Product Reference', 'Region', 'Currency', 'Should-Cost', 'Actual', 'Gap %', 'Exposure', 'Index Flag', 'Drift Flag'],
@@ -122,6 +139,8 @@ export default function Dashboard() {
 
       {view === 'matrix' ? (
         <PriorityMatrix data={matrix} loading={matrixLoading} error={matrixErr} />
+      ) : view === 'buy' ? (
+        <BuyWindows data={buy} loading={buyLoading} error={buyErr} />
       ) : loading ? (
         <div style={{ padding: 20, color: 'var(--muted)' }}>Loading...</div>
       ) : !portfolio || portfolio.models.length === 0 ? (

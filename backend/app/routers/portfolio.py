@@ -286,3 +286,78 @@ def priority_matrix(
         volatility_threshold=round(vol_thr, 3),
         exposure_threshold=round(exp_thr, 2),
     )
+
+
+# ── Scrum 22: Opportunistic buy windows (should-cost vs trailing-4Q average) ──
+
+_BUY_THRESHOLD_PCT = 3.0   # deviation beyond ±3% flips the cheap/expensive signal
+
+
+class BuyWindow(BaseModel):
+    cost_model_id: uuid.UUID
+    product_name: str
+    supplier_name: str | None
+    region: str
+    currency: str
+    current_should_cost: float
+    avg_4q: float | None            # trailing 4-quarter average should-cost (baseline)
+    deviation_pct: float | None     # current vs baseline, %
+    signal: str                     # cheap | neutral | expensive | insufficient
+
+
+def _buy_signal(db: Session, cm: CostModel) -> BuyWindow | None:
+    """Cheap/expensive-now signal: current should-cost vs the average should-cost
+    of the prior 4 quarters (from the evolution series — the should-cost tracks
+    the indices, so this is a spot-vs-recent-contract read without needing spot
+    price data). None if the model has no formula."""
+    fv = cm.current_formula
+    if not fv:
+        return None
+    current = calculate_should_cost(db, cm).should_cost
+    evo = calculate_evolution(db, cm, EvolutionRequest(cost_model_id=cm.id))
+    series = [p.theoretical for p in evo.periods if p.theoretical]
+    prior = series[-5:-1]   # the up-to-4 quarters *before* the latest point
+    base = dict(
+        cost_model_id=cm.id, product_name=cm.product.name,
+        supplier_name=cm.supplier.name if cm.supplier else None,
+        region=cm.region, currency=cm.currency,
+        current_should_cost=round(current, 4),
+    )
+    if len(prior) < 2:
+        return BuyWindow(**base, avg_4q=None, deviation_pct=None, signal="insufficient")
+    avg4 = sum(prior) / len(prior)
+    dev = (current - avg4) / avg4 * 100 if avg4 else 0.0
+    signal = "cheap" if dev <= -_BUY_THRESHOLD_PCT else "expensive" if dev >= _BUY_THRESHOLD_PCT else "neutral"
+    return BuyWindow(**base, avg_4q=round(avg4, 4), deviation_pct=round(dev, 2), signal=signal)
+
+
+@router.get("/buy-windows", response_model=list[BuyWindow])
+def buy_windows(
+    team_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Per-product buy-now-or-wait signal across the portfolio (Scrum 22).
+    Sorted cheapest-relative-to-recent first (best buying opportunities up top)."""
+    require_permission(db, current_user, team_id, "costing.view")
+    cost_models = db.query(CostModel).filter(CostModel.team_id == team_id).all()
+    rows = [w for cm in cost_models if (w := _buy_signal(db, cm)) is not None]
+    rows.sort(key=lambda w: (w.deviation_pct is None, w.deviation_pct if w.deviation_pct is not None else 0))
+    return rows
+
+
+@router.get("/buy-windows/{cost_model_id}", response_model=BuyWindow)
+def buy_window_for_model(
+    cost_model_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Buy signal for a single cost model — used in the cost-model / product view."""
+    cm = db.query(CostModel).filter(CostModel.id == cost_model_id).first()
+    if not cm:
+        raise HTTPException(status_code=404, detail="Cost model not found")
+    require_permission(db, current_user, cm.team_id, "costing.view")
+    signal = _buy_signal(db, cm)
+    if signal is None:
+        raise HTTPException(status_code=400, detail="Cost model has no formula")
+    return signal

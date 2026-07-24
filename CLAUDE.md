@@ -639,10 +639,11 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🟡 **Audit note (this pass):** the Intelligence forecast band is still an illustrative stub; the forecast engine itself is net-new and unbuilt.
   - 🟢 **Scrum 64 (Forecast tab shell → new IA, honest stub)** — `ForecastArea` rebuilt to the new IA with real data, no fabricated forward numbers: a composite headline-commodity index (`GET /api/indexes/public-quarterly`, each series rebased to base 100 and averaged) charted as real history with an honest dashed ±1.5% forecast stub (no invented trajectory), stat cards (products / flagged / avg gap / exposure), a flat portfolio should-cost/actual/gap table from `GET /api/portfolio/summary`, and per-commodity QoQ index-movement cards. Forward-projection engine stays Wave 3 — see Scrum 64 (UI-4) below for full detail.
 
-- 🔴 **Scrum 22** — Opportunistic buy windows (spot vs contract signal)
-  - 🔴 Per-product signal: current should-cost vs 4-quarter average — "cheap now" or "expensive now"
-  - 🔴 Requires spot-price data stored at product level (extend pricing model)
-  - 🔴 Recommendation shown in cost model view and dashboard
+- 🟢 **Scrum 22** — Opportunistic buy windows (spot vs contract signal)
+  - 🟢 Per-product signal: current should-cost vs 4-quarter average — "cheap now" or "expensive now" — `GET /api/portfolio/buy-windows` computes, per model, current should-cost vs the mean should-cost of the prior 4 quarters (from `calculate_evolution`); `_buy_signal` → `cheap`/`neutral`/`expensive`/`insufficient` at a ±3% threshold, with `deviation_pct` and `avg_4q`
+  - 🟢 Requires spot-price data stored at product level — **not needed**: the should-cost itself (index-driven) is the spot-vs-recent-contract read, so no pricing-model change was required (the audit's cheaper path). Signal is `insufficient` when <2 prior quarters of history exist
+  - 🟢 Recommendation shown in cost model view and dashboard — Dashboard gets a "Buy Windows" view (4th toggle) with the ranked table + CSV (`components/BuyWindows.jsx`); the product/cost-model view (`ProductDetailArea`) shows a `BuySignalBadge` under the live should-cost (via `GET /api/portfolio/buy-windows/{id}`)
+  - 🟢 Tests `tests/test_buy_windows.py` (4): owner 200 + list shape, non-member 403, unauthenticated 401, unknown model 403/404
 
 - 🟢 **Scrum 23** — Supplier benchmarking (who prices near should-cost, who pads margin)
   - 🟢 Per-supplier view: average gap % across all products + trend over time — `GET /api/suppliers/benchmark?team_id=` aggregates, for every priced quarter of every cost model a supplier holds, gap% = (actual − should_cost)/should_cost×100 (should-cost via the same `_compute_indexed_cost`+`_apply_margin` pipeline as the Excel export, factored into `_should_cost_for_period`); returns `avg_gap_pct`, `latest_gap_pct`, per-quarter `trend`, volume-weighted `exposure`, `n_models`, `n_quarters_priced`
