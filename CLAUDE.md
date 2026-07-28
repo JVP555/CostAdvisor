@@ -652,12 +652,14 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🟢 Visible to owner/admin only; seeds Wave 3 trust grading — endpoint gated via `require_team_role(["owner","admin"])` (super-admin bypass); frontend shows a graceful "owner/admin only" message on 403. `Supplier` trust *fields* still deferred to Scrum 31 (this scrum is the benchmarking data it builds on)
   - 🟢 Tests `tests/test_supplier_benchmark.py` (4): owner 200 + `suppliers` shape, admin 200, member 403, non-member 403
 
-- 🔴 **Scrum 24** — Alerts (email & Slack on index moves, new gaps, buy windows)
-  - 🔴 User can subscribe to alerts per index or per product
-  - 🔴 Email alert sent when index moves > configurable threshold (e.g. ±5% in a quarter)
-  - 🔴 Email alert sent when a new gap exceeds a threshold
-  - 🔴 Slack webhook support (team-level setting)
-  - 🔴 Alert history visible in-app; alerts recorded in AuditLog
+- 🟢 **Scrum 24** — Alerts (email & Slack on index moves, new gaps, buy windows)
+  - 🟢 User can subscribe to alerts per index or per product — `AlertSubscription` model (team-scoped RLS, per-user), `trigger_type` index_move/gap/buy_window with optional `cost_model_id` (product) or `commodity_id` (index) scope, else portfolio-wide; `GET/POST/PUT/DELETE /api/alerts/subscriptions` (`routers/alerts.py`), scope validated against the team. Frontend `pages/Alerts.jsx` (nav "More" → Alerts) with add-form (trigger/scope/threshold/channel), subscription list (toggle/delete), history, Slack field, "Run now"
+  - 🟢 Email alert sent when index moves > configurable threshold — `services/alerts.py` `_index_move_trigger`: latest-two-quarter index level (avg across regions), fires when |QoQ move| ≥ `threshold_pct`; portfolio-wide expands to every commodity referenced by the team's formulas
+  - 🟢 Email alert sent when a new gap exceeds a threshold — `_gap_trigger`: current should-cost (`calculate_should_cost`) vs latest actual, fires when |gap%| ≥ threshold (direction reported); buy-window trigger reuses `_buy_signal`. `send_alert_email` via SMTP (`email.py`)
+  - 🟢 Slack webhook support (team-level setting) — `teams.slack_webhook_url`; `GET/PUT /api/alerts/slack-webhook` (PUT owner/admin, https-only, member sees `configured` bool not the URL); `_deliver` posts to the webhook for `channel='slack'` subscriptions
+  - 🟢 Alert history visible in-app; alerts recorded in AuditLog — `AlertEvent` ledger (message/detail/channel/delivered/`dedup_key`) → `GET /api/alerts/history`; `dedup_key` (trigger:target:quarter:direction) makes an identical condition fire once. `evaluate_team_alerts` runs on demand via `POST /api/alerts/evaluate` (owner/admin) and via Celery `app.tasks.alerts.evaluate_all_alerts` (wire into the beat schedule for nightly). Subscription create/delete + Slack change audit-logged
+  - 🟢 Migration `al1a2b3c4d5e` (subscriptions + events + `teams.slack_webhook_url` + RLS). Tests `tests/test_alerts.py` (6): subscription CRUD, invalid-scope 422, Slack admin-only + member-masked + non-https 422, evaluate owner-ok, non-member 403, history shape. Live-verified: seeded team fires 14 alerts (10 gap + 4 index-move), dedup → 0 on re-run
+  - 🔴 Follow-up: register `evaluate_all_alerts` in the Celery beat schedule (`celeryconfig`) for automatic nightly runs — today it runs on demand via the endpoint
 
 - 🟢 **Scrum 25** — Intra-team collaboration (notes, flags, shared negotiation position)
   - 🟢 Users can leave notes on a cost model (threaded, timestamped) — new `CostModelNote` model (`cost_model_notes`, team-scoped RLS, `parent_note_id` self-FK for one-level threading; migration `nt1a2b3c4d5e`); `GET/POST/DELETE /api/cost-models/{id}/notes` (`routers/collaboration.py`). Frontend `components/NotesPanel.jsx` (threaded list, reply, delete-own, @mention highlight) mounted in `ProductDetailArea`

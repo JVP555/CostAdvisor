@@ -256,3 +256,15 @@ def send_mention_email(to_email: str, mentioner_name: str, product_name: str,
         cta_label="Open in CostAdvisor →",
     )
     return _send(to_email, f"{who} mentioned you on {product_name}", html)
+
+
+def send_alert_email(to_email: str, message: str, link: str) -> bool:
+    """Scrum 24 — deliver a triggered alert (index move / gap / buy window) by email."""
+    html = build_welcome_html(
+        display_name=to_email.split("@")[0],
+        app_url=link,
+        heading="CostAdvisor alert",
+        body_lines=[message, "Open CostAdvisor to review and act."],
+        cta_label="Open CostAdvisor →",
+    )
+    return _send(to_email, "CostAdvisor alert", html)
