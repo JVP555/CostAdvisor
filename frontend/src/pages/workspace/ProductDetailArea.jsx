@@ -6,6 +6,15 @@ import { QUARTER_OPTS, qLabel } from '../../utils/quarters';
 import { PIE_COLORS } from '../../utils/constants';
 import { StackedBar } from './wsCharts';
 import { BuySignalBadge } from '../../components/BuyWindows';
+import NotesPanel from '../../components/NotesPanel';
+
+// Scrum 25 — negotiation flag states
+const NEG_STATES = [
+  { key: 'none', label: 'No flag', color: 'var(--muted)' },
+  { key: 'in_negotiation', label: 'In negotiation', color: 'var(--accent3)' },
+  { key: 'under_review', label: 'Under review', color: 'var(--accent4)' },
+  { key: 'agreed', label: 'Agreed', color: 'var(--accent)' },
+];
 
 /* ──────────────────────────────────────────────────────────────────────
  * Product detail — a product opens to its formula, its starting point, and
@@ -31,6 +40,7 @@ export default function ProductDetailArea() {
   const [error, setError] = useState(null);
   const [sc, setSc] = useState({ status: 'loading' });   // live should-cost
   const [buySignal, setBuySignal] = useState(null);       // buy-window signal
+  const [flagSaving, setFlagSaving] = useState(false);    // negotiation flag save
 
   // Starting-point editor
   const [editing, setEditing] = useState(false);
@@ -62,6 +72,19 @@ export default function ProductDetailArea() {
   };
 
   useEffect(() => { loadCm(); loadSc(); loadBuy(); /* eslint-disable-next-line */ }, [costModelId]);
+
+  // Scrum 25 — set the negotiation flag (needs costing.edit; backend enforces).
+  const setNegotiation = async (state) => {
+    setFlagSaving(true);
+    try {
+      await api.put(`/api/cost-models/${costModelId}/flag`, { negotiation_state: state });
+      setCm(prev => ({ ...prev, negotiation_state: state }));
+    } catch (e) {
+      showAlert({ title: 'Could not update flag', message: formatApiError(e) });
+    } finally {
+      setFlagSaving(false);
+    }
+  };
 
   const fv = cm?.formula_versions?.[0] || null;
 
@@ -152,6 +175,26 @@ export default function ProductDetailArea() {
           </p>
         </div>
         <button className="ca-btn ca-btn-primary" onClick={() => navigate(`/cost-models/${costModelId}`)}>Edit formula</button>
+      </div>
+
+      {/* Negotiation flag (Scrum 25) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Status</span>
+        {NEG_STATES.map(s => {
+          const active = (cm.negotiation_state || 'none') === s.key;
+          return (
+            <button key={s.key} disabled={flagSaving} onClick={() => setNegotiation(s.key)}
+              className="ca-btn ca-btn-sm"
+              style={{
+                borderColor: active ? s.color : 'var(--border)',
+                color: active ? s.color : 'var(--text-secondary)',
+                background: active ? 'var(--surface2)' : 'transparent',
+                fontWeight: active ? 700 : 400,
+              }}>
+              {s.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Live should-cost + starting point */}
@@ -281,6 +324,11 @@ export default function ProductDetailArea() {
         <button className="ca-btn ca-btn-ghost" onClick={() => navigate(`/cost-models/${costModelId}/brief`)}>Brief</button>
         <button className="ca-btn ca-btn-ghost" onClick={() => navigate(`/cost-models/${costModelId}/squeeze`)}>Squeeze</button>
         <button className="ca-btn ca-btn-ghost" onClick={() => navigate(`/negotiate/${costModelId}`)}>Negotiate</button>
+      </div>
+
+      {/* Team notes (Scrum 25) */}
+      <div style={{ marginTop: 16 }}>
+        <NotesPanel costModelId={costModelId} />
       </div>
     </div>
   );

@@ -659,12 +659,12 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🔴 Slack webhook support (team-level setting)
   - 🔴 Alert history visible in-app; alerts recorded in AuditLog
 
-- 🔴 **Scrum 25** — Intra-team collaboration (notes, flags, shared negotiation position)
-  - 🔴 Users can leave notes on a cost model (threaded, timestamped)
-  - 🔴 Flag a model as "in negotiation", "agreed", "under review"
-  - 🔴 Notes and flags visible to all team members; recorded in AuditLog
-  - 🔴 @mention teammate in a note triggers email notification
-  - 🔴 **Audit note (this pass):** no Note/Comment model and no flag-state field; a nullable `formula_versions.notes` column exists but is unused — not wired to any endpoint or UI.
+- 🟢 **Scrum 25** — Intra-team collaboration (notes, flags, shared negotiation position)
+  - 🟢 Users can leave notes on a cost model (threaded, timestamped) — new `CostModelNote` model (`cost_model_notes`, team-scoped RLS, `parent_note_id` self-FK for one-level threading; migration `nt1a2b3c4d5e`); `GET/POST/DELETE /api/cost-models/{id}/notes` (`routers/collaboration.py`). Frontend `components/NotesPanel.jsx` (threaded list, reply, delete-own, @mention highlight) mounted in `ProductDetailArea`
+  - 🟢 Flag a model as "in negotiation", "agreed", "under review" — `cost_models.negotiation_state` column (`none`/`in_negotiation`/`under_review`/`agreed`); `PUT /api/cost-models/{id}/flag` (gated on `costing.edit`, 422 on invalid state); exposed on `CostModelOut`; selectable status badges in `ProductDetailArea`
+  - 🟢 Notes and flags visible to all team members; recorded in AuditLog — team-scoped read (`costing.view`); note create/delete + flag change all `log_event`-audited (`cost_model_note` / `cost_model_flag`)
+  - 🟢 @mention teammate in a note triggers email notification — `@email` tokens parsed, resolved against team members, `send_mention_email` (best-effort, after commit) links to `/portfolio/{id}`
+  - 🟢 Permissions: any member (view) can post a note; only `costing.edit` can change the flag or delete another member's note (author can delete own). Tests `tests/test_collaboration.py` (5): create+thread, delete-own, flag set/invalid/read-back, member-can-note-not-flag, non-member 403/404
 
 - 🔴 **Scrum 26** — Index-provider API integration (stretch — Fastmarkets, Argus, ICIS)
   - 🔴 Team can configure an API key for a supported index provider
