@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import api from '../../api';
+import api, { formatApiError } from '../../api';
 import { useAuth } from '../../AuthContext';
+import { useToast } from '../../components/Toast';
 import IndexPopupModal from '../../components/IndexPopupModal';
 import AddIndexModal from '../../components/AddIndexModal';
 import EditCellModal from '../../components/EditCellModal';
@@ -25,6 +26,8 @@ function fmtVal(v, unit) {
 
 export default function IndexLibraryArea() {
   const { activeTeamId } = useAuth();
+  const { addToast } = useToast();
+  const [syncing, setSyncing] = useState(false);
   const [data, setData] = useState([]);
   const [commodities, setCommodities] = useState([]);
   const [sources, setSources] = useState([]);
@@ -233,6 +236,24 @@ export default function IndexLibraryArea() {
     (!followedOnly || isFollowed(r)) &&
     (!search || `${r.mat} ${r.meta.provider || ''}`.toLowerCase().includes(search.toLowerCase()));
 
+  // Sync platform FX rates — runs the ECB scrapers + Frankfurter quarterly
+  // backfill for all pairs (POST /api/fx-rates/scrape). The seed loads commodity
+  // index values but NOT FX rates, so this is what populates the FX rows.
+  // FX-manager / super-admin only (server-gated); refetches the grid on success.
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data: res } = await api.post('/api/fx-rates/scrape');
+      const n = res?.pairs?.length ?? res?.scraped ?? null;
+      addToast(`FX rates synced${n != null ? ` — ${n} pair${n === 1 ? '' : 's'}` : ''}. Refreshing…`, 'success');
+      await fetchData();
+    } catch (err) {
+      addToast(formatApiError(err) || 'Sync failed', 'error');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Export the currently-visible rows (respects type/region/search filters), in display order.
   const handleExport = () => {
     const headers = ['In use', 'Index', 'Type', 'Provider', 'Source URL', 'Region', 'Frequency', 'Latest price', 'vs base %', ...periodsDesc.map(p => p.label)];
@@ -296,6 +317,12 @@ export default function IndexLibraryArea() {
           Followed only
         </button>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          {canManagePairs && (
+            <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleSync} disabled={syncing}
+              title="Scrape latest ECB/Frankfurter FX rates and backfill quarterly platform data">
+              {syncing ? 'Syncing…' : '⟳ Sync FX rates'}
+            </button>
+          )}
           <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleExport} disabled={!rows.length}>Export CSV</button>
           <button className="ca-btn ca-btn-sm ca-btn-primary" onClick={() => setShowAddModal(true)}>+ Add Index</button>
         </div>
@@ -304,7 +331,7 @@ export default function IndexLibraryArea() {
       {loading ? (
         <div className="ca-card" style={{ padding: 20, color: 'var(--muted)' }}>Loading…</div>
       ) : rows.length === 0 ? (
-        <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>No index data for this team yet. Add sources or scrape from the Indexes page.</div>
+        <div className="ca-card" style={{ textAlign: 'center', padding: 48, color: 'var(--text-secondary)' }}>No index data for this team yet. {canManagePairs ? 'Use "Sync FX rates" above to fetch FX data, or add a source / index.' : 'Add a source or index, or ask an FX manager to sync rates.'}</div>
       ) : (
         <div className="ca-card">
           <div className="ca-scroll-x">
