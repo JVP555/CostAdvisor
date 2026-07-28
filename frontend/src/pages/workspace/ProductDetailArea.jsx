@@ -5,6 +5,7 @@ import { useAlert } from '../../components/ConfirmDialog';
 import { QUARTER_OPTS, qLabel } from '../../utils/quarters';
 import { PIE_COLORS } from '../../utils/constants';
 import { StackedBar } from './wsCharts';
+import { BuySignalBadge } from '../../components/BuyWindows';
 
 /* ──────────────────────────────────────────────────────────────────────
  * Product detail — a product opens to its formula, its starting point, and
@@ -29,6 +30,7 @@ export default function ProductDetailArea() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sc, setSc] = useState({ status: 'loading' });   // live should-cost
+  const [buySignal, setBuySignal] = useState(null);       // buy-window signal
 
   // Starting-point editor
   const [editing, setEditing] = useState(false);
@@ -52,7 +54,14 @@ export default function ProductDetailArea() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadCm(); loadSc(); /* eslint-disable-next-line */ }, [costModelId]);
+  // Buy-window signal (Scrum 22) — best-effort; absent for models without history.
+  const loadBuy = () => {
+    api.get(`/api/portfolio/buy-windows/${costModelId}`)
+      .then(({ data }) => setBuySignal(data))
+      .catch(() => setBuySignal(null));
+  };
+
+  useEffect(() => { loadCm(); loadSc(); loadBuy(); /* eslint-disable-next-line */ }, [costModelId]);
 
   const fv = cm?.formula_versions?.[0] || null;
 
@@ -159,6 +168,11 @@ export default function ProductDetailArea() {
               {deltaPct != null && (
                 <div style={{ marginTop: 4, fontSize: 12, color: deltaPct > 0 ? 'var(--accent2)' : deltaPct < 0 ? 'var(--accent)' : 'var(--muted)' }}>
                   {deltaPct > 0 ? '+' : ''}{deltaPct.toFixed(1)}% since starting point
+                </div>
+              )}
+              {buySignal && buySignal.signal !== 'insufficient' && (
+                <div style={{ marginTop: 8 }} title="Current should-cost vs the trailing 4-quarter average">
+                  <BuySignalBadge signal={buySignal.signal} deviationPct={buySignal.deviation_pct} />
                 </div>
               )}
               <hr className="ca-sep" />
