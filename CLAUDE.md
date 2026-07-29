@@ -702,11 +702,11 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🟢 Tests `tests/test_safe_eval.py` (8): baseline arithmetic unchanged, min/max/abs/round, clamp bounds, step, ternary/chained/boolean thresholds, mod, injection + unknown-call + undefined-var all raise
 
 - 🟡 **Scrum 29** — Negotiation aid system (guided advisor with auto-generated script and materials)
-  - 🔴 "Prepare negotiation" flow: enter known supplier position, get counter-argument suggestions (no flow/endpoint; `workspace/NegotiateArea.jsx` is a hardcoded mockup, not wired to an API)
+  - 🔴 "Prepare negotiation" flow: enter known supplier position, get counter-argument suggestions (no such flow/endpoint — the guided advisor is unbuilt; note `workspace/NegotiateArea.jsx` IS now real (Scrum 65, wired to `/api/portfolio/summary` + `/api/costing/brief`), but it's the brief flow, not a position→counter→floor advisor)
   - 🟡 Auto-generates talking points from the gap, drivers, and index movement (`services/narrative.py` produces rule-based + LLM talking points for the brief — but not as a distinct counter-argument advisor)
   - 🔴 Produces a structured negotiation brief: your position, likely counter, recommended floor
   - 🔴 Output exportable as PDF alongside the standard cost brief
-  - 🟡 **Audit note (this pass):** narrative generation is the only real piece; the guided advisor (position/counter/floor + script) is unbuilt and the Negotiate workspace page is demo-only.
+  - 🟡 **Audit note (this pass):** narrative generation is the only real piece; the guided advisor (position/counter/floor + script) is unbuilt. (The Negotiate workspace page itself is now real — Scrum 65 — so it is no longer demo-only; Scrum 29 is specifically the advisor layer on top.)
 
 - 🔴 **Scrum 30** — Extract pricing from PDFs (supplier quotes and price lists)
   - 🔴 User uploads a supplier PDF; system extracts product name, price, date, currency
