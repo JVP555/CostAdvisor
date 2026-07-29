@@ -554,6 +554,23 @@ export default function IndexLibraryArea() {
     }
   };
 
+  // Sync commodity indexes — runs the registered scrapers for all scrape-enabled
+  // commodities (POST /api/indexes/scrape-all, super-admin). Complements the FX
+  // sync so an admin can pull live index data on demand, not just nightly.
+  const [syncingIdx, setSyncingIdx] = useState(false);
+  const handleSyncIndexes = async () => {
+    setSyncingIdx(true);
+    try {
+      const { data: res } = await api.post('/api/indexes/scrape-all');
+      addToast(`Indexes synced — ${res?.scrapers_run ?? 0} feeds, ${res?.values_updated ?? 0} values updated.`, 'success');
+      await fetchData();
+    } catch (err) {
+      addToast(formatApiError(err) || 'Index sync failed', 'error');
+    } finally {
+      setSyncingIdx(false);
+    }
+  };
+
   // Export exactly what's on screen, in display order — same filtered set the
   // table renders, so the CSV can never disagree with the grid.
   const handleExport = () => {
@@ -607,6 +624,12 @@ export default function IndexLibraryArea() {
             <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleSync} disabled={syncing}
               title="Scrape latest ECB/Frankfurter FX rates and backfill quarterly platform data">
               {syncing ? 'Syncing…' : '⟳ Sync FX rates'}
+            </button>
+          )}
+          {canManagePairs && (
+            <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleSyncIndexes} disabled={syncingIdx}
+              title="Scrape latest values for all scrape-enabled commodity indexes (super-admin)">
+              {syncingIdx ? 'Syncing…' : '⟳ Sync indexes'}
             </button>
           )}
           <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleExport} disabled={!visibleRows.length}>Export CSV</button>
