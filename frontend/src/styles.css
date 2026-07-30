@@ -215,7 +215,15 @@ body, #root {
   letter-spacing: 0.5px;
   text-transform: uppercase;
   display: inline-flex; align-items: center; gap: 6px;
+  /* <a class="ca-btn"> download links inherit the UA underline otherwise, so a
+     link-as-button renders underlined next to an identical <button> that doesn't. */
+  text-decoration: none;
 }
+/* There was no :disabled rule at all — a disabled button was pixel-identical to
+   an enabled one, so "Add"/"Analyze" looked broken rather than not-yet-usable. */
+.ca-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.ca-btn:disabled:hover { transform: none; opacity: 0.45; }
+.ca-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ca-btn-primary { background: var(--accent); color: var(--on-accent); }
 .ca-btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
 .ca-btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }

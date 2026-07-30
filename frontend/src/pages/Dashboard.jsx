@@ -231,7 +231,7 @@ export default function Dashboard() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                       <div>
                         <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15 }}>{m.product_name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{m.supplier_name || 'No supplier'} \u00B7 {m.region}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{[m.supplier_name || 'No supplier', m.region].filter(Boolean).join(' \u00B7 ')}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 4 }}>
                         {m.flag_index_moved && <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, background: 'var(--info-bg)', color: 'var(--accent3)' }}>IDX</span>}
