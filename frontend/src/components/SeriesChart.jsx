@@ -170,10 +170,14 @@ export default function SeriesChart({ points, comparePoints, markedLabels, color
     return Math.max(0, Math.min(N - 1, idx));
   };
   const onMove = e => setHover(idxFromEvent(e));
+  // Three-click cycle: anchor A → commit A–B → clear both. Clicking a completed
+  // span used to re-anchor A at the click instead, which read as the band
+  // "sliding" from the old end point to the new click rather than resetting.
   const onClick = e => {
     const idx = idxFromEvent(e);
-    if (selA == null || (selA != null && selB != null)) { setSelA(idx); setSelB(null); } // start new selection
-    else setSelB(idx);
+    if (selA != null && selB != null) { setSelA(null); setSelB(null); return; }
+    if (selA == null) { setSelA(idx); return; }
+    setSelB(idx);
   };
 
   const hp = hover != null ? windowed[hover] : null;
