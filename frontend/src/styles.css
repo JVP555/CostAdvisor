@@ -250,6 +250,42 @@ body, #root {
 .ca-btn-link:hover { color: var(--accent); }
 .ca-btn-link:focus-visible { outline: 2px solid var(--accent4); outline-offset: 2px; border-radius: 2px; }
 
+/* Dropdown menu — the app's first shared menu primitive. Every other dropdown
+   is still hand-rolled inline; they can adopt these classes as they're touched.
+   Hover and keyboard focus share one rule so a focused item is never invisible,
+   which is what the previous onMouseEnter/onMouseLeave style-mutation caused. */
+.ca-menu {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  min-width: 216px; z-index: 50; padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-popover);
+}
+.ca-menu-identity {
+  padding: 9px 10px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.ca-menu-label {
+  padding: 8px 10px 3px;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--muted);
+}
+.ca-menu-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; box-sizing: border-box; text-align: left;
+  background: transparent; border: none; cursor: pointer;
+  padding: 8px 10px; border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--text); text-decoration: none;
+}
+.ca-menu-item:hover { background: var(--surface2); }
+.ca-menu-item:focus-visible { background: var(--surface2); outline: 2px solid var(--accent); outline-offset: -2px; }
+.ca-menu-item[aria-current="page"] { color: var(--accent); }
+.ca-menu-sep { height: 1px; background: var(--border); margin: 5px 0; }
+
 /* Badge */
 .ca-badge {
   display: inline-block; padding: 3px 10px; border-radius: 20px;
