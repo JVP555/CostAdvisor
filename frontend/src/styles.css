@@ -309,15 +309,23 @@ body, #root {
    REQUIRES no scrolling ancestor between the table and the viewport — any
    `overflow: auto` wrapper becomes the sticky containing block and the offset is
    then measured from that box instead (see .ca-grid-scroll). */
-.ca-table-sticky th { top: var(--nav-h, 58px); z-index: 2; }
+.ca-table-sticky th { top: 0; z-index: 2; }
 
-/* Grid wrapper: visible by default so the sticky header above can reach the
-   viewport. Only narrow screens get a horizontal scroller — there, sticky is
-   measured from this box instead, which is an acceptable trade on mobile. */
-.ca-grid-scroll { max-width: 100%; }
-@media (max-width: 1100px) {
-  .ca-grid-scroll { overflow-x: auto; }
-  .ca-table-sticky th { top: 0; }
+/* Grid wrapper: the scroll container for a wide grid, in BOTH axes.
+ *
+ * This was `overflow: visible` so a sticky `thead` could reach the viewport. But
+ * with nothing clipping it, a table wider than the card simply bled out past the
+ * card's right border — which happened as soon as values grew to 5 digits and the
+ * row width crossed the ~1298px the card allows. Scrolling beats spilling.
+ *
+ * Because an `overflow` container is the sticky containing block, the header now
+ * pins to the top of THIS box rather than the viewport, so the box owns the
+ * vertical scroll too. Sized off the viewport (not the old fixed 440px porthole),
+ * it gives roughly 650px of grid with the header always visible. */
+.ca-grid-scroll {
+  max-width: 100%;
+  overflow: auto;
+  max-height: calc(100vh - var(--nav-h, 58px) - 32px);
 }
 /* Numeric columns carry short mono values and don't need the full gutter. Tighter
    padding is what keeps the windowed grid inside the page width, so it fits
@@ -430,8 +438,26 @@ input[type=range] { padding: 0; cursor: pointer; accent-color: var(--accent); }
 }
 
 /* Animations */
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.ca-fade-in { animation: fadeIn .35s ease-out; }
+/* Page-entry fade. OPACITY ONLY — deliberately no transform.
+ *
+ * This used to be `from { opacity: 0; transform: translateY(8px) }`. A transformed
+ * element becomes the containing block for its `position: fixed` descendants, and
+ * `.ca-fade-in` sits on `.ca-page` in ~30 places with every modal backdrop rendered
+ * inside it. So for the ~150ms the transform was interpolating, every fixed element
+ * on the page resolved its coordinates against the page box instead of the viewport
+ * — measured at `top: 66px` instead of `0` — and then snapped into position when the
+ * animation ended. That was the modal misalignment on page entry.
+ *
+ * There is no way to keep the 8px rise here: any transform (or `translate`,
+ * `filter`, `perspective`, `will-change`, `contain`) on this element re-creates the
+ * containing block, and animating `top`/`margin` instead would thrash layout. If the
+ * rise is ever wanted back, it has to go on an inner wrapper that contains no
+ * fixed-position descendants. */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.ca-fade-in { animation: fadeIn .28s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .ca-fade-in { animation: none; }
+}
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
 /* Modal */

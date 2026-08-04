@@ -238,8 +238,10 @@ def resolve_index_values(
         comp_q = comp_q.filter(CommodityIndex.name == commodity_name_filter)
     if commodity_ids is not None and commodity_ids:
         comp_q = comp_q.filter(CommodityIndex.id.in_(commodity_ids))
-    comp_region = region or "GLOBAL"
     for ci in comp_q.all():
+        # A composite pinned to a region reports under that region; an unpinned one
+        # follows the requested region and falls back to GLOBAL, as before.
+        comp_region = ci.composite_region or region or "GLOBAL"
         if (ci.id, comp_region) in covered_pairs:
             continue
         y, q = _fy, _fq
@@ -284,8 +286,24 @@ def compute_composite_value(
     context: dict[str, float] = {}
     for var_name, var_def in (ci.composite_variables or {}).items():
         if var_def.get("type") == "index" and var_def.get("commodity_id"):
+            # WHERE an input is read from is decided per input, NOT by the label on
+            # the composite.
+            #
+            # `composite_region` says what this composite IS (a European index); it
+            # must not dictate where its inputs come from. A European product
+            # legitimately depends on global feedstocks — Brent has no European
+            # series — and letting the label force every unpinned input to Europe
+            # silently changed which number the maths used for any commodity that
+            # happens to carry both a Europe and a GLOBAL series.
+            #
+            # So: an explicit pin wins; otherwise a pinned composite reads the
+            # neutral GLOBAL series, and only an UNPINNED composite (a polymorphic
+            # formula shape) follows the region it was asked for.
+            var_region = var_def.get("region") or (
+                "GLOBAL" if ci.composite_region else region
+            )
             val = get_single_index_value(
-                db, team_id, var_def["commodity_id"], region, year, quarter,
+                db, team_id, var_def["commodity_id"], var_region, year, quarter,
                 _resolving=_resolving,
             )
             if val is None:
