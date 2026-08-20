@@ -21,6 +21,7 @@ from app.models.formula_template import FormulaTemplate, FormulaTemplateComponen
 from app.models.demo import DemoHost, DemoBlockedSlot, DemoRequest
 from app.models.collaboration import CostModelNote
 from app.models.alerts import AlertSubscription, AlertEvent
+from app.models.refresh_token import RefreshToken
 
 __all__ = [
     "User",
