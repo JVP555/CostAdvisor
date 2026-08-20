@@ -46,7 +46,7 @@ export default function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/team" replace />} />
             <Route path="/cost-models/new" element={<CostModelBuilder />} />
             <Route path="/cost-models/:costModelId" element={<CostModelBuilder />} />
             <Route path="/cost-models/:costModelId/evolution" element={<Evolution />} />
