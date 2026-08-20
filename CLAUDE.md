@@ -214,8 +214,8 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Backup/retention policy written and tested (restore drill)
   - 🔴 Security posture document ready to share with enterprise IT
 
-- 🔴 **Scrum 11** — SOC 2 groundwork
-  - 🔴 Sentry capturing errors in production (**re-audited: inert, not 🟡** — `init_sentry()` is wired in `observability.py` + called from `main.py` with user context, but `sentry-sdk` is NOT in `requirements.txt`/`requirements-dev.txt`, so `_SDK_AVAILABLE` is False and `init_sentry()` is a no-op even with a DSN set; `sentry_dsn` also defaults empty. Nothing is captured today. Fix = add the SDK to requirements + set the Railway DSN env var)
+- 🟡 **Scrum 11** — SOC 2 groundwork (code slice done; the rest is ops/process, not attempted)
+  - 🟢 Sentry capturing errors in production — `sentry-sdk==2.19.0` added to `requirements.txt`; `main.py` now conditionally applies `SentryAsgiMiddleware` (`if _SDK_AVAILABLE and settings.sentry_dsn`) — previously imported in `observability.py` but never actually attached to the FastAPI app at all, so even a configured DSN wouldn't have captured anything. Verified both branches locally: with the SDK installed and no DSN, middleware stays absent (inert, as before); with a DSN set, `app.user_middleware` includes it. **Still needs the user's action**: set `SENTRY_DSN` in Railway's env vars for a real deployed environment (an actual Sentry account/project must exist) — that step is ops, out of code scope
   - 🔴 Uptime monitoring with alerting configured
   - 🔴 Branch protection on `main` enforced
   - 🟢 Costing engine has determinism regression tests — `test_brief.py` covers brief / evolution / squeeze (repeated calls return identical output) + exact numeric anchors on the brief
