@@ -5,6 +5,7 @@ import { useAuth } from '../../AuthContext';
 import exportCsv from '../../utils/exportCsv';
 import { GroupHeader } from './wsCharts';
 import ProductFormModal from '../../components/ProductFormModal';
+import { useConfirm, useAlert } from '../../components/ConfirmDialog';
 
 /* ──────────────────────────────────────────────────────────────────────
  * Portfolio — the product as the central object. REAL data: every product
@@ -67,6 +68,8 @@ function StatusBadge({ status }) {
 export default function PortfolioArea() {
   const { activeTeamId } = useAuth();
   const navigate = useNavigate();
+  const confirm = useConfirm();
+  const showAlert = useAlert();
 
   const [costModels, setCostModels] = useState([]);
   const [products, setProducts] = useState([]);
@@ -75,6 +78,26 @@ export default function PortfolioArea() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sc, setSc] = useState({});           // { [costModelId]: { status: 'loading'|'ok'|'err', value, currency, unit } }
+  const [loadingExample, setLoadingExample] = useState(false);
+
+  // Scrum 16 — self-serve onboarding: seed a runnable demo for a brand-new team.
+  const handleLoadExampleData = async () => {
+    const ok = await confirm({
+      title: 'Load example data?',
+      message: 'This adds 5 sample products, suppliers, cost models and 3 years of prices/volumes to your team so you can explore CostAdvisor immediately. Safe to run more than once.',
+      confirmLabel: 'Load example data',
+    });
+    if (!ok) return;
+    setLoadingExample(true);
+    try {
+      await api.post(`/api/teams/${activeTeamId}/load-example-data`);
+      fetchData();
+    } catch (err) {
+      showAlert({ title: 'Could not load example data', message: formatApiError(err) });
+    } finally {
+      setLoadingExample(false);
+    }
+  };
 
   const [search, setSearch] = useState('');
   const [familyFilter, setFamilyFilter] = useState('all');
@@ -316,7 +339,12 @@ export default function PortfolioArea() {
       ) : products.length === 0 && costModels.length === 0 ? (
         <div className="ca-card" style={{ textAlign: 'center', padding: 48 }}>
           <div style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>No products yet — add one to start building should-cost models.</div>
-          <button className="ca-btn ca-btn-primary" onClick={() => setShowAddProduct(true)}>Add your first product</button>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button className="ca-btn ca-btn-primary" onClick={() => setShowAddProduct(true)}>Add your first product</button>
+            <button className="ca-btn ca-btn-ghost" onClick={handleLoadExampleData} disabled={loadingExample}>
+              {loadingExample ? 'Loading…' : 'Load example data'}
+            </button>
+          </div>
         </div>
       ) : (
         <>

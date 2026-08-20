@@ -3,6 +3,7 @@ import ProtectedRoute from './ProtectedRoute';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ImpersonationBar from './components/ImpersonationBar';
+import OnboardingChecklist from './components/OnboardingChecklist';
 import { ToastProvider } from './components/Toast';
 import Login from './pages/Login';
 import CostModelBuilder from './pages/CostModelBuilder';
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         {user && <ImpersonationBar />}
+        {user && <OnboardingChecklist />}
       </div>
       <Footer />
     </ToastProvider>
