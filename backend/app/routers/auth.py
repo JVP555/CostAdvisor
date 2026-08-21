@@ -19,6 +19,7 @@ from app.models.refresh_token import RefreshToken
 from app.rate_limit import limiter
 from app.schemas.user import UserOut, UserWithTeams
 from app.services.email import send_welcome_email
+from app.services.audit import log_auth_event
 
 router = APIRouter()
 settings = get_settings()
@@ -205,6 +206,8 @@ async def callback(request: Request, db: Session = Depends(get_db)):
 
     if user is None:
         if not settings.allow_signup:
+            log_auth_event(db, email, "login_failed", reason="signup_disabled", request=request)
+            db.commit()
             bypass_rls_var.set(False)
             return RedirectResponse(
                 url=f"{settings.app_url}?login_error=signup_disabled", status_code=302
@@ -238,6 +241,8 @@ async def callback(request: Request, db: Session = Depends(get_db)):
                 error = "access_rejected"
             else:
                 error = "access_needed"
+            log_auth_event(db, email, "login_failed", reason=error, request=request)
+            db.commit()
             bypass_rls_var.set(False)
             return RedirectResponse(
                 url=f"{settings.app_url}?login_error={error}", status_code=302
@@ -266,6 +271,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
             user.display_name = display_name
         user.avatar_url = avatar_url
 
+    log_auth_event(db, email, "login_success", user_id=user.id, request=request)
     db.commit()
     bypass_rls_var.set(False)
 
@@ -392,17 +398,36 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
 @router.post("/logout")
 def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     """Clear the auth cookies and revoke the current refresh token so it can't be
-    replayed after logout."""
+    replayed after logout.
+
+    Deliberately does NOT depend on get_current_user — logout must succeed even
+    with an already-expired/invalid ca_token, so the audit-event user lookup is
+    best-effort (via ca_refresh's stored user_id, else a soft ca_token decode)."""
     raw = request.cookies.get("ca_refresh")
-    if raw:
-        bypass_rls_var.set(True)
-        try:
+    logout_user_id = None
+    bypass_rls_var.set(True)
+    try:
+        if raw:
             row = db.query(RefreshToken).filter(RefreshToken.token_hash == _hash_token(raw)).first()
             if row and row.revoked_at is None:
                 row.revoked_at = datetime.now(timezone.utc)
+                logout_user_id = row.user_id
                 db.commit()
-        finally:
-            bypass_rls_var.set(False)
+        if logout_user_id is None:
+            token = request.cookies.get("ca_token")
+            if token:
+                try:
+                    payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+                    logout_user_id = uuid.UUID(payload["sub"])
+                except Exception:
+                    pass
+        if logout_user_id is not None:
+            user = db.query(User).filter(User.id == logout_user_id).first()
+            if user:
+                log_auth_event(db, user.email, "logout", user_id=user.id, request=request)
+                db.commit()
+    finally:
+        bypass_rls_var.set(False)
 
     is_prod = settings.environment != "development"
     same_site = "none" if is_prod else "lax"

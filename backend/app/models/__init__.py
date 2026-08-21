@@ -22,6 +22,7 @@ from app.models.demo import DemoHost, DemoBlockedSlot, DemoRequest
 from app.models.collaboration import CostModelNote
 from app.models.alerts import AlertSubscription, AlertEvent
 from app.models.refresh_token import RefreshToken
+from app.models.auth_event import AuthEvent
 
 __all__ = [
     "User",
@@ -61,4 +62,6 @@ __all__ = [
     "DemoHost",
     "DemoBlockedSlot",
     "DemoRequest",
+    "RefreshToken",
+    "AuthEvent",
 ]
