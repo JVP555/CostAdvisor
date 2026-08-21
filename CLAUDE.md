@@ -151,6 +151,8 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
 
 ### Wave 1
 
+> **Status: code-complete, not fully closed.** Every code-buildable slice across Scrums 9/10/11/16/17 has landed (branch `dev-wave1`). What remains open is deliberately non-code: Scrum 12's Cloudflare production deploy/Search Console/field CWV, and the ops/paperwork half of 10/11 — written TLS-in-transit + encryption-at-rest confirmation, EU data residency documentation, a tested backup/retention policy (real restore drill), a security posture doc for buyer IT, uptime monitoring + alerting, GitHub branch protection on `main`, an incident-response plan, and a vendor DPA list. None of these are blocked on missing code; they're human/process actions.
+
 - 🟢 **Scrum 8** — Real admin console
   - 🟢 Super-admin can list, search, and view all tenants and users
   - 🟢 Impersonation works end-to-end; `ImpersonationBar` is visible while impersonating
