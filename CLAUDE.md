@@ -151,7 +151,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
 
 ### Wave 1
 
-> **Status: code-complete, not fully closed.** Every code-buildable slice across Scrums 9/10/11/16/17 has landed (branch `dev-wave1`). What remains open is deliberately non-code: Scrum 12's Cloudflare production deploy/Search Console/field CWV, and the ops/paperwork half of 10/11 — written TLS-in-transit + encryption-at-rest confirmation, EU data residency documentation, a tested backup/retention policy (real restore drill), a security posture doc for buyer IT, uptime monitoring + alerting, GitHub branch protection on `main`, an incident-response plan, and a vendor DPA list. None of these are blocked on missing code; they're human/process actions.
+> **Status: code-complete, not fully closed.** Every code-buildable slice across Scrums 9/10/11/16/17 has landed (branch `dev-wave1`). Draft written deliverables now exist too: `jvpdocs/security-posture.md`, `jvpdocs/eu-data-residency.md`, `jvpdocs/backup-retention-policy.md`, `jvpdocs/incident-response.md`, `jvpdocs/vendor-risk.md` — each has explicit `[NEEDS CONFIRMATION]`/`[NEEDS ACTION]` placeholders where a real dashboard check, a real drill, or a real signature is the only thing missing. **The complete remaining checklist — every non-code action across Scrums 9/10/11/12, in suggested order — lives in `jvpdocs/wave1manual.md`.** None of it is blocked on missing code; it's dashboard clicks, real accounts, an actual restore drill, and legal agreements.
 
 - 🟢 **Scrum 8** — Real admin console
   - 🟢 Super-admin can list, search, and view all tenants and users
@@ -254,7 +254,7 @@ When a task has subtasks, list them indented beneath the parent. Update the stat
   - 🔴 Landing page deployed and live at `www.costadvisor.org` (Cloudflare dashboard wiring) — production swap deferred by user
   - 🔴 Google Search Console shows page indexed
   - 🔴 Core Web Vitals pass (LCP < 2.5 s) — measured in the field (deferred with prod deploy)
-  - 🟡 Stats added (McKinsey 13%, AlixPartners ~50%) with source footnote; Bain 8–12% not yet included; formal verification pending
+  - 🟡 All three roadmap proof points now on the page: McKinsey 13% + AlixPartners ~50% (existing per-card stats) plus a new consolidated Bain 8–12% strip below the feature cards (`.fd3-consult`, theme-safe via existing CSS tokens only). "Formal verification" (confirming each figure against its primary published source before high-stakes use) is a manual research step — see `jvpdocs/wave1manual.md`
 
 - 🟢 **Scrum 13** — Working team invites (send invite emails)
   - 🟢 Owner/admin can send an invite email to any address (creates TeamInvite with 256-bit token; sends via SMTP — no third-party SDK)
