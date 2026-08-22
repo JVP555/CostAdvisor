@@ -238,7 +238,10 @@ below. Fill those in as each is done so the documents stop being drafts.
   `api.costadvisor.org`, `app.costadvisor.org`, and `costadvisor.org`
   (Better Uptime, UptimeRobot, Pingdom, or Railway's own health-check
   alerting).
-- [ ] **Enable GitHub branch protection on `main`**: require a PR + review
+- [ ] **Enable GitHub branch protection on `main`** — **deliberately
+  deferred**: only 3 people work on the private repo today, so the risk
+  this guards against (an accidental unreviewed push straight to `main`)
+  is low. Revisit once the team grows. When ready: require a PR + review
   before merge, disallow direct pushes. GitHub UI (Settings → Branches →
   Add rule) or `gh api repos/JVP555/CostAdvisor/branches/main/protection`
   — ask explicitly if you want this run via `gh` from here, since it's a
