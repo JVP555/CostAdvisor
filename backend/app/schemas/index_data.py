@@ -74,6 +74,38 @@ class IndexValueOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class IndexProjectionPointOut(BaseModel):
+    year: int
+    quarter: int
+    value: float
+    ci_lo: float | None = None
+    ci_hi: float | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class IndexProjectionOut(BaseModel):
+    """One vintaged projection run (Scrum 70 Part 1). `status`/`method` are how a
+    hold or no-history result is distinguished from a real fit downstream —
+    never render them identically to a fitted trend."""
+    id: int
+    commodity_id: int
+    region: str
+    vintage_at: datetime
+    status: str  # "fitted" | "hold" | "no_history"
+    method: str
+    history_from_year: int | None = None
+    history_from_quarter: int | None = None
+    history_to_year: int | None = None
+    history_to_quarter: int | None = None
+    history_points_used: int
+    horizon_quarters: int
+    residual_std: float | None = None
+    points: list[IndexProjectionPointOut] = []
+
+    model_config = {"from_attributes": True}
+
+
 class PublicQuarterPoint(BaseModel):
     year: int
     quarter: int

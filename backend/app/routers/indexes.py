@@ -25,11 +25,13 @@ from app.schemas.index_data import (
     CellOverrideRequest, BulkOverrideRequest,
     FilterOptionsOut, IndexImpactItem, IndexImpactResponse,
     IndexValuePublicOut, PublicQuarterPoint, ProxyLogicUpdate, CompositeUpdate,
+    IndexProjectionOut,
 )
 from app.services.data_resolver import resolve_index_values
 from app.services.file_parser import parse_index_upload
 from app.services.scraper import GenericWebScraper, smart_scrape, smart_scrape_all, detect_source_type, ScrapedDataPoint
 from app.services.audit import log_event
+from app.services.index_projection import run_projection, latest_projection, DEFAULT_HORIZON_QUARTERS
 
 router = APIRouter()
 
@@ -1282,3 +1284,36 @@ async def scrape_all_indexes(
     db.commit()
     return {"scrapers_run": len(scraped), "values_updated": updated,
             "commodities_without_scraper": no_scraper}
+
+
+@router.post("/{commodity_id}/project", response_model=IndexProjectionOut)
+def project_index(
+    commodity_id: int,
+    region: str = Query(...),
+    horizon: int = Query(DEFAULT_HORIZON_QUARTERS, ge=1, le=12),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """On-demand (re)projection for one (commodity, region) series (Scrum 70
+    Part 1). Super-admin only — same trust tier as /scrape-all, this is a
+    platform-data write. Always creates a NEW vintage; never overwrites a
+    prior run."""
+    require_super_admin(current_user)
+    commodity = db.query(CommodityIndex).filter(CommodityIndex.id == commodity_id).first()
+    if not commodity:
+        raise HTTPException(status_code=404, detail="Commodity not found")
+    run = run_projection(db, commodity_id, region, horizon_quarters=horizon)
+    return run
+
+
+@router.get("/{commodity_id}/projections/latest", response_model=IndexProjectionOut | None)
+def latest_projection_endpoint(
+    commodity_id: int,
+    region: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Latest projection vintage for a series, or null if it has never been
+    projected — any authenticated user (platform metadata, view-only), same
+    gating tier as the commodity list itself."""
+    return latest_projection(db, commodity_id, region)

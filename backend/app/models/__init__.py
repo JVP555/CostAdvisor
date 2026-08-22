@@ -23,6 +23,7 @@ from app.models.collaboration import CostModelNote
 from app.models.alerts import AlertSubscription, AlertEvent
 from app.models.refresh_token import RefreshToken
 from app.models.auth_event import AuthEvent
+from app.models.index_projection import IndexProjectionRun, IndexProjectionPoint
 
 __all__ = [
     "User",
@@ -64,4 +65,6 @@ __all__ = [
     "DemoRequest",
     "RefreshToken",
     "AuthEvent",
+    "IndexProjectionRun",
+    "IndexProjectionPoint",
 ]
