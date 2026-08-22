@@ -12,6 +12,19 @@ from app.schemas.index_data import IndexValueOut
 from app.services.scraper import SCRAPER_REGISTRY, SCRAPER_SOURCE_LABELS
 
 
+def _override_source_label(override: IndexOverride) -> str:
+    """A non-null override's source_file tags where it came from (Scrum 26)
+    — "provider:<name>:<series_id>" for a provider-adapter fetch, "scrape:<url>"
+    for a team scrape, anything else (manual entry, upload, blank) reads as a
+    plain team override. Distinguishing "provider" here is what makes a
+    provider-credential value's provenance visible on the resolved row,
+    without changing which value wins (IndexOverride already outranks
+    scraped IndexValue in every branch below)."""
+    if (override.source_file or "").startswith("provider:"):
+        return "provider"
+    return "team_override"
+
+
 def resolve_index_values(
     db: Session,
     team_id: uuid.UUID,
@@ -118,7 +131,7 @@ def resolve_index_values(
                 year=row.year,
                 quarter=row.quarter,
                 value=float(o.value) if o.value is not None else None,
-                source="team_blank" if o.value is None else "team_override",
+                source="team_blank" if o.value is None else _override_source_label(o),
                 scraped_value=float(row.value),
                 override_id=o.id,
                 override_by=display_name,
@@ -169,7 +182,7 @@ def resolve_index_values(
             year=ovr_year,
             quarter=ovr_quarter,
             value=float(o.value),
-            source="team_override",
+            source=_override_source_label(o),
             scraped_value=None,
             override_id=o.id,
             override_by=display_name,
@@ -411,8 +424,9 @@ def get_single_index_value_detailed(
     """Same resolution as `get_single_index_value`, but also returns which branch of
     the priority chain produced the value — for surfacing index provenance in a
     should-cost breakdown (Scrum 17). Source labels: "composite", "fixed",
-    "team_override", "scraped_region", "scraped_global", "scraped_any_region",
-    "scraped_temporal_carry_forward", or None if nothing resolved."""
+    "provider", "team_override", "scraped_region", "scraped_global",
+    "scraped_any_region", "scraped_temporal_carry_forward", or None if nothing
+    resolved."""
     # Composite / calculated index: compute live from its components (with cycle guard).
     ci = db.query(CommodityIndex).filter(CommodityIndex.id == commodity_id).first()
     if ci is not None and ci.composite_expression:
@@ -455,7 +469,7 @@ def get_single_index_value_detailed(
     if override:
         # Null override = intentional blank (team source doesn't cover this period)
         if override.value is not None:
-            return float(override.value), "team_override"
+            return float(override.value), _override_source_label(override)
         return None, None
 
     # Fall back to scraped

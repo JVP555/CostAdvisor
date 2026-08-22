@@ -6,7 +6,9 @@ from app.models.region import Region
 from app.models.product import Product
 from app.models.supplier import Supplier
 from app.models.cost_model import CostModel, FormulaVersion, FormulaComponent
-from app.models.index_data import CommodityIndex, IndexValue, IndexOverride, TeamIndexSource
+from app.models.index_data import (
+    CommodityIndex, IndexValue, IndexOverride, TeamIndexSource, TeamProviderCredential,
+)
 from app.models.price_data import ActualPrice
 from app.models.actual_volume import ActualVolume
 from app.models.fx_rate import FxRate
@@ -41,6 +43,7 @@ __all__ = [
     "IndexValue",
     "IndexOverride",
     "TeamIndexSource",
+    "TeamProviderCredential",
     "ActualPrice",
     "ActualVolume",
     "FxRate",

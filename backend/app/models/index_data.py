@@ -122,7 +122,10 @@ class TeamIndexSource(Base):
     region: Mapped[str] = mapped_column(String(20), ForeignKey("regions.code"), nullable=False)
     source_type: Mapped[str] = mapped_column(
         String(20), nullable=False
-    )  # "manual" | "scrape_url" | "upload" | "fixed"
+    )  # "manual" | "scrape_url" | "upload" | "fixed" | "provider_credential"
+    # For "provider_credential": scrape_config carries {"provider": "...", "series_id": "..."}.
+    # The secret itself lives in TeamProviderCredential, keyed (team_id, provider) —
+    # not duplicated per commodity/region row, so one vendor subscription rotates once.
     scrape_url: Mapped[str | None] = mapped_column(String(512))
     scrape_config: Mapped[dict | None] = mapped_column(JSONB)
     source_file: Mapped[str | None] = mapped_column(String(255))
@@ -138,3 +141,51 @@ class TeamIndexSource(Base):
 
     # Relationships
     commodity = relationship("CommodityIndex")
+
+
+class TeamProviderCredential(Base):
+    """A team's own entitlement with a paid index provider (Fastmarkets, Argus,
+    ICIS, ...), keyed by (team_id, provider) so every TeamIndexSource row that
+    points at that provider shares one credential to rotate (Scrum 26).
+
+    The secret is Fernet-encrypted JSON (shape varies per provider — API key vs
+    client-id+secret vs basic auth) — see services/provider_credentials.py.
+    `status`/`last_error` are updated on every fetch attempt so a stale/rejected
+    credential is visible without re-triggering a fetch. "missing" is never
+    stored here — it's a transient error raised when no row exists at all.
+
+    NOTE (future re-key risk): TeamIndexSource is currently keyed
+    (team_id, commodity_id, region). A referenced future re-keying of that grain
+    does not exist anywhere in this repo today — this table's own key
+    (team_id, provider) is independent of commodity/region, so it is unaffected
+    either way; only TeamIndexSource's scrape_config pointer would need
+    revisiting if that migration ever lands.
+    """
+
+    __tablename__ = "team_provider_credentials"
+    __table_args__ = (
+        UniqueConstraint("team_id", "provider"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    team_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False
+    )
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)  # normalized lowercase
+    credential_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="unverified"
+    )  # unverified | ok | expired | rejected | error
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )

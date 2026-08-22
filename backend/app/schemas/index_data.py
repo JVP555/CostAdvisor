@@ -63,7 +63,7 @@ class IndexValueOut(BaseModel):
     year: int
     quarter: int
     value: float | None = None
-    source: str  # 'scraped', 'team_override', 'team_blank'
+    source: str  # 'scraped', 'team_override', 'team_blank', 'fixed', 'composite', 'provider'
     scraped_value: float | None = None
     override_id: int | None = None
     override_by: str | None = None
@@ -162,7 +162,7 @@ class TeamIndexSourceCreate(BaseModel):
     team_id: uuid.UUID
     commodity_id: int
     region: str
-    source_type: Literal["manual", "scrape_url", "upload", "fixed"]
+    source_type: Literal["manual", "scrape_url", "upload", "fixed", "provider_credential"]
     scrape_url: str | None = None
     scrape_config: dict | None = None
     fixed_value: float | None = None

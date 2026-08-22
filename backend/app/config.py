@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     google_calendar_encryption_key: str = ""
 
+    # Team-supplied provider credentials (Fastmarkets/Argus/ICIS, Scrum 26) — a
+    # SEPARATE Fernet key from google_calendar_encryption_key above; different
+    # secret domain, must not be shared. Generate the same way.
+    provider_credential_encryption_key: str = ""
+
     # JWT
     jwt_secret: str = "change-me"
     jwt_algorithm: str = "HS256"
