@@ -23,6 +23,10 @@ class ShouldCostResult(BaseModel):
     unit: str
     incoterm: str | None = None
     normalized_to_incoterm: str | None = None
+    # Scrum 28b — a component that should be index-linked but isn't (broken
+    # name match, or a tracking-mode link that fell back to its last-known
+    # snapshot) surfaces here instead of silently riding flat at ratio 1.0.
+    data_gaps: list["DataGap"] = []
 
 
 # ── Should-cost breakdown (Scrum 17 — inspectable numbers) ─────────────────────
@@ -40,6 +44,15 @@ class ComponentBreakdown(BaseModel):
     base_period: str           # e.g. "Q1 2024"
     current_period: str
     has_data: bool             # False if either base_value or current_value is missing
+    # Scrum 28b — provenance, mirrors GET /formulas/{id}/resolve's per-line
+    # shape exactly (populated from the live catalog recipe in tracking mode,
+    # from the frozen snapshot in pinned mode). None for hand-built lines.
+    component_type: str | None = None       # "index" | "fixed" | None
+    depth: int | None = None
+    via_template_id: uuid.UUID | None = None
+    via_template_name: str | None = None
+    line_region: str | None = None
+    is_proxy: bool | None = None
 
 
 class ShouldCostBreakdown(BaseModel):

@@ -19,6 +19,7 @@ a formula can only ever see platform templates and its own.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
@@ -282,3 +283,145 @@ def evaluate_weighted_template(
     else:
         result["reason"] = "no base price anchor — index level only"
     return result
+
+
+# ── Visibility (Scrum 28b) ──────────────────────────────────────────────────
+# Extracted from routers/formulas.py's private _get_visible_template so
+# cost_models.py can validate a source_coverage_id without a router-to-router
+# import — services are the shared layer per the repo's folder convention.
+# Returns None on a miss; callers pick their own HTTP status/detail.
+
+def get_visible_template(
+    db: Session, template_id: uuid.UUID, team_id: uuid.UUID | None = None
+) -> FormulaTemplate | None:
+    """A template the caller may read: platform (team_id NULL), or the
+    caller's own team. RLS enforces this at the DB too — the explicit check
+    stops a team addressing another team's template through a team_id they
+    *are* a member of."""
+    template = db.query(FormulaTemplate).filter(FormulaTemplate.id == template_id).first()
+    if not template or (
+        team_id is not None
+        and template.team_id is not None
+        and template.team_id != team_id
+    ):
+        return None
+    return template
+
+
+def get_visible_coverage(
+    db: Session, coverage_id: uuid.UUID, team_id: uuid.UUID | None = None
+) -> FormulaRegionCoverage | None:
+    """A coverage ("combo") row the caller may read — visible iff its
+    template is visible."""
+    coverage = db.query(FormulaRegionCoverage).filter(FormulaRegionCoverage.id == coverage_id).first()
+    if not coverage:
+        return None
+    if get_visible_template(db, coverage.template_id, team_id) is None:
+        return None
+    return coverage
+
+
+# ── Pinned vs. tracking (Scrum 28b) ─────────────────────────────────────────
+
+@dataclass
+class EffectiveLine:
+    """One line of a formula version's *effective* recipe — either the
+    frozen snapshot on FormulaComponent (pinned / unlinked) or a live
+    resolution of the catalog recipe (tracking). The costing engine reads
+    only this shape; it never branches on link_mode itself."""
+    label: str
+    commodity_id: int | None
+    commodity_name: str | None
+    weight: float
+    component_type: str | None
+    depth: int | None
+    via_template_id: uuid.UUID | None
+    via_template_name: str | None
+    line_region: str | None
+    is_proxy: bool | None
+
+
+def _effective_lines_from_snapshot(fv) -> list[EffectiveLine]:
+    return [
+        EffectiveLine(
+            label=c.label,
+            commodity_id=c.commodity_id,
+            commodity_name=c.commodity.name if c.commodity else None,
+            weight=float(c.weight),
+            component_type=c.component_type,
+            depth=c.depth,
+            via_template_id=c.via_template_id,
+            via_template_name=c.via_template.name if c.via_template else None,
+            line_region=c.line_region,
+            is_proxy=c.is_proxy,
+        )
+        for c in fv.components
+    ]
+
+
+def get_effective_lines(db: Session, fv, cost_model) -> tuple[list[EffectiveLine], str | None]:
+    """Resolve a formula version's lines for the costing engine to evaluate.
+
+    Returns (lines, fallback_reason). fallback_reason is None whenever
+    resolution went as expected (pinned/unlinked, or a live tracking
+    resolution succeeded); it's set to a human reason whenever a
+    tracking-mode version had to fall back to its last-known snapshot
+    (deleted coverage/template, a broken chain, or a degenerate recipe) —
+    explicit, so a caller can surface it as a gap rather than silently
+    serving a possibly-stale number.
+    """
+    if fv.link_mode != "tracking":
+        return _effective_lines_from_snapshot(fv), None
+    if fv.source_coverage_id is None:
+        # A version saved with link_mode="tracking" always had a
+        # source_coverage_id at save time (FormulaVersionCreate requires both
+        # or neither). Seeing one without the other now means the linked
+        # coverage — or its parent template — was deleted and the FK's ON
+        # DELETE SET NULL fired; that's a broken link, not "never linked".
+        return _effective_lines_from_snapshot(fv), "tracking link unavailable (combo deleted) — showing last-known formula"
+
+    coverage = db.get(FormulaRegionCoverage, fv.source_coverage_id)
+    if coverage is None:
+        # Defensive backstop — unreachable via any real deletion path (the FK
+        # above guarantees source_coverage_id is already None by then).
+        return _effective_lines_from_snapshot(fv), "tracking link unavailable (combo deleted) — showing last-known formula"
+
+    try:
+        raw_lines = flatten_components(db, coverage.template_id, region=cost_model.region)
+    except FormulaChainError as exc:
+        return _effective_lines_from_snapshot(fv), f"tracking link broken ({exc}) — showing last-known formula"
+
+    base_sum = sum(l["effective_weight_pct"] for l in raw_lines)
+    if not raw_lines or base_sum <= 0:
+        return _effective_lines_from_snapshot(fv), "tracking link has no weighted lines — showing last-known formula"
+
+    commodity_ids = {l["commodity_id"] for l in raw_lines if l["commodity_id"]}
+    template_ids = {l["via_template_id"] for l in raw_lines if l["via_template_id"]}
+    commodity_names = {}
+    if commodity_ids:
+        from app.models.index_data import CommodityIndex
+        commodity_names = {
+            row.id: row.name
+            for row in db.query(CommodityIndex).filter(CommodityIndex.id.in_(commodity_ids)).all()
+        }
+    template_names = {
+        row.id: row.name
+        for row in db.query(FormulaTemplate).filter(FormulaTemplate.id.in_(template_ids)).all()
+    } if template_ids else {}
+
+    lines = [
+        EffectiveLine(
+            label=l["name"],
+            commodity_id=l["commodity_id"],
+            commodity_name=commodity_names.get(l["commodity_id"]),
+            weight=l["effective_weight_pct"] / base_sum,
+            component_type=l["component_type"],
+            depth=l["depth"],
+            via_template_id=l["via_template_id"],
+            via_template_name=template_names.get(l["via_template_id"]),
+            line_region=l["line_region"],
+            is_proxy=l["is_proxy"],
+        )
+        for l in raw_lines
+    ]
+    return lines, None

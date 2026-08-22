@@ -37,6 +37,7 @@ from app.services.formula_resolver import (
     evaluate_weighted_template,
     flatten_components,
     resolve_coverage,
+    get_visible_template,
 )
 from app.services.permissions import require_permission, require_platform_permission, has_platform_permission
 
@@ -310,15 +311,11 @@ def can_edit_platform_formulas(
 def _get_visible_template(
     db: Session, template_id: uuid.UUID, team_id: uuid.UUID | None = None
 ) -> FormulaTemplate:
-    """Fetch a template the caller may read (RLS enforces this at the DB too;
-    the explicit team check keeps a team from addressing another team's
-    template through a team_id they *are* a member of)."""
-    template = db.query(FormulaTemplate).filter(FormulaTemplate.id == template_id).first()
-    if not template or (
-        team_id is not None
-        and template.team_id is not None
-        and template.team_id != team_id
-    ):
+    """Thin router-level wrapper: services.formula_resolver.get_visible_template
+    (Scrum 28b) owns the actual visibility rule so cost_models.py can reuse it
+    without a router-to-router import; this just picks the HTTP status."""
+    template = get_visible_template(db, template_id, team_id)
+    if not template:
         raise HTTPException(status_code=404, detail="Formula template not found")
     return template
 
