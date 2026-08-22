@@ -22,9 +22,10 @@ production service exists and is running).
      open your existing OAuth 2.0 Client ID (the one staging already uses —
      one client can hold multiple redirect URIs, no need for a second one
      unless you want to keep prod/staging fully separate).
-1.2. Under **Authorized JavaScript origins**, add:
+1.2. Under **Authorized JavaScript origins**, add the **app** subdomain (not
+     the bare domain — that's the landing page, see Step 4):
      ```
-     https://costadvisor.org
+     https://app.costadvisor.org
      ```
 1.3. Under **Authorized redirect URIs**, add:
      ```
@@ -71,7 +72,7 @@ narratives (`LLM_ENABLED=false`). This is a hard requirement, not optional.
 | `JWT_SECRET` | A new, random secret — **never reuse staging's**. Generate: `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | From Step 1 |
 | `GOOGLE_CALENDAR_ENCRYPTION_KEY` | Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
-| `APP_URL` | `https://costadvisor.org` |
+| `APP_URL` | `https://app.costadvisor.org` — the app SPA's own subdomain, **not** the bare domain (that's the landing page, Step 4) |
 | `API_URL` | `https://api.costadvisor.org` |
 | `ENVIRONMENT` | `production` |
 | `ALLOW_SIGNUP` | `true` — this is the invite-only *gate* toggle, not a public-signup toggle: with it `true`, a brand-new account can only complete signup if it has an accepted access request or a pending team invite (Scrum 13b). Setting it `false` would block every new account, invited or not. |
@@ -89,14 +90,29 @@ narratives (`LLM_ENABLED=false`). This is a hard requirement, not optional.
 
 ## Step 4 — Cloudflare: bind the production custom domains
 
-4.1. Workers & Pages → the `costadvisor-web` worker (created on first
-     deploy in Step 5 if it doesn't exist yet) → **Custom Domains** → add
-     `costadvisor.org`.
-4.2. Same for the `costadvisor-landing` worker → add `www.costadvisor.org`.
-4.3. Confirm DNS: `costadvisor.org`, `www.costadvisor.org`, and
-     `api.costadvisor.org` all point at Cloudflare (orange-clouded).
-     `api.costadvisor.org` should be a proxied CNAME/A record per Railway's
-     own custom-domain instructions for the backend service.
+The bare domain is the **landing page**, not the app — same split already
+established for staging (`dev.costadvisor.org` = landing,
+`app.dev.costadvisor.org` = the app). Getting the two workers' domain
+bindings crossed is the single easiest mistake here and produces a
+Cloudflare 522 ("connection timed out") on whichever domain is
+misconfigured or unbound, not an obvious "wrong page" error.
+
+4.1. Workers & Pages → the `costadvisor-landing` worker → **Settings →
+     Domains & Routes (Custom Domains)** → add `costadvisor.org` (the bare
+     apex domain).
+4.2. Same worker → also add `www.costadvisor.org`. (A `www` CNAME pointed
+     at the apex, proxied through Cloudflare, is a normal setup — you don't
+     need a second identical binding if `www` is already a proxied CNAME to
+     the apex; either approach works, just don't leave `www` bound to a
+     *different* worker than the apex.)
+4.3. Workers & Pages → the `costadvisor-web` worker (the app SPA) → same
+     screen → add `app.costadvisor.org`. **Not** the bare domain — that's
+     reserved for landing per 4.1.
+4.4. Confirm DNS: `costadvisor.org`, `www.costadvisor.org`,
+     `app.costadvisor.org`, and `api.costadvisor.org` all point at
+     Cloudflare (orange-clouded). `api.costadvisor.org` should be a proxied
+     CNAME/A record per Railway's own custom-domain instructions for the
+     backend service.
 4.4. Wait for SSL certificates to provision (usually automatic, a few
      minutes after the domain is added).
 
@@ -186,7 +202,7 @@ narratives (`LLM_ENABLED=false`). This is a hard requirement, not optional.
 
 ## Step 7 — First login and verification
 
-7.1. Go to `https://costadvisor.org`, sign in with the Google account for
+7.1. Go to `https://app.costadvisor.org`, sign in with the Google account for
      `jil@staminachem.com`.
 7.2. Confirm you land signed in **and** already see the Admin tab — that
      proves the Step 6.4 pre-provisioning worked.
@@ -219,8 +235,9 @@ below. Fill those in as each is done so the documents stop being drafts.
   exception in production and confirm it shows up in the Sentry dashboard
   (skip if you didn't set it in Step 3).
 - [ ] **Set up uptime monitoring with alerting** against
-  `api.costadvisor.org` and `costadvisor.org` (Better Uptime, UptimeRobot,
-  Pingdom, or Railway's own health-check alerting).
+  `api.costadvisor.org`, `app.costadvisor.org`, and `costadvisor.org`
+  (Better Uptime, UptimeRobot, Pingdom, or Railway's own health-check
+  alerting).
 - [ ] **Enable GitHub branch protection on `main`**: require a PR + review
   before merge, disallow direct pushes. GitHub UI (Settings → Branches →
   Add rule) or `gh api repos/JVP555/CostAdvisor/branches/main/protection`
@@ -249,7 +266,7 @@ below. Fill those in as each is done so the documents stop being drafts.
   (McKinsey 13%, AlixPartners ~50%, Bain 8–12%) against their primary
   published sources before treating them as verified rather than
   "commonly cited, not yet source-checked."
-- [ ] **Verify `SameSite=Strict` works** across `costadvisor.org` /
+- [ ] **Verify `SameSite=Strict` works** across `app.costadvisor.org` /
   `api.costadvisor.org` before flipping `ca_token`/`ca_refresh` cookies from
   `SameSite=None` — same-registrable-domain subdomains *should* support it,
   but this needs a real cross-subdomain login test in production before
