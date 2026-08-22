@@ -1,5 +1,5 @@
 {
-  "name": "costadvisor-web-dev",
+  "name": "costadvisor-web",
   "compatibility_date": "2025-09-01",
   "assets": {
     "directory": "./dist",
