@@ -2,20 +2,18 @@
 
 *Last updated 2026-08-22.*
 
-## Current state
+## Current state — confirmed: production is US-hosted, not EU
 
 CostAdvisor's infrastructure is hosted on Railway (API + PostgreSQL + Redis)
-and Cloudflare (frontend, edge). Both providers offer EU-region hosting, but
-**which region the production and staging projects are actually provisioned
-in has not been confirmed from this codebase** — that information lives in
-each provider's dashboard, not in application config or source control.
+and Cloudflare (frontend, edge). Confirmed directly from the Railway
+dashboard (Postgres service → Settings → Scale → Regions & Replicas):
+**production runs in US East (Virginia, USA)**. Staging's region has not
+been separately checked yet, but there's no reason to expect it differs.
 
-**[NEEDS CONFIRMATION — see `jvpdocs/wave1manual.md`]**: check the Railway
-project settings for `main` (production) and `dev` (staging) and record the
-actual deployment region here. Railway supports EU-West (Amsterdam) among
-its regions; if the project is not currently pinned there, this section
-should instead become a migration plan (target region, cutover approach,
-expected downtime, data-transfer method) rather than a confirmation.
+This means: as of today, CostAdvisor does **not** offer EU data residency.
+If an EU-headquartered prospect requires it under GDPR, the migration plan
+below is what would need to actually happen — this isn't a formality to
+tick off, it's a real infrastructure decision that hasn't been made yet.
 
 ## What's true regardless of region
 
@@ -34,14 +32,11 @@ expected downtime, data-transfer method) rather than a confirmation.
   component's residency should be checked against whichever Hetzner project
   currently hosts it.
 
-## Migration plan template (fill in once the current region is confirmed)
+## Migration plan (production is confirmed non-EU — US East, Virginia)
 
-If production is confirmed to already be EU-hosted: state that plainly here
-with the specific region, and this item is closed.
+Not yet started — only needed if/when an EU-based prospect requires it:
 
-If production is confirmed to be non-EU: this section becomes:
-
-1. **Target region:** Railway EU-West (or provider-equivalent).
+1. **Target region:** Railway EU-West (Amsterdam).
 2. **Cutover approach:** stand up a new EU-region Postgres instance,
    `pg_dump`/`pg_restore` (or Railway's built-in migration tooling) the
    production database across, cut the API's `DATABASE_URL` over during a

@@ -8,10 +8,9 @@ procurement/vendor-security review. Every claim below is backed by a specific
 control in the codebase or infrastructure — file references are included so
 engineering can verify each point on request.
 
-Two items in this document are marked **[NEEDS CONFIRMATION]** — they depend
-on settings in Railway's/Cloudflare's dashboards that aren't visible from the
-codebase and must be confirmed against the live production project before
-this document is shared externally. See `jvpdocs/wave1manual.md`.
+One item in this document is still marked **[NEEDS CONFIRMATION]** —
+production's backup frequency/retention window, pending one more dashboard
+check. See `jvpdocs/wave1manual.md`.
 
 ---
 
@@ -39,11 +38,13 @@ sharing between environments.
   `api.costadvisor.org` / `api-dev.costadvisor.org`; the API is not reachable
   over plain HTTP from the public internet.
 - **Database connections:** the API connects to Railway PostgreSQL over
-  Railway's private network. **[NEEDS CONFIRMATION]** — whether Railway's
-  private network connection additionally negotiates TLS at the Postgres
-  protocol level, or relies solely on network-level isolation, must be
-  confirmed against the Railway project and stated explicitly here (see
-  `jvpdocs/wave1manual.md` item 3).
+  Railway's private network (`postgres.railway.internal`), never over the
+  public internet. Confirmed via Railway's own documentation: private-network
+  traffic between services is encrypted end-to-end with **WireGuard**
+  (ChaCha20/Curve25519/BLAKE2s) — this is automatic, not something the
+  application configures. The production database additionally runs on
+  Railway's TLS-enabled Postgres image (`postgres-ssl:18`), a second layer
+  at the Postgres protocol level itself.
 - **AI / Ollama:** the narrative-generation service runs on a private Hetzner
   VM and is reachable **only over Tailscale** (a WireGuard-based encrypted
   mesh network) — it has no public IP and is never exposed to the internet.
@@ -55,10 +56,12 @@ sharing between environments.
 
 ## 3. Encryption at rest
 
-- **Database:** Railway PostgreSQL. **[NEEDS CONFIRMATION]** — Railway's own
-  statement on at-rest encryption for its managed Postgres offering must be
-  captured here verbatim (or linked) before this document is shared
-  externally (see `jvpdocs/wave1manual.md` item 3).
+- **Database:** Railway PostgreSQL. Confirmed via Railway's own support
+  documentation: *"All customer data within Railway projects is encrypted
+  at rest... at the lowest level, so if somebody were to gain physical
+  access to the disk your data resides in, they would not be able to view
+  the data without the decryption key."* This applies automatically to the
+  managed Postgres offering — nothing the application configures.
 - **Secrets at rest:** the JWT signing secret, Google OAuth client
   credentials, SMTP credentials, and the Google-Calendar Fernet encryption
   key are stored as environment variables in Railway's secret manager
@@ -149,9 +152,8 @@ have different data-availability guarantees:
 ## 7. Data residency
 
 See `jvpdocs/eu-data-residency.md` for the full statement and migration plan.
-Summary: **[NEEDS CONFIRMATION]** — the specific Railway/Cloudflare region
-configuration for the production project must be confirmed and stated there
-before this document is shared with an EU-based prospect.
+Summary: **confirmed — production is hosted in US East (Virginia)**, not the
+EU. See that document for what this means for EU-based prospects.
 
 ## 8. Backup & retention
 

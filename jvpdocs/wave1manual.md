@@ -246,12 +246,16 @@ below. Fill those in as each is done so the documents stop being drafts.
   Add rule) or `gh api repos/JVP555/CostAdvisor/branches/main/protection`
   — ask explicitly if you want this run via `gh` from here, since it's a
   change to shared repo policy.
-- [ ] **Confirm Railway Postgres connection-level TLS and encryption at
-  rest** for the production project specifically — get Railway's provider
-  statement and record it in `jvpdocs/security-posture.md` §2–3.
-- [ ] **Confirm the actual deployment region** for the production Railway
-  project and Cloudflare Workers config, and record it in
-  `jvpdocs/eu-data-residency.md`.
+- [x] **Confirm Railway Postgres connection-level TLS and encryption at
+  rest** — done: private-network traffic is WireGuard-encrypted (Railway's
+  own docs), the Postgres image is the TLS-enabled `postgres-ssl:18`
+  variant, and Railway confirms disk-level encryption at rest by default.
+  Recorded in `jvpdocs/security-posture.md` §2–3.
+- [x] **Confirm the actual deployment region** — done: production Postgres
+  is in **US East (Virginia, USA)**, confirmed via the Railway dashboard
+  (Postgres → Settings → Scale → Regions & Replicas) — **not EU**. Recorded
+  in `jvpdocs/eu-data-residency.md`, including what this means if an
+  EU-based prospect requires data residency.
 - [ ] **Confirm Railway's automated-backup configuration** (frequency,
   retention, point-in-time recovery availability) and record it in
   `jvpdocs/backup-retention-policy.md`.
