@@ -11,22 +11,25 @@ retained there that isn't reproducible from Postgres) or the Ollama VM
 (stateless narrative generation, results cached in Redis with a 7-day TTL,
 never the source of truth).
 
-## Backup
+## Backup — confirmed, live on the production Railway project
 
-**[NEEDS CONFIRMATION — see `jvpdocs/wave1manual.md`]**: Railway's managed
-PostgreSQL includes automated backups, but the exact configuration
-(frequency, retention window, and whether point-in-time recovery is
-available on the current plan tier) must be confirmed against the live
-Railway project settings and recorded here before this policy is
-considered final. Until confirmed, treat the following as the *target*
-policy rather than a verified-in-place one:
-
-- **Frequency:** daily automated snapshot, minimum.
-- **Retention window:** 30 days of daily snapshots.
-- **Point-in-time recovery:** if available on the plan tier, enabled with at
-  least a 24-hour recovery window; if not available, daily snapshots are the
-  floor and this should be flagged as a gap to close (upgrade plan tier or
-  add a supplementary `pg_dump` cron to off-platform storage).
+- **Point-in-time recovery (PITR):** enabled. Continuous WAL archiving —
+  can restore to any recent moment, not just a daily snapshot. (Had to
+  regenerate the storage-account credentials once during setup after an
+  initial "WAL archive credentials may be invalid" error; resolved cleanly
+  after a redeploy.)
+- **Volume backups:** scheduled daily, plus on-demand backups available at
+  any time. Independent of PITR — kept as belt-and-braces coverage per
+  Railway's own recommendation.
+- **Restore mechanism (verified safe):** both PITR and volume-backup
+  restores can create a **new, standalone Postgres service**, leaving the
+  live production database completely untouched — confirmed by actually
+  performing one (see Restore drill below). Note: the *volume backup*
+  restore path also offers a second, different option that swaps the
+  current service's volume in place (a real in-production rollback, not a
+  drill) — always use the "restore to new service" option for testing.
+- **Region:** US East (Virginia, USA) — same as the primary database (see
+  `jvpdocs/eu-data-residency.md`).
 
 ## Retention
 
@@ -66,19 +69,13 @@ policy rather than a verified-in-place one:
   super-admins. Track as a backlog item if/when a real erasure request
   arrives, rather than building it speculatively ahead of need.
 
-## Restore drill
+## Restore drill — performed 2026-08-22
 
-**[NOT YET PERFORMED — see `jvpdocs/wave1manual.md`]**. This policy is not
-complete until a real restore has actually been executed and logged. Record
-here, once done:
-
-| Date | Performed by | Source snapshot | Target | Result | Notes |
+| Date | Performed by | Source | Target | Result | Notes |
 |---|---|---|---|---|---|
-| _pending_ | | | | | |
+| 2026-08-22 | Jil Varghese | PITR restore, target `22 Aug 2026 10:35am` | New standalone Postgres service (`Postgres-restored-20260822-0505`) | **Pass** | Recovery time: under 1 minute — new service was queryable essentially instantly after clicking Restore. Row counts confirmed on the restored copy: `users`=7, `cost_models`=20, `audit_logs`=45. Production database was never touched (separate service, separate volume, no connections to the live `CostAdvisor`/`worker` services). Temporary service deleted after verification. |
 
-The drill should: restore the most recent production (or a staging clone of
-production) snapshot into a fresh, isolated database; run the backend test
-suite's smoke checks against it (`pytest tests/ -k smoke` or equivalent
-manual verification); confirm row counts on a few key tables match the
-source; and record the wall-clock time taken, since that number is what
-"our recovery time objective" actually means to a buyer's IT team.
+This is a real, tested result — not the target/hoped-for policy above. Recovery
+time objective for a full-database restore is effectively **sub-minute** on
+Railway's PITR mechanism, which is materially better than the "estimate once
+you've done it" placeholder this section used to carry.

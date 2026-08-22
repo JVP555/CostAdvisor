@@ -256,12 +256,15 @@ below. Fill those in as each is done so the documents stop being drafts.
   (Postgres → Settings → Scale → Regions & Replicas) — **not EU**. Recorded
   in `jvpdocs/eu-data-residency.md`, including what this means if an
   EU-based prospect requires data residency.
-- [ ] **Confirm Railway's automated-backup configuration** (frequency,
-  retention, point-in-time recovery availability) and record it in
+- [x] **Confirm Railway's automated-backup configuration** — done: PITR
+  enabled (continuous WAL archiving, after a one-time credential fix) +
+  daily volume backup schedule + on-demand backups. Recorded in
   `jvpdocs/backup-retention-policy.md`.
-- [ ] **Actually perform a restore drill** against the production backup
-  and log the result in the table in `jvpdocs/backup-retention-policy.md`
-  — a backup policy nobody has tested is a guess, not a policy.
+- [x] **Actually perform a restore drill** — done 2026-08-22: PITR restore
+  to a new standalone Postgres service, sub-minute recovery time, row
+  counts verified (`users`=7, `cost_models`=20, `audit_logs`=45),
+  production untouched, temporary service deleted afterward. Logged in
+  `jvpdocs/backup-retention-policy.md`.
 - [ ] **Name real people** for the four roles in
   `jvpdocs/incident-response.md`'s role table.
 - [ ] **Obtain and countersign DPAs** for every vendor in
