@@ -26,6 +26,7 @@ from app.models.alerts import AlertSubscription, AlertEvent
 from app.models.refresh_token import RefreshToken
 from app.models.auth_event import AuthEvent
 from app.models.index_projection import IndexProjectionRun, IndexProjectionPoint
+from app.models.sheet_import_run import SheetImportRun, SheetImportRowDiff
 
 __all__ = [
     "User",
@@ -70,4 +71,6 @@ __all__ = [
     "AuthEvent",
     "IndexProjectionRun",
     "IndexProjectionPoint",
+    "SheetImportRun",
+    "SheetImportRowDiff",
 ]
