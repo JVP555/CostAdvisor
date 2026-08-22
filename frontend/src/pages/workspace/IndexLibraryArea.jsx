@@ -579,6 +579,24 @@ export default function IndexLibraryArea() {
     }
   };
 
+  // Project forecasts (Scrum 70) — fits a new vintage for every (commodity,
+  // region) series with history, via POST /api/indexes/project-all. Same
+  // "run the weekly job right now" pattern as handleSyncIndexes above — the
+  // weekly Celery task exists, but waiting up to 7 days to see a brand-new
+  // feature work for the first time isn't a substitute for an on-demand run.
+  const [projecting, setProjecting] = useState(false);
+  const handleProjectIndexes = async () => {
+    setProjecting(true);
+    try {
+      const { data: res } = await api.post('/api/indexes/project-all');
+      addToast(`Forecasts updated — ${res?.series_projected ?? 0} series (${res?.fitted ?? 0} fitted, ${res?.hold ?? 0} held flat, ${res?.no_history ?? 0} no history).`, 'success');
+    } catch (err) {
+      addToast(formatApiError(err) || 'Projection failed', 'error');
+    } finally {
+      setProjecting(false);
+    }
+  };
+
   // Export exactly what's on screen, in display order — same filtered set the
   // table renders, so the CSV can never disagree with the grid.
   const handleExport = () => {
@@ -638,6 +656,12 @@ export default function IndexLibraryArea() {
             <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleSyncIndexes} disabled={syncingIdx}
               title="Scrape latest values for all scrape-enabled commodity indexes (super-admin)">
               {syncingIdx ? 'Syncing…' : '⟳ Sync indexes'}
+            </button>
+          )}
+          {isSuperAdmin && (
+            <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleProjectIndexes} disabled={projecting}
+              title="Fit a new forecast vintage for every index series with history — feeds the lock/hold verdict on product pages (super-admin)">
+              {projecting ? 'Projecting…' : '⟳ Project forecasts'}
             </button>
           )}
           {isSuperAdmin && (

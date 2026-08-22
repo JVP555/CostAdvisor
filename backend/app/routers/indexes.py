@@ -31,7 +31,9 @@ from app.services.data_resolver import resolve_index_values
 from app.services.file_parser import parse_index_upload
 from app.services.scraper import GenericWebScraper, smart_scrape, smart_scrape_all, detect_source_type, ScrapedDataPoint
 from app.services.audit import log_event
-from app.services.index_projection import run_projection, latest_projection, DEFAULT_HORIZON_QUARTERS
+from app.services.index_projection import (
+    run_projection, latest_projection, project_all_series, DEFAULT_HORIZON_QUARTERS,
+)
 
 router = APIRouter()
 
@@ -1284,6 +1286,20 @@ async def scrape_all_indexes(
     db.commit()
     return {"scrapers_run": len(scraped), "values_updated": updated,
             "commodities_without_scraper": no_scraper}
+
+
+@router.post("/project-all")
+def project_all_indexes(
+    horizon: int = Query(DEFAULT_HORIZON_QUARTERS, ge=1, le=12),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """On-demand (re)projection of every (commodity, region) series that has
+    history — the same work the weekly Celery job does, callable immediately.
+    Super-admin only, same tier as /scrape-all. Mirrors that endpoint's
+    synchronous, return-counts shape rather than enqueuing a background job."""
+    require_super_admin(current_user)
+    return project_all_series(db, horizon_quarters=horizon)
 
 
 @router.post("/{commodity_id}/project", response_model=IndexProjectionOut)

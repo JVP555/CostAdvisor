@@ -194,6 +194,18 @@ def run_projection(
     return run
 
 
+def project_all_series(db: Session, horizon_quarters: int = DEFAULT_HORIZON_QUARTERS) -> dict:
+    """Refresh the projection vintage for every (commodity, region) pair that
+    has at least one IndexValue row. Shared by the on-demand admin endpoint
+    and the weekly Celery task so there's one loop, not two."""
+    pairs = db.query(IndexValue.commodity_id, IndexValue.region).distinct().all()
+    counts = {"fitted": 0, "hold": 0, "no_history": 0}
+    for commodity_id, region in pairs:
+        run = run_projection(db, commodity_id, region, horizon_quarters=horizon_quarters)
+        counts[run.status] = counts.get(run.status, 0) + 1
+    return {"series_projected": len(pairs), **counts}
+
+
 def latest_projection(db: Session, commodity_id: int, region: str) -> IndexProjectionRun | None:
     return (
         db.query(IndexProjectionRun)

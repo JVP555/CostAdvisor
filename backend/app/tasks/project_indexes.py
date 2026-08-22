@@ -1,7 +1,6 @@
 from app.tasks import celery_app
 from app.database import SessionLocal, bypass_rls_var
-from app.models.index_data import IndexValue
-from app.services.index_projection import run_projection, DEFAULT_HORIZON_QUARTERS
+from app.services.index_projection import project_all_series, DEFAULT_HORIZON_QUARTERS
 
 
 @celery_app.task(name="app.tasks.project_indexes.project_all")
@@ -12,17 +11,6 @@ def project_all(horizon_quarters: int = DEFAULT_HORIZON_QUARTERS):
     bypass_rls_var.set(True)  # System task — no user context
     db = SessionLocal()
     try:
-        pairs = (
-            db.query(IndexValue.commodity_id, IndexValue.region)
-            .distinct()
-            .all()
-        )
-
-        results = {}
-        for commodity_id, region in pairs:
-            run = run_projection(db, commodity_id, region, horizon_quarters=horizon_quarters)
-            results[f"{commodity_id}:{region}"] = run.status
-
-        return results
+        return project_all_series(db, horizon_quarters=horizon_quarters)
     finally:
         db.close()
