@@ -5,6 +5,7 @@ import api from '../api';
 import exportCsv from '../utils/exportCsv';
 import FormulaDetailModal from '../components/FormulaDetailModal';
 import FileUpload from '../components/FileUpload';
+import SheetRoundTripPanel from '../components/SheetRoundTripPanel';
 import { stripReservedFns } from '../utils/formulaFns';
 import NumberInput from '../components/NumberInput';
 import { normalizeVarMap } from '../components/VariableMapEditor';
@@ -294,6 +295,7 @@ function CatalogSection({ rows, canEdit, onEdit, onDelete, onOpen, canFork = fal
   const [confFilter, setConfFilter] = useState('all');
   const [expanded, setExpanded] = useState(() => new Set());
   const [showPriceImport, setShowPriceImport] = useState(false);
+  const [showRoundTrip, setShowRoundTrip] = useState(false);
 
   const catalogRows = rows.filter(t => t.code);
   const otherRows = rows.filter(t => !t.code);
@@ -380,6 +382,12 @@ function CatalogSection({ rows, canEdit, onEdit, onDelete, onOpen, canFork = fal
                 Import Prices
               </button>
             )}
+            {canEdit && (
+              <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }}
+                onClick={() => setShowRoundTrip(v => !v)}>
+                Review &amp; Apply Price Changes
+              </button>
+            )}
             <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 11 }} onClick={handleExport}>
               Export CSV
             </button>
@@ -413,6 +421,8 @@ function CatalogSection({ rows, canEdit, onEdit, onDelete, onOpen, canFork = fal
           </div>
         </div>
       )}
+
+      {showRoundTrip && canEdit && <SheetRoundTripPanel catalogRows={catalogRows} />}
 
       {catalogRows.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap' }}>
