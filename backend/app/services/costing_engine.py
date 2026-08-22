@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from app.models.cost_model import CostModel
 from app.models.price_data import ActualPrice
 from app.models.actual_volume import ActualVolume
-from app.services.data_resolver import get_single_index_value, get_single_index_value_detailed
+from app.services.data_resolver import (
+    get_single_index_value, get_single_index_value_detailed, get_forward_index_value,
+)
 from app.services.volume_projector import project_volumes
 from app.services.narrative import generate_narrative
 from app.services.fx_converter import convert_price
@@ -19,7 +21,7 @@ from app.schemas.costing import (
     SqueezeRequest, SqueezeResult, SqueezePeriod,
     BriefRequest, BriefResult, BriefDriver,
     PriceChangeRequest, PriceChangeResult, PriceChangeComponent,
-    DataGap,
+    DataGap, ForwardShouldCostResult,
 )
 
 # ── Advanced formula evaluator ─────────────────────────────────
@@ -1237,3 +1239,172 @@ def _compute_advanced_cost(
     except Exception:
         # Fall back to base_price so callers always get a numeric result.
         return float(fv.base_price)
+
+
+# ── Forward should-cost (Scrum 70 Part 2) ──────────────────────────────────
+# A lock/hold verdict needs a should-cost N quarters from now, built from the
+# projection service's stored forecasts rather than scraped IndexValue rows.
+# These are deliberately SIBLINGS of _compute_indexed_cost(_detailed)/
+# _compute_advanced_cost, not a parameter threaded into them: those three are
+# called from calculate_should_cost/calculate_evolution/calculate_squeeze/
+# calculate_should_cost_breakdown today, and the forward path needs to hard-
+# fail to "insufficient" the instant one component has no forecast — logic
+# that doesn't belong in those already-tested call sites.
+
+def _advance_quarter(year: int, quarter: int, steps: int) -> tuple[int, int]:
+    q = year * 4 + (quarter - 1) + steps
+    return q // 4, (q % 4) + 1
+
+
+def _compute_indexed_cost_forward(
+    db: Session,
+    fv,
+    cost_model: CostModel,
+    region: str,
+    ref_year: int,
+    ref_quarter: int,
+    target_year: int,
+    target_quarter: int,
+    base_price: float,
+) -> tuple[float | None, list, dict[int, dict]]:
+    """Mirrors _compute_indexed_cost_detailed's loop exactly, but the CURRENT-
+    period value comes from get_forward_index_value instead of
+    get_single_index_value_detailed; the reference period stays historical.
+    Returns (None, gaps, {}) — never a fabricated ratio=1.0 — the moment any
+    commodity-linked component has no usable forecast. Fixed-weight components
+    (no commodity_id) always ratio=1.0 — nothing to forecast, not a gap."""
+    comp_base = _component_base(base_price, fv.margin_type, fv.margin_value)
+    indexed_cost = 0.0
+    cur_label = _period_label(target_year, target_quarter)
+    meta_by_commodity: dict[int, dict] = {}
+
+    for comp in fv.components:
+        weight = float(comp.weight)
+        if comp.commodity_id:
+            ref_val, _ = get_single_index_value_detailed(
+                db, cost_model.team_id, comp.commodity_id, region, ref_year, ref_quarter
+            )
+            cur_val, meta = get_forward_index_value(
+                db, cost_model.team_id, comp.commodity_id, region, target_year, target_quarter
+            )
+            if not ref_val or cur_val is None:
+                reason = "no forecast available" if ref_val else "no reference index value found"
+                return None, [DataGap(component_label=comp.label, period=cur_label, reason=reason)], {}
+            ratio = cur_val / ref_val
+            if meta:
+                meta_by_commodity[comp.commodity_id] = meta
+        else:
+            ratio = 1.0
+        indexed_cost += comp_base * weight * ratio
+    return indexed_cost, [], meta_by_commodity
+
+
+def _compute_advanced_cost_forward(
+    db: Session,
+    fv,
+    cost_model: CostModel,
+    region: str,
+    target_year: int,
+    target_quarter: int,
+) -> tuple[float | None, list, dict[int, dict]]:
+    """Advanced-formula counterpart to _compute_indexed_cost_forward — same
+    expression, but index variables resolve via get_forward_index_value."""
+    cur_label = _period_label(target_year, target_quarter)
+    if not fv.expression:
+        return None, [DataGap(component_label="expression", period=cur_label, reason="no expression")], {}
+
+    context: dict[str, float] = {}
+    meta_by_commodity: dict[int, dict] = {}
+    for var_name, var_def in (fv.variables or {}).items():
+        if var_def.get('type') == 'index' and var_def.get('commodity_id'):
+            val, meta = get_forward_index_value(
+                db, cost_model.team_id, var_def['commodity_id'], region, target_year, target_quarter,
+            )
+            if val is None:
+                return None, [DataGap(component_label=var_name, period=cur_label, reason="no forecast available")], {}
+            context[var_name] = val
+            if meta:
+                meta_by_commodity[var_def['commodity_id']] = meta
+        else:
+            context[var_name] = float(var_def.get('value', 0))
+
+    try:
+        return safe_eval_expr(fv.expression, context), [], meta_by_commodity
+    except Exception:
+        return None, [DataGap(component_label="expression", period=cur_label, reason="expression evaluation failed")], {}
+
+
+def calculate_forward_should_cost(
+    db: Session,
+    cost_model: CostModel,
+    horizon_quarters: int,
+) -> ForwardShouldCostResult:
+    """Evaluate the CURRENT FormulaVersion horizon_quarters ahead of today,
+    using Scrum 70 Part 1's projected index values for the target quarter.
+    Works for any cost model — hand-built or catalog-linked — because it walks
+    the same fv.components/fv.variables shape calculate_should_cost already
+    walks; no FormulaRegionCoverage dependency."""
+    now_y, now_q = _current_quarter()
+    h_year, h_quarter = _advance_quarter(now_y, now_q, horizon_quarters)
+
+    fv = cost_model.current_formula
+    if not fv:
+        return ForwardShouldCostResult(
+            insufficient=True, horizon_year=h_year, horizon_quarter=h_quarter,
+            data_gaps=[DataGap(component_label="formula", period=_period_label(h_year, h_quarter),
+                                reason="no active formula")],
+        )
+
+    base_price = _effective_base_price(db, cost_model.id, fv)
+    region = cost_model.region
+    ref_year, ref_quarter = fv.base_year, fv.base_quarter
+    formula_type = getattr(fv, 'formula_type', 'simple') or 'simple'
+
+    has_commodity_component = (
+        any(c.commodity_id for c in fv.components) if formula_type != 'advanced'
+        else any(v.get('type') == 'index' and v.get('commodity_id') for v in (fv.variables or {}).values())
+    )
+    if not has_commodity_component:
+        # Nothing to forecast is not the same as missing data — an all-fixed
+        # formula's should-cost is deterministically unchanged at any horizon.
+        current = calculate_should_cost(db, cost_model)
+        return ForwardShouldCostResult(
+            insufficient=False, forecast_should_cost=current.should_cost,
+            forecast_vintage=None, forecast_method="fixed_formula_no_forecast_needed",
+            horizon_year=h_year, horizon_quarter=h_quarter, data_gaps=[],
+        )
+
+    if formula_type == 'advanced':
+        indexed_cost, data_gaps, meta = _compute_advanced_cost_forward(
+            db, fv, cost_model, region, h_year, h_quarter,
+        )
+        margin_amount = 0.0
+        should_cost = indexed_cost
+    else:
+        indexed_cost, data_gaps, meta = _compute_indexed_cost_forward(
+            db, fv, cost_model, region, ref_year, ref_quarter, h_year, h_quarter, base_price,
+        )
+        should_cost = None
+        if indexed_cost is not None:
+            should_cost, margin_amount = _apply_margin(
+                indexed_cost, fv.margin_type, fv.margin_value, base_price
+            )
+
+    if should_cost is None:
+        return ForwardShouldCostResult(
+            insufficient=True, horizon_year=h_year, horizon_quarter=h_quarter, data_gaps=data_gaps,
+        )
+
+    vintages = [m["vintage"] for m in meta.values() if m.get("vintage") is not None]
+    methods = {m["method"] for m in meta.values() if m.get("method")}
+    forecast_vintage = min(vintages) if vintages else None
+    forecast_method = next(iter(methods)) if len(methods) == 1 else ("mixed" if len(methods) > 1 else None)
+
+    return ForwardShouldCostResult(
+        insufficient=False,
+        forecast_should_cost=round(should_cost, 4),
+        forecast_vintage=forecast_vintage,
+        forecast_method=forecast_method,
+        horizon_year=h_year, horizon_quarter=h_quarter,
+        data_gaps=data_gaps,
+    )

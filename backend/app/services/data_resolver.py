@@ -317,6 +317,70 @@ def compute_composite_value(
         return None
 
 
+def get_forward_index_value(
+    db: Session,
+    team_id: uuid.UUID,
+    commodity_id: int,
+    region: str,
+    year: int,
+    quarter: int,
+) -> tuple[float | None, dict | None]:
+    """Resolve a FUTURE-period value for the forward should-cost path (Scrum 70
+    Part 2) only — never used for historical/current periods.
+
+    Priority: a team's fixed source, then an explicit team override for that
+    future quarter (a team's own forward data legitimately applies — same top
+    two tiers as get_single_index_value_detailed), then the latest projection
+    vintage (Scrum 70 Part 1) for (commodity_id, region).
+
+    Deliberately does NOT fall through to scraped_region/scraped_global/
+    scraped_any_region/scraped_temporal_carry_forward — those tiers exist so a
+    historical ratio never flattens to 1.0 for lack of data, but reusing them
+    here would let a flat carry-forward pose as a real forecast, exactly what
+    the projection service exists to prevent.
+
+    Composite/calculated indexes are not forward-resolved in this pass (their
+    components would each need their own forward resolution) — they return
+    the explicit no-forecast result below, same as any other unprojected series.
+
+    Returns (None, None) — an explicit gap — when nothing resolves.
+    """
+    from app.services.index_projection import latest_projection
+
+    fixed_source = db.query(TeamIndexSource).filter(
+        TeamIndexSource.team_id == team_id,
+        TeamIndexSource.commodity_id == commodity_id,
+        TeamIndexSource.region == region,
+        TeamIndexSource.source_type == "fixed",
+    ).first()
+    if fixed_source and fixed_source.fixed_value is not None:
+        return float(fixed_source.fixed_value), {"method": "fixed", "status": "fixed"}
+
+    override = db.query(IndexOverride).filter(
+        IndexOverride.team_id == team_id,
+        IndexOverride.commodity_id == commodity_id,
+        IndexOverride.region == region,
+        IndexOverride.year == year,
+        IndexOverride.quarter == quarter,
+    ).first()
+    if override and override.value is not None:
+        return float(override.value), {"method": "team_override", "status": "team_override"}
+
+    run = latest_projection(db, commodity_id, region)
+    if run is None:
+        return None, None
+    point = next((p for p in run.points if p.year == year and p.quarter == quarter), None)
+    if point is None:
+        return None, None
+    return float(point.value), {
+        "vintage": run.vintage_at,
+        "method": run.method,
+        "status": run.status,
+        "ci_lo": float(point.ci_lo) if point.ci_lo is not None else None,
+        "ci_hi": float(point.ci_hi) if point.ci_hi is not None else None,
+    }
+
+
 def get_single_index_value(
     db: Session,
     team_id: uuid.UUID,

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from pydantic import BaseModel
 
 
@@ -55,6 +56,21 @@ class ShouldCostBreakdown(BaseModel):
     unit: str
     incoterm: str | None = None
     normalized_to_incoterm: str | None = None
+
+
+# ── Forward should-cost (Scrum 70 Part 2) ──────────────────────────────────
+
+class ForwardShouldCostResult(BaseModel):
+    """A should-cost evaluated `horizon_quarters` ahead of today, using Scrum 70
+    Part 1's projected index values instead of scraped ones. `insufficient=True`
+    means no forecast should-cost was produced — never a fabricated number."""
+    insufficient: bool
+    forecast_should_cost: float | None = None
+    forecast_vintage: datetime | None = None
+    forecast_method: str | None = None
+    horizon_year: int
+    horizon_quarter: int
+    data_gaps: list["DataGap"] = []
 
 
 class EvolutionRequest(BaseModel):
