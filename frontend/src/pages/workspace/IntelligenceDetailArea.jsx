@@ -1,29 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api, { formatApiError } from '../../api';
-import { qLabel } from '../../utils/quarters';
 import { MultiLineChart } from './wsCharts';
 
 /* ──────────────────────────────────────────────────────────────────────
  * Intelligence detail — modelled on sample_idea/intelligence_mockup.html.
  * ONE /api/costing/brief call feeds Tab 1 "Market & Pricing": should-cost
- * index history (rebased to base 100) + a STUB forecast band, an index-driver
- * decomposition, the stored (cached) AI narrative read-only, and derived
- * cycle-position / snapshot cards. Tab 2 "Product Intelligence" is a flagged
- * placeholder — its expert-authored reference content needs a backend
- * persistence + review layer that doesn't exist yet. No new engine.
+ * index history (rebased to base 100), an index-driver decomposition, the
+ * stored (cached) AI narrative read-only, and derived cycle-position /
+ * snapshot cards. Tab 2 "Product Intelligence" is a flagged placeholder —
+ * its expert-authored reference content needs a backend persistence +
+ * review layer that doesn't exist yet. No new engine.
+ *
+ * A flat ±1.5% illustrative forecast band used to sit on the chart here —
+ * removed rather than kept as a placeholder that looks like a forecast but
+ * isn't one (same treatment as ForecastArea.jsx). The real per-(commodity,
+ * region) projection engine (Scrum 21) doesn't have a 1:1 substitute for
+ * this page's already-weighted should-cost index without a page redesign;
+ * for a real forecast see the Index Library or a product's buy-window
+ * verdict.
  * ──────────────────────────────────────────────────────────────────── */
 
 const curSym = (c) => (c === 'EUR' ? '€' : c === 'USD' ? '$' : c === 'GBP' ? '£' : c ? `${c} ` : '');
-const FORECAST_STEPS = 2;          // stub: quarters projected past the last real period
-const FORECAST_BAND = 0.015;       // stub: ±1.5% illustrative range
-
-function nextQuarters(year, quarter, n) {
-  const out = [];
-  let y = year, q = quarter;
-  for (let i = 0; i < n; i++) { q += 1; if (q > 4) { q = 1; y += 1; } out.push({ year: y, quarter: q, label: qLabel(y, q) }); }
-  return out;
-}
 
 const dirIcon = (d) => (d === 'up' ? '↑' : d === 'down' ? '↓' : '→');
 
@@ -65,25 +63,10 @@ export default function IntelligenceDetailArea() {
   const idxTheo = base ? theo.map(v => (v != null ? (v / base) * 100 : null)) : theo;
   const idxActual = base ? periods.map(p => (p.actual != null ? (p.actual / base) * 100 : null)) : periods.map(p => p.actual);
 
-  // Stub forecast: flat continuation of the last real should-cost index + a ±band.
-  const lastIdx = idxTheo.length ? idxTheo[idxTheo.length - 1] : null;
-  const last = N ? periods[N - 1] : null;
-  const fLabels = last ? nextQuarters(last.year, last.quarter, FORECAST_STEPS).map(o => o.label) : [];
-  const pad = Array(FORECAST_STEPS).fill(null);
-  const at = (i, v) => { const a = Array(N + FORECAST_STEPS).fill(null); a[i] = v; return a; };
-  const fLine = last != null ? (() => { const a = at(N - 1, lastIdx); for (let i = 0; i < FORECAST_STEPS; i++) a[N + i] = lastIdx; return a; })() : [];
-  const fUp = last != null ? (() => { const a = at(N - 1, lastIdx); for (let i = 0; i < FORECAST_STEPS; i++) a[N + i] = lastIdx * (1 + FORECAST_BAND); return a; })() : [];
-  const fDn = last != null ? (() => { const a = at(N - 1, lastIdx); for (let i = 0; i < FORECAST_STEPS; i++) a[N + i] = lastIdx * (1 - FORECAST_BAND); return a; })() : [];
-
-  const xLabels = [...periods.map(p => p.period), ...fLabels];
+  const xLabels = periods.map(p => p.period);
   const series = [
-    { name: 'Should-cost index', color: 'var(--accent)', values: [...idxTheo, ...pad] },
-    { name: 'Actual', color: 'var(--accent4)', values: [...idxActual, ...pad] },
-    ...(last != null ? [
-      { name: 'Forecast (stub)', color: 'var(--accent3)', values: fLine, dashed: true },
-      { color: 'var(--muted)', values: fUp, dashed: true },
-      { color: 'var(--muted)', values: fDn, dashed: true },
-    ] : []),
+    { name: 'Should-cost index', color: 'var(--accent)', values: idxTheo },
+    { name: 'Actual', color: 'var(--accent4)', values: idxActual },
   ];
 
   // Cycle position from the should-cost history (min / max / latest).
@@ -131,14 +114,14 @@ export default function IntelligenceDetailArea() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
             {/* Index chart */}
             <div className="ca-card">
-              <div className="ca-card-title">Should-cost index — history + forecast</div>
+              <div className="ca-card-title">Should-cost index — history</div>
               {N >= 2 ? (
-                <MultiLineChart series={series} xLabels={xLabels} height={240} refValue={base ? 100 : null} refLabel="base 100" splitIndex={last != null ? N : null} splitLabel="Forecast" />
+                <MultiLineChart series={series} xLabels={xLabels} height={240} refValue={base ? 100 : null} refLabel="base 100" />
               ) : (
                 <div style={{ color: 'var(--muted)', fontSize: 12, padding: 16 }}>Not enough history to chart. Record actuals / index data across quarters.</div>
               )}
               <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>
-                Formula-weighted should-cost, rebased to 100 at {periods[0]?.period || 'start'}. Dashed segment past “Forecast” is an <strong>illustrative stub</strong> (±1.5% range) — no forecast engine yet.
+                Formula-weighted should-cost, rebased to 100 at {periods[0]?.period || 'start'}. Real history only — no forecast engine for this weighted index yet; see the Index Library or a product's buy-window verdict for a real forecast.
               </div>
             </div>
 
