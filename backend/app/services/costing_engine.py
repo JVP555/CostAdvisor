@@ -1455,3 +1455,27 @@ def calculate_forward_should_cost(
         horizon_year=h_year, horizon_quarter=h_quarter,
         data_gaps=data_gaps,
     )
+
+
+# ── Should-cost for one period, given a model (Scrum 23) ──────────────────
+# Extracted here (was private to routers/suppliers.py) so Scrum 32's supplier
+# trust scorer can reuse the exact same should-cost math benchmarking already
+# uses, rather than a second, driftable copy.
+
+def should_cost_for_period(db: Session, model: CostModel, year: int, quarter: int) -> float | None:
+    """Should-cost for one cost model at one quarter, using the formula active that
+    period (same pipeline as the Excel export / costing engine). Returns None if the
+    model has no formula."""
+    period_fv = model.formula_for_period(year, quarter)
+    if not period_fv:
+        return None
+    pbp = float(period_fv.base_price)
+    indexed_cost = _compute_indexed_cost(
+        db, period_fv, model, model.region,
+        period_fv.base_year, period_fv.base_quarter,
+        year, quarter, pbp,
+    )
+    theoretical, _margin = _apply_margin(
+        indexed_cost, period_fv.margin_type, period_fv.margin_value, pbp,
+    )
+    return theoretical
