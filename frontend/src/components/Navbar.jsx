@@ -63,15 +63,16 @@ export default function Navbar() {
   ];
 
   // Old flat-nav pages with no slot in the 8-tab journey shell. This is not a
-  // leftovers list — /formulas and /alerts have no other inbound link anywhere
-  // in the app, and /suppliers' only one is a back-button from its own child,
-  // so for three of these five this menu is the sole entry point.
+  // leftovers list — /formulas, /alerts and /quotes have no other inbound
+  // link anywhere in the app, and /suppliers' only one is a back-button from
+  // its own child, so for four of these six this menu is the sole entry point.
   const goToLinks = [
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/products', label: 'Products' },
     { path: '/suppliers', label: 'Suppliers' },
     { path: '/formulas', label: 'Formulas' },
     { path: '/alerts', label: 'Alerts' },
+    { path: '/quotes', label: 'Quotes' },
   ];
 
   const handleLogout = async () => { setOpen(false); await logout(); };

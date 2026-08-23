@@ -677,7 +677,7 @@ def negotiation_position(
     year: int,
     quarter: int,
     team_id: uuid.UUID,
-    supplier_price: float,
+    supplier_price: float | None = None,
     supplier_currency: str | None = None,
     supplier_unit: str | None = None,
     supplier_incoterm: str | None = None,
@@ -687,6 +687,10 @@ def negotiation_position(
     # GET call never sends — accepted as a JSON-encoded string instead so it
     # actually arrives as a query param.
     incoterm_adjustments: str | None = None,
+    # Scrum 31b — an alternative to typing supplier_price by hand: pull it
+    # (and currency/unit/incoterm) straight from a confirmed quote record
+    # line. Mutually exclusive with supplier_price.
+    quote_line_id: uuid.UUID | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -698,6 +702,27 @@ def negotiation_position(
     _get_visible_template(db, template_id, team_id)
     if not (1 <= quarter <= 4) or not (2000 <= year <= 2100):
         raise HTTPException(status_code=400, detail="Invalid period")
+
+    if (supplier_price is None) == (quote_line_id is None):
+        raise HTTPException(status_code=400, detail="Provide exactly one of supplier_price or quote_line_id")
+
+    if quote_line_id is not None:
+        from app.models.quote import QuoteRecordLine, QuoteRecord
+
+        quote_line = (
+            db.query(QuoteRecordLine)
+            .join(QuoteRecord, QuoteRecordLine.quote_record_id == QuoteRecord.id)
+            .filter(QuoteRecordLine.id == quote_line_id, QuoteRecord.team_id == team_id)
+            .first()
+        )
+        if not quote_line:
+            raise HTTPException(status_code=404, detail="Quote record line not found")
+        if quote_line.price is None:
+            raise HTTPException(status_code=400, detail="Quote line has no price")
+        supplier_price = float(quote_line.price)
+        supplier_currency = quote_line.currency
+        supplier_unit = quote_line.unit
+        supplier_incoterm = quote_line.incoterm
 
     parsed_adjustments = None
     if incoterm_adjustments:

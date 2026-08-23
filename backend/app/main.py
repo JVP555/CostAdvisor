@@ -16,7 +16,7 @@ from app.routers import (
     volumes, costing, scenarios, suppliers, chemical_families, subfamilies,
     fx_rates, audit, portfolio, admin, ai, account, freight_lanes,
     invites, access_requests, settings as settings_router, formulas, demo, regions,
-    collaboration, alerts, provider_credentials, sheets,
+    collaboration, alerts, provider_credentials, sheets, quotes,
 )
 # Imported for its side effect: registers the before_flush listener that
 # auto-registers region codes so the region FK never rejects a user write.
@@ -74,6 +74,7 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(indexes.router, prefix="/api/indexes", tags=["indexes"])
 app.include_router(provider_credentials.router, prefix="/api/indexes", tags=["provider-credentials"])
 app.include_router(sheets.router, prefix="/api/sheets", tags=["sheets"])
+app.include_router(quotes.router, prefix="/api/quotes", tags=["quotes"])
 app.include_router(prices.router, prefix="/api/prices", tags=["prices"])
 app.include_router(volumes.router, prefix="/api/volumes", tags=["volumes"])
 app.include_router(fx_rates.router, prefix="/api/fx-rates", tags=["fx-rates"])
