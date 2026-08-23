@@ -13,11 +13,16 @@ from app.models.formula_template import (
     FormulaTemplateComponent,
     FormulaRegionCoverage,
 )
+from app.models.formula_estimator import EstimatorProposal, EstimatorProposalLine
 from app.models.index_data import CommodityIndex
 from app.models.region import Region
 from app.models.team import TeamMembership
 from app.models.user import User
 from app.routers.auth import get_current_user
+from app.schemas.formula_estimator import (
+    BacktestReportOut,
+    EstimatorProposalOut,
+)
 from app.schemas.formula_template import (
     FormulaTemplateCreate,
     FormulaTemplateUpdate,
@@ -33,6 +38,12 @@ from app.schemas.formula_template import (
 )
 from app.schemas.negotiation_position import NegotiationResponseOut
 from app.services.audit import log_event
+from app.services.formula_estimator import (
+    approve_proposal,
+    create_or_update_proposal,
+    reject_proposal,
+    run_backtest,
+)
 from app.services.formula_resolver import (
     FormulaChainError,
     assert_valid_chain_input,
@@ -568,6 +579,119 @@ def delete_coverage(
     db.delete(row)
     db.commit()
     return {"status": "deleted"}
+
+
+# ── Cost-structure estimator (Scrum 33) ─────────────────────────────────────
+# Drafts only — never mutates the live recipe until explicitly approved. See
+# services/formula_estimator.py for the sibling-region-inheritance +
+# priced-history-correlation design.
+
+@router.post("/{template_id}/estimator/propose", response_model=EstimatorProposalOut)
+def propose_estimator_recipe(
+    template_id: uuid.UUID,
+    region: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    template = _get_visible_template(db, template_id)
+    _require_template_edit(db, current_user, template)
+
+    try:
+        proposal = create_or_update_proposal(db, template_id, region)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    audit_team_id = template.team_id or _first_team_id(db, current_user.id)
+    if audit_team_id:
+        log_event(db, audit_team_id, current_user.id, "propose", "estimator_proposal",
+                  f"{template_id}:{region}", new_value={"status": proposal.status, "line_count": len(proposal.lines)})
+    db.commit()
+    return proposal
+
+
+@router.get("/{template_id}/estimator/proposal", response_model=EstimatorProposalOut)
+def get_estimator_proposal(
+    template_id: uuid.UUID,
+    region: str,
+    team_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_permission(db, current_user, team_id, "formulas.view")
+    _get_visible_template(db, template_id, team_id)
+    proposal = db.query(EstimatorProposal).filter(
+        EstimatorProposal.template_id == template_id, EstimatorProposal.region == region,
+    ).first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="No estimator proposal for this combo")
+    return proposal
+
+
+@router.post("/estimator/proposals/{proposal_id}/approve", response_model=FormulaCoverageOut)
+def approve_estimator_proposal(
+    proposal_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    proposal = db.query(EstimatorProposal).filter(EstimatorProposal.id == proposal_id).first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    template = _get_visible_template(db, proposal.template_id)
+    _require_template_edit(db, current_user, template)
+
+    try:
+        coverage = approve_proposal(db, proposal, current_user.id, current_user.email)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    audit_team_id = template.team_id or _first_team_id(db, current_user.id)
+    if audit_team_id:
+        log_event(db, audit_team_id, current_user.id, "approve", "estimator_proposal",
+                  str(proposal_id), new_value={"template_id": str(proposal.template_id), "region": proposal.region})
+
+    out = FormulaCoverageOut.model_validate(coverage)
+    db.expunge(coverage)
+    db.commit()
+    return out
+
+
+@router.post("/estimator/proposals/{proposal_id}/reject")
+def reject_estimator_proposal(
+    proposal_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    proposal = db.query(EstimatorProposal).filter(EstimatorProposal.id == proposal_id).first()
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+    template = _get_visible_template(db, proposal.template_id)
+    _require_template_edit(db, current_user, template)
+
+    try:
+        reject_proposal(db, proposal)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    audit_team_id = template.team_id or _first_team_id(db, current_user.id)
+    if audit_team_id:
+        log_event(db, audit_team_id, current_user.id, "reject", "estimator_proposal", str(proposal_id))
+    db.commit()
+    return {"status": "rejected"}
+
+
+@router.get("/estimator/backtest", response_model=BacktestReportOut)
+def estimator_backtest(
+    template_id: uuid.UUID | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Runs the estimator against every combo that already has a trustworthy
+    human recipe, holding each one out (sibling search always excludes a
+    combo's own region, so this is non-circular by construction) and
+    reporting how well the proposal matches the real recipe. Optionally
+    scoped to one template instead of the whole catalog."""
+    require_platform_permission(db, current_user, "formulas.edit")
+    return run_backtest(db, template_id=template_id)
 
 
 @router.post("/coverage/upload")

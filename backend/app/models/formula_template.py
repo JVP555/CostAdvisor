@@ -202,6 +202,12 @@ class FormulaRegionCoverage(Base):
     # expert reviews against. Loaded as metadata, never re-applied (the weight
     # corrections are already baked into the source lines).
     review_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # ── Provenance (Scrum 33) — orthogonal to data_confidence: not "how much
+    # do we trust it" but "how did it get here". "imported" (Scrum 59/60
+    # seeding, the default for every pre-existing row) / "ai_draft" (the
+    # estimator proposed it, not yet reviewed) / "human_approved" (a person
+    # signed off — via mark_coverage_reviewed or estimator approval).
+    provenance: Mapped[str] = mapped_column(String(16), default="imported", server_default="imported")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
