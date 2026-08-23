@@ -1,3 +1,4 @@
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -30,6 +31,7 @@ from app.schemas.formula_template import (
     ResolvedLineOut,
     FormulaEvaluateOut,
 )
+from app.schemas.negotiation_position import NegotiationResponseOut
 from app.services.audit import log_event
 from app.services.formula_resolver import (
     FormulaChainError,
@@ -39,6 +41,7 @@ from app.services.formula_resolver import (
     resolve_coverage,
     get_visible_template,
 )
+from app.services.negotiation_position import compute_negotiation_position
 from app.services.permissions import require_permission, require_platform_permission, has_platform_permission
 
 router = APIRouter()
@@ -665,6 +668,81 @@ def evaluate_formula(
         l["commodity_name"] = commodity_names.get(l["commodity_id"])
 
     return FormulaEvaluateOut(template_id=template_id, **result)
+
+
+@router.get("/{template_id}/negotiation-position", response_model=NegotiationResponseOut)
+def negotiation_position(
+    template_id: uuid.UUID,
+    region: str,
+    year: int,
+    quarter: int,
+    team_id: uuid.UUID,
+    supplier_price: float,
+    supplier_currency: str | None = None,
+    supplier_unit: str | None = None,
+    supplier_incoterm: str | None = None,
+    combo_unit: str | None = None,
+    combo_incoterm: str | None = None,
+    # A bare `dict` type is classified by FastAPI as a request body, which a
+    # GET call never sends — accepted as a JSON-encoded string instead so it
+    # actually arrives as a query param.
+    incoterm_adjustments: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Negotiation position (Scrum 30b): a defensible target off the same
+    weighted-evaluation engine as /evaluate, the ask (supplier's number minus
+    target) normalised for currency/unit/Incoterm where declared, and an
+    explicit unexplained remainder — never a fabricated supplier counter."""
+    require_permission(db, current_user, team_id, "formulas.view")
+    _get_visible_template(db, template_id, team_id)
+    if not (1 <= quarter <= 4) or not (2000 <= year <= 2100):
+        raise HTTPException(status_code=400, detail="Invalid period")
+
+    parsed_adjustments = None
+    if incoterm_adjustments:
+        try:
+            parsed_adjustments = json.loads(incoterm_adjustments)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="incoterm_adjustments must be a JSON object")
+
+    try:
+        result = compute_negotiation_position(
+            db, team_id, template_id, region, year, quarter, supplier_price,
+            supplier_currency=supplier_currency, supplier_unit=supplier_unit,
+            supplier_incoterm=supplier_incoterm, combo_unit=combo_unit,
+            combo_incoterm=combo_incoterm, incoterm_adjustments=parsed_adjustments,
+        )
+    except FormulaChainError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Enrich every line (target + attributed_components share the same
+    # commodity_id/via_template_id keys) in two batch lookups, mirroring
+    # /resolve's enrichment — traceability requires the display names too.
+    all_lines = result["target"]["lines"] + result["position"]["attributed_components"]
+    commodity_ids = {l["commodity_id"] for l in all_lines if l["commodity_id"] is not None}
+    commodity_names = {
+        row.id: row.name
+        for row in db.query(CommodityIndex.id, CommodityIndex.name)
+        .filter(CommodityIndex.id.in_(commodity_ids)).all()
+    } if commodity_ids else {}
+    template_ids = {l["via_template_id"] for l in all_lines if l.get("via_template_id") is not None}
+    template_names = {
+        row.id: row.name
+        for row in db.query(FormulaTemplate.id, FormulaTemplate.name)
+        .filter(FormulaTemplate.id.in_(template_ids)).all()
+    } if template_ids else {}
+    for l in all_lines:
+        l["commodity_name"] = commodity_names.get(l["commodity_id"])
+        l["via_template_name"] = template_names.get(l.get("via_template_id"))
+
+    log_event(db, team_id, current_user.id, "negotiation_position_generated", "formula_template",
+              str(template_id), new_value={"region": region, "year": year, "quarter": quarter,
+                                            "supplier_price": supplier_price})
+    db.commit()
+    return NegotiationResponseOut(
+        template_id=template_id, region_requested=region, year=year, quarter=quarter, **result
+    )
 
 
 @router.get("/{template_id}/resolve", response_model=FormulaResolveOut)
