@@ -226,6 +226,34 @@ def test_resolution_flag_present(db, tenant_a, client_as):
         _cleanup(db, supplier_ids=[supplier.id])
 
 
+def test_resolution_flag_present_on_single_supplier_endpoints(db, tenant_a, client_as):
+    """The all-suppliers listing wraps its response with a top-level
+    `resolution` flag, but the single-supplier compute/get endpoints return a
+    bare list of score rows with no wrapper to carry it — so each row itself
+    must carry the flag, or a caller hitting one supplier at a time never
+    sees the disclosure at all."""
+    product = _mk_product(db, tenant_a["team_id"], tenant_a["user_id"], "P-single")
+    supplier = _mk_supplier(db, tenant_a["team_id"], "Single Lookup Co")
+    cm = _mk_flat_cost_model(db, tenant_a["team_id"], tenant_a["user_id"], product.id, supplier.id)
+    _add_prices(db, cm.id, tenant_a["user_id"], [110, 115, 120, 125])
+    c = client_as(tenant_a)
+    try:
+        r = c.post(f"/api/suppliers/{supplier.id}/trust-score/compute",
+                   params={"team_id": str(tenant_a["team_id"])})
+        assert r.status_code == 200, r.text
+        rows = r.json()
+        assert len(rows) == 1
+        assert rows[0]["resolution"] == "raw_supplier_name"
+
+        r2 = c.get(f"/api/suppliers/{supplier.id}/trust-score", params={"team_id": str(tenant_a["team_id"])})
+        assert r2.status_code == 200, r2.text
+        rows2 = r2.json()
+        assert len(rows2) == 1
+        assert rows2[0]["resolution"] == "raw_supplier_name"
+    finally:
+        _cleanup(db, [cm.id], [product.id], [supplier.id])
+
+
 def test_permission_and_rls(db, tenant_a, tenant_b, user_factory, client_as):
     supplier = _mk_supplier(db, tenant_a["team_id"], "Gated Co")
     member = user_factory()

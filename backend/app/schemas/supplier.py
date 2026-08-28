@@ -31,6 +31,11 @@ class SupplierTrustScoreOut(BaseModel):
     grade: str | None
     inputs: dict
     computed_at: datetime
+    # Same disclosure as SupplierTrustScoresResponse.resolution below, repeated
+    # here so the single-supplier endpoints (which return a bare list of these,
+    # not the wrapped multi-supplier response) carry it too — not just the
+    # all-suppliers listing.
+    resolution: str = "raw_supplier_name"
 
     model_config = {"from_attributes": True}
 
