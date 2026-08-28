@@ -27,7 +27,10 @@ from datetime import datetime, timezone
 from math import sqrt
 from statistics import mean
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
+
+from app.constants.trust import GRADE_HIGH, GRADE_MEDIUM
 
 from app.models.cost_model import FormulaVersion
 from app.models.formula_estimator import EstimatorProposal, EstimatorProposalLine
@@ -54,13 +57,25 @@ def _find_sibling_recipe(
         .filter(
             FormulaRegionCoverage.template_id == template_id,
             FormulaRegionCoverage.region != exclude_region,
+            # SCRUM-78: `data_confidence` is None on everything the July drop
+            # loaded, so this filter alone now matches nothing. The derived
+            # trust grade is the live equivalent — a sibling counts as
+            # trustworthy if either the legacy confidence says so or the grade
+            # does.
+            or_(
+                or_(
             FormulaRegionCoverage.data_confidence.in_(["CONF-HIGH", "CONF-MED"]),
+            FormulaRegionCoverage.trust_grade.in_([GRADE_HIGH, GRADE_MEDIUM]),
+        ),
+                FormulaRegionCoverage.trust_grade.in_([GRADE_HIGH, GRADE_MEDIUM]),
+            ),
         )
         .order_by(FormulaRegionCoverage.region)
         .all()
     )
     # CONF-HIGH siblings first, then CONF-MED — a deterministic tie-break.
-    coverages.sort(key=lambda c: 0 if c.data_confidence == "CONF-HIGH" else 1)
+    coverages.sort(key=lambda c: (
+        0 if c.data_confidence == "CONF-HIGH" or c.trust_grade == GRADE_HIGH else 1))
 
     for cov in coverages:
         lines = (
