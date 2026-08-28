@@ -18,12 +18,38 @@ class CommodityIndex(Base):
     unit: Mapped[str | None] = mapped_column(String(32))
     currency: Mapped[str | None] = mapped_column(String(3))
     category: Mapped[str | None] = mapped_column(String(64))
-    provider: Mapped[str | None] = mapped_column(String(64))      # e.g. ECB, EIA, Eurostat, FRED, World Bank
-    frequency: Mapped[str | None] = mapped_column(String(16))     # e.g. Daily, Weekly, Monthly, Quarterly
+    # The publishing agency. Widened from String(64) in DB-5: the drop's
+    # agency strings run to 72 chars, several being a sentence rather than a
+    # name ("ICIS (directional commentary only — subscription required...)").
+    provider: Mapped[str | None] = mapped_column(String(255))     # e.g. ECB, EIA, Eurostat, FRED, World Bank
+    # Widened from String(16) for the same reason — the drop states compound
+    # cadences like "Quarterly (NA/EU) · Annual (CN/IN/MEA/LA/APAC)" (45 ch).
+    frequency: Mapped[str | None] = mapped_column(String(64))     # e.g. Daily, Weekly, Monthly, Quarterly
     source_url: Mapped[str | None] = mapped_column(String(512))
     scrape_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     quoted_incoterm: Mapped[str | None] = mapped_column(String(8), nullable=True)
     quoted_named_place: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    # ── Price-series layer (Scrum 74 / DB-5 + DB-6) ────────────────────────────
+    # This table IS the price series in the three-layer model; the display
+    # grouping moved out to IndexCard and the resolution join to TypeCode.
+    # See app/models/index_layer.py.
+    #
+    # The drop's stable series key (`brent`, `lab-eu`). NULL on rows seeded
+    # before the drop — they were never part of that vocabulary.
+    commodity_key: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    # What the numbers ARE. Every series in the drop is `index_level` with
+    # base 100 = Jan 2023 — nothing here is money, which is why a should-cost
+    # gap can be stated in percent but never in currency from this data alone.
+    # Storing it explicitly is what stops an engine or a screen implying money
+    # that is not there.
+    value_kind: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    base_period: Mapped[str | None] = mapped_column(String(16), nullable=True)  # e.g. "2023-01"
+    # The source's own declared region for the series. Informational only —
+    # IndexCard.region is authoritative for resolution, because the series key
+    # is not a reliable region indicator (`-ppi`/`-wb`/`-mb` are data sources,
+    # and 23 of 28 `multi` cards sit on a region-tokened series).
+    source_region: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # ── Metadata + proxy mapping (Scrum 57) — all on the region-agnostic index ──
     access_tier: Mapped[str | None] = mapped_column(String(16), nullable=True)        # Free / Partial / Subscription
