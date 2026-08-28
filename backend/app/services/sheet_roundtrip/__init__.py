@@ -1,8 +1,12 @@
 from app.services.sheet_roundtrip.base import SheetColumnSpec, SheetPayloadSpec
+from app.services.sheet_roundtrip.dimension_decision import DimensionDecisionSpec
 from app.services.sheet_roundtrip.formula_coverage_price import FormulaCoveragePriceSpec
 
 PAYLOAD_REGISTRY: dict[str, SheetPayloadSpec] = {
     "formula_coverage_price": FormulaCoveragePriceSpec(),
+    # SCRUM-77: the analyst-decided half of the dimension layer. A second
+    # payload is a spec plus this line — the mechanism never branched.
+    "dimension_decision": DimensionDecisionSpec(),
 }
 
 
