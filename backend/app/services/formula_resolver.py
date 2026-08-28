@@ -149,6 +149,9 @@ def flatten_components(
                 "name": c.name,
                 "component_type": c.component_type,
                 "commodity_id": c.commodity_id,
+                # SCRUM-79 reads the resolution chain from the type-code side;
+                # additive, so nothing that already consumes this dict changes.
+                "type_code_id": c.type_code_id,
                 "weight_pct": float(c.weight_pct),
                 "effective_weight_pct": float(c.weight_pct) * _scale,
                 "is_proxy": c.is_proxy,
@@ -339,6 +342,10 @@ class EffectiveLine:
     via_template_name: str | None
     line_region: str | None
     is_proxy: bool | None
+    # Set only on a live tracking resolution — `FormulaComponent` (the frozen
+    # snapshot) has no type-code column, so a pinned line reaches the type-code
+    # side through its series instead. Defaulted, so nothing else has to change.
+    type_code_id: int | None = None
 
 
 def _effective_lines_from_snapshot(fv) -> list[EffectiveLine]:
@@ -421,6 +428,7 @@ def get_effective_lines(db: Session, fv, cost_model) -> tuple[list[EffectiveLine
             via_template_name=template_names.get(l["via_template_id"]),
             line_region=l["line_region"],
             is_proxy=l["is_proxy"],
+            type_code_id=l.get("type_code_id"),
         )
         for l in raw_lines
     ]
