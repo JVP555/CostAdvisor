@@ -16,7 +16,9 @@ from app.routers import (
     volumes, costing, scenarios, suppliers, chemical_families, subfamilies,
     fx_rates, audit, portfolio, admin, ai, account, freight_lanes,
     invites, access_requests, settings as settings_router, formulas, demo, regions,
-    collaboration, alerts, provider_credentials, sheets, quotes,
+    collaboration, alerts, provider_credentials, sheets, quotes, resolution,
+    contracts, radar, editorial, dimensions, index_dossier, seasonality,
+    intelligence,
 )
 # Imported for its side effect: registers the before_flush listener that
 # auto-registers region codes so the region FK never rejects a user write.
@@ -71,7 +73,19 @@ app.include_router(products.router, prefix="/api/products", tags=["products"])
 app.include_router(cost_models.router, prefix="/api/cost-models", tags=["cost-models"])
 app.include_router(collaboration.router, prefix="/api/cost-models", tags=["collaboration"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
+app.include_router(contracts.router, prefix="/api/contracts", tags=["contracts"])
+app.include_router(radar.router, prefix="/api/radar", tags=["radar"])
+app.include_router(editorial.router, prefix="/api/editorial", tags=["editorial"])
+app.include_router(dimensions.router, prefix="/api/dimensions", tags=["dimensions"])
+app.include_router(index_dossier.router, prefix="/api/dossiers", tags=["dossiers"])
+app.include_router(seasonality.router, prefix="/api/seasonality",
+                  tags=["seasonality"])
+app.include_router(intelligence.router, prefix="/api/intelligence",
+                  tags=["intelligence"])
 app.include_router(indexes.router, prefix="/api/indexes", tags=["indexes"])
+# Platform-grain index resolution reads (Scrum 74) — deliberately its own
+# surface rather than a mode of /api/indexes, which is team-scoped.
+app.include_router(resolution.router, prefix="/api/resolution", tags=["resolution"])
 app.include_router(provider_credentials.router, prefix="/api/indexes", tags=["provider-credentials"])
 app.include_router(sheets.router, prefix="/api/sheets", tags=["sheets"])
 app.include_router(quotes.router, prefix="/api/quotes", tags=["quotes"])
