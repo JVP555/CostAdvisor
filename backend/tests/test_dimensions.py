@@ -837,7 +837,12 @@ def test_repair_deletes_only_what_nothing_supports(db):
         a4.raw_value = None
         db.commit()
 
-        dry = repair(db, kind="industry", apply=False)
+        # Scoped to this test's own terms. conftest imports SessionLocal
+        # directly, so the suite runs against the SAME database as the app: an
+        # unscoped `apply=True` here deletes real catalogue rows as a side
+        # effect. It did, the first time this test ran.
+        scope = [good.code, other.code]
+        dry = repair(db, term_codes=scope, apply=False)
         mine = {o.subject_code for o in dry.orphans}
         assert "RPR-ORPHAN" in mine
         assert "RPR-ALIASLESS" not in mine, "an alias-less row that still resolves is sound"
@@ -851,7 +856,7 @@ def test_repair_deletes_only_what_nothing_supports(db):
                      .filter(DimensionAssertion.term_id == good.id).all()}
         assert {"RPR-ALIASED", "RPR-ALIASLESS", "RPR-ORPHAN", "RPR-NORAW"} <= survivors
 
-        applied = repair(db, kind="industry", apply=True)
+        applied = repair(db, term_codes=scope, apply=True)
         db.commit()
         assert applied.deleted >= 1
         after = {a.subject_code for a in db.query(DimensionAssertion)
@@ -860,7 +865,7 @@ def test_repair_deletes_only_what_nothing_supports(db):
         assert {"RPR-ALIASED", "RPR-ALIASLESS", "RPR-NORAW"} <= after
 
         # Idempotent: the rows it would match are gone.
-        again = repair(db, kind="industry", apply=True)
+        again = repair(db, term_codes=scope, apply=True)
         db.commit()
         assert not [o for o in again.orphans if o.subject_code == "RPR-ORPHAN"]
     finally:
@@ -872,3 +877,42 @@ def test_repair_deletes_only_what_nothing_supports(db):
             synchronize_session=False)
         db.commit()
         _cleanup(db, term_ids=[good.id, other.id])
+
+
+def test_repair_scope_is_honoured_so_a_run_cannot_reach_past_it(db):
+    """A guard on the tool, not just on this test.
+
+    The suite shares a database with the app, and `repair` deletes. Scoping has
+    to actually restrict what is scanned, or a targeted repair silently becomes
+    a library-wide one.
+    """
+    from app.services.dimension_repair import find_orphans
+
+    a = _term(db, "industry", f"scope-a-{uuid.uuid4().hex[:6]}", "Scope A")
+    b = _term(db, "industry", f"scope-b-{uuid.uuid4().hex[:6]}", "Scope B")
+    upsert_alias(db, a, a.label, source="taxonomy")
+    upsert_alias(db, b, b.label, source="taxonomy")
+    db.commit()
+    try:
+        for term, code in ((a, "SCOPE-A-ORPHAN"), (b, "SCOPE-B-ORPHAN")):
+            row = assert_term(db, term, subject_type="formula", subject_code=code,
+                              raw_value="a value no term claims")
+            row.matched_alias_id = None
+        db.commit()
+
+        only_a = find_orphans(db, term_codes=[a.code])
+        subjects = {o.subject_code for o in only_a.orphans}
+        assert "SCOPE-A-ORPHAN" in subjects
+        assert "SCOPE-B-ORPHAN" not in subjects, "scope leaked past the named term"
+        assert only_a.scanned == 1, "scanned must be scoped too, or the report lies"
+
+        both = find_orphans(db, term_codes=[a.code, b.code])
+        assert {"SCOPE-A-ORPHAN", "SCOPE-B-ORPHAN"} <= {o.subject_code for o in both.orphans}
+    finally:
+        db.rollback()
+        bypass_rls_var.set(True)
+        db.query(DimensionAssertion).filter(
+            DimensionAssertion.subject_code.in_(
+                ["SCOPE-A-ORPHAN", "SCOPE-B-ORPHAN"])).delete(synchronize_session=False)
+        db.commit()
+        _cleanup(db, term_ids=[a.id, b.id])

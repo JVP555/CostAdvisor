@@ -103,25 +103,36 @@ class RepairReport:
         return "\n".join(lines)
 
 
-def find_orphans(db: Session, kind: str | None = None) -> RepairReport:
-    """Every assertion that no recorded alias and no current mapping supports."""
+def find_orphans(db: Session, kind: str | None = None,
+                 term_codes: list[str] | None = None) -> RepairReport:
+    """Every assertion that no recorded alias and no current mapping supports.
+
+    `term_codes` narrows to specific terms. That is an operator need in its own
+    right — fixing one bad term without touching the rest of a facet — and it is
+    also what makes this safe to exercise from a test, because the suite runs
+    against the same database as the app and an unscoped `apply=True` would
+    delete real rows as a side effect.
+    """
     report = RepairReport()
     q = (
         db.query(DimensionAssertion, DimensionTerm)
         .join(DimensionTerm, DimensionTerm.id == DimensionAssertion.term_id)
         .filter(DimensionAssertion.matched_alias_id.is_(None))
     )
+    scanned_q = (
+        db.query(DimensionAssertion)
+        .join(DimensionTerm, DimensionTerm.id == DimensionAssertion.term_id)
+    )
     if kind:
         q = q.filter(DimensionTerm.kind == kind)
+        scanned_q = scanned_q.filter(DimensionTerm.kind == kind)
+    if term_codes:
+        q = q.filter(DimensionTerm.code.in_(term_codes))
+        scanned_q = scanned_q.filter(DimensionTerm.code.in_(term_codes))
 
     # Counting the whole population, not just the alias-less slice, so the
     # report can state what it left alone as well as what it found.
-    report.scanned = (
-        db.query(DimensionAssertion)
-        .join(DimensionTerm, DimensionTerm.id == DimensionAssertion.term_id)
-        .filter(DimensionTerm.kind == kind).count() if kind
-        else db.query(DimensionAssertion).count()
-    )
+    report.scanned = scanned_q.count()
 
     for assertion, term in q.all():
         if not assertion.raw_value:
@@ -140,13 +151,14 @@ def find_orphans(db: Session, kind: str | None = None) -> RepairReport:
     return report
 
 
-def repair(db: Session, *, kind: str | None = None, apply: bool = False) -> RepairReport:
+def repair(db: Session, *, kind: str | None = None,
+           term_codes: list[str] | None = None, apply: bool = False) -> RepairReport:
     """Report the orphans, and delete them only when explicitly asked.
 
     The caller commits or rolls back — the dry path is the real path with the
     transaction thrown away, so it genuinely rehearses the write.
     """
-    report = find_orphans(db, kind=kind)
+    report = find_orphans(db, kind=kind, term_codes=term_codes)
     report.dry_run = not apply
     if report.orphans:
         ids = [o.assertion_id for o in report.orphans]
