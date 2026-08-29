@@ -13,6 +13,7 @@ from app.models.formula_template import (
     FormulaTemplateComponent,
     FormulaRegionCoverage,
 )
+from app.constants.trust import GRADE_SEVERITY, GRADE_UNRATED
 from app.models.formula_estimator import EstimatorProposal, EstimatorProposalLine
 from app.models.index_data import CommodityIndex
 from app.models.region import Region
@@ -122,6 +123,63 @@ def _require_template_approve(db: Session, user: User, template) -> None:
         require_permission(db, user, template.team_id, "content.approve")
 
 
+# How many type-codes to name per reason in the rollup. The point of carrying
+# reasons up to the list at all is that a reviewer can see *what* to go and look
+# at without opening the combo; the full set lives on the coverage row.
+_ROLLUP_SUBJECT_CAP = 6
+
+
+def _trust_rollups(db: Session, template_ids: list[uuid.UUID]) -> dict:
+    """Per-template rollup of the SCRUM-78 combo grades. One batch query.
+
+    Trust is graded per (template, region) because a recipe can resolve cleanly
+    in one region and hit a dead series in another. The catalog list renders one
+    row per template, so it needs the *worst* grade plus how many combos are
+    queued — anything softer would let a blocked region hide behind a healthy one.
+    """
+    if not template_ids:
+        return {}
+    rows = (
+        db.query(FormulaRegionCoverage)
+        .filter(FormulaRegionCoverage.template_id.in_(template_ids))
+        .all()
+    )
+    acc: dict = {}
+    for row in rows:
+        bucket = acc.setdefault(row.template_id, {
+            "combo_count": 0, "needs_review_count": 0, "reviewed_count": 0,
+            "grades": {}, "reasons": {},
+        })
+        bucket["combo_count"] += 1
+        if row.needs_review:
+            bucket["needs_review_count"] += 1
+        if row.reviewed_at is not None:
+            bucket["reviewed_count"] += 1
+        grade = row.trust_grade or GRADE_UNRATED
+        bucket["grades"][grade] = bucket["grades"].get(grade, 0) + 1
+        for reason in (row.trust_inputs or {}).get("reasons", []) or []:
+            subjects = bucket["reasons"].setdefault(reason.get("reason"), set())
+            subjects.update(reason.get("subjects") or [])
+
+    out = {}
+    for template_id, bucket in acc.items():
+        worst = min(bucket["grades"], key=lambda g: GRADE_SEVERITY.get(g, 9))
+        out[template_id] = {
+            "worst_grade": worst,
+            "caveat": GRADE_CAVEATS.get(worst),
+            "combo_count": bucket["combo_count"],
+            "needs_review_count": bucket["needs_review_count"],
+            "reviewed_count": bucket["reviewed_count"],
+            "grades": bucket["grades"],
+            "reasons": [
+                {"reason": reason, "subjects": sorted(subjects)[:_ROLLUP_SUBJECT_CAP],
+                 "subject_count": len(subjects)}
+                for reason, subjects in sorted(bucket["reasons"].items())
+            ],
+        }
+    return out
+
+
 def _enrich_with_emails(db: Session, templates: list[FormulaTemplate]) -> list[FormulaTemplateOut]:
     """Batch-load creator emails + taxonomy names to avoid N+1 queries."""
     from app.models.chemical_family import ChemicalFamily
@@ -143,6 +201,8 @@ def _enrich_with_emails(db: Session, templates: list[FormulaTemplate]) -> list[F
         for s in db.query(Subfamily).filter(Subfamily.id.in_(sub_ids)).all()
     } if sub_ids else {}
 
+    trust_map = _trust_rollups(db, [t.id for t in templates])
+
     result = []
     for t in templates:
         out = FormulaTemplateOut.model_validate(t)
@@ -150,6 +210,7 @@ def _enrich_with_emails(db: Session, templates: list[FormulaTemplate]) -> list[F
         if t.family_id in family_map:
             out.family_code, out.family_name = family_map[t.family_id]
         out.subfamily_name = sub_map.get(t.subfamily_id)
+        out.trust_summary = trust_map.get(t.id)
         result.append(out)
     return result
 

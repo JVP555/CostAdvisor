@@ -43,6 +43,13 @@ class FormulaTemplateOut(BaseModel):
     family_name: str | None = None
     subfamily_name: str | None = None
     catalog_meta: dict | None = None
+    # SCRUM-78 rollup across this template's coverage rows. The grade is stored
+    # per (template, region) because trust is a property of a *combo*, not of a
+    # recipe — but the catalog list renders one row per template, so the worst
+    # grade and the review count are rolled up here rather than making the page
+    # fetch every combo. `catalog_meta.data_confidence` is NOT a substitute: the
+    # July sheet dropped that column, so it is null on everything loaded since.
+    trust_summary: dict | None = None
     description: str | None
     expression: str | None
     variables: dict | None

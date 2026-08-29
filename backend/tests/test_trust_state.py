@@ -754,3 +754,56 @@ def test_the_queue_does_not_swallow_the_whole_library(db, tenant_a):
         "no combo landed at medium — the proxy tier is not doing its job of "
         "keeping softer signals out of the queue"
     )
+
+
+def test_the_catalog_list_carries_the_grade_not_the_retired_confidence(
+        db, tenant_a, client_as):
+    """The list page renders one row per *template*, but trust is graded per
+    (template, region) — so the list has to roll up, and it has to roll up to
+    the **worst** region. A blocked region hiding behind a healthy one is the
+    exact failure the old `catalog_meta.data_confidence` badge had after the
+    July sheet stopped shipping that column: it went null everywhere and the
+    badge silently rendered a dash for the entire catalog.
+    """
+    s_ok, s_dry = _series(db), _series(db)
+    good = _code(db, s_ok)
+    unbought = _code(db, s_dry, resolution="no_series")
+    tpl, clean_cov = _combo(db, created_by=tenant_a["user_id"],
+                            lines=[(100, good, "index", False)], region="Europe")
+    # A second region on the SAME template, blocked.
+    bad_cov = FormulaRegionCoverage(
+        template_id=tpl.id, region="NA", base_price=100, currency="EUR",
+        base_year=2024, base_quarter=1,
+    )
+    db.add(bad_cov)
+    db.flush()
+    db.add(FormulaTemplateComponent(
+        template_id=tpl.id, region="NA", name="line", component_type="index",
+        commodity_id=s_dry.id, type_code_id=unbought.id, weight_pct=100,
+        is_proxy=False, sort_order=0,
+    ))
+    db.flush()
+    try:
+        apply_assessment(db, clean_cov)
+        apply_assessment(db, bad_cov)
+        db.commit()
+
+        rows = client_as(tenant_a).get(
+            f"/api/formulas/?team_id={tenant_a['team_id']}").json()
+        row = next(r for r in rows if r["id"] == str(tpl.id))
+        summary = row["trust_summary"]
+
+        assert summary["worst_grade"] == GRADE_BLOCKED, (
+            "the healthy Europe combo must not mask the blocked NA one"
+        )
+        assert summary["combo_count"] == 2
+        assert summary["grades"][GRADE_HIGH] == 1
+        assert summary["needs_review_count"] == 1
+        # The hover names what to go and look at, not just a verdict.
+        reasons = {r["reason"]: r["subjects"] for r in summary["reasons"]}
+        assert unbought.code in reasons[REASON_NO_SERIES]
+        # And it does not resurrect the retired column.
+        assert row["catalog_meta"] is None or             row["catalog_meta"].get("data_confidence") is None
+    finally:
+        _cleanup(db, template_ids=[tpl.id], code_ids=[good.id, unbought.id],
+                 series_ids=[s_ok.id, s_dry.id])
