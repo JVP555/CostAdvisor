@@ -4,9 +4,10 @@ Priority: team override > scraped value > fallback.
 """
 import uuid
 from sqlalchemy.orm import Session
-from sqlalchemy import text, and_, or_
+from sqlalchemy import func, text, and_, or_
 
 from app.models.index_data import CommodityIndex, IndexValue, IndexOverride, TeamIndexSource
+from app.models.index_layer import IndexMonthlyValue
 from app.models.user import User
 from app.schemas.index_data import IndexValueOut
 from app.services.scraper import SCRAPER_REGISTRY, SCRAPER_SOURCE_LABELS
@@ -412,6 +413,78 @@ def get_single_index_value(
     return value
 
 
+# ── The drop's monthly series (Wave 3, unit 12 follow-up) ────────────────────
+#
+# `IndexValue` is quarterly and region-keyed; the 2026-07 drop's 121 series
+# landed in `index_monthly_values` instead, and this resolver could not see
+# them. Measured on the live catalogue: **76 of the 98 commodities the catalog's
+# cost lines reference are monthly-only**, so three quarters of the catalog was
+# invisible to the costing engine.
+#
+# Three rules this tier follows, none of them optional:
+#
+# * **Actual only.** 726 of the monthly rows are `forecast`. A forecast reaching
+#   a historical should-cost would be fabrication, not a fallback.
+# * **Quarterly is the mean of the quarter's months** — that is how the drop's
+#   own quarterly rollups were produced (verified reproducible to the last
+#   decimal when the layer was built), so this reads the same way rather than
+#   inventing a second convention. A partial quarter averages what it has and
+#   says so through its source label, because refusing a two-month quarter would
+#   report "no data" for a period that has data.
+# * **No region fallback.** Region is baked into the series key in this layer
+#   (`ammonia-eu` and `ammonia-in` are different series), so there is no region
+#   dimension here to fall back through — the region argument does not apply.
+
+
+def _monthly_quarter_mean(
+    db: Session, commodity_id: int, year: int, quarter: int
+) -> float | None:
+    """Mean of the actual monthly observations inside one quarter."""
+    months = [quarter * 3 - 2, quarter * 3 - 1, quarter * 3]
+    rows = (
+        db.query(IndexMonthlyValue.value)
+        .filter(
+            IndexMonthlyValue.commodity_id == commodity_id,
+            IndexMonthlyValue.year == year,
+            IndexMonthlyValue.month.in_(months),
+            IndexMonthlyValue.kind == "actual",
+        )
+        .all()
+    )
+    if not rows:
+        return None
+    return sum(float(v) for (v,) in rows) / len(rows)
+
+
+def _monthly_carry_forward(
+    db: Session, commodity_id: int, year: int, quarter: int
+) -> float | None:
+    """The most recent actual month at or before the end of the requested quarter.
+
+    The quarterly tier above has carried values forward since long before this
+    layer existed, precisely so a future reference quarter does not flatten every
+    ratio to 1.0. A monthly-only series needs the same protection, or it would
+    resolve for history and silently go flat the moment a model reaches past its
+    last observation.
+    """
+    end_month = quarter * 3
+    row = (
+        db.query(IndexMonthlyValue.value)
+        .filter(
+            IndexMonthlyValue.commodity_id == commodity_id,
+            IndexMonthlyValue.kind == "actual",
+            or_(
+                IndexMonthlyValue.year < year,
+                and_(IndexMonthlyValue.year == year,
+                     IndexMonthlyValue.month <= end_month),
+            ),
+        )
+        .order_by(IndexMonthlyValue.year.desc(), IndexMonthlyValue.month.desc())
+        .first()
+    )
+    return float(row[0]) if row else None
+
+
 def get_single_index_value_detailed(
     db: Session,
     team_id: uuid.UUID,
@@ -503,11 +576,34 @@ def get_single_index_value_detailed(
     if iv:
         return float(iv.value), "scraped_any_region"
 
+    # The drop's monthly series, aggregated to the requested quarter. Placed
+    # BEFORE the carry-forward tiers because a real observation for the period
+    # asked about beats a stale one carried from an earlier quarter.
+    #
+    # No commodity currently has rows in both stores (measured: 24 quarterly, 121
+    # monthly, zero overlap), so this reorders nothing that resolves today. The
+    # ordering is chosen for the day that changes: if this sat after the
+    # carry-forward instead, a single stray quarterly row on a drop series would
+    # be carried forward forever in preference to that series' real monthly data.
+    monthly = _monthly_quarter_mean(db, commodity_id, year, quarter)
+    if monthly is not None:
+        months_found = (
+            db.query(func.count(IndexMonthlyValue.id))
+            .filter(
+                IndexMonthlyValue.commodity_id == commodity_id,
+                IndexMonthlyValue.year == year,
+                IndexMonthlyValue.month.in_([quarter * 3 - 2, quarter * 3 - 1, quarter * 3]),
+                IndexMonthlyValue.kind == "actual",
+            ).scalar()
+        )
+        # A partial quarter is still an observation, but the label says so — a
+        # consumer showing provenance should not present one month as three.
+        return monthly, ("monthly_actual" if months_found == 3 else "monthly_partial_quarter")
+
     # Temporal fallback: carry forward the most recent available value.
     # This handles cases where the requested period (e.g. a future reference
     # quarter) doesn't have data yet — use the latest known value instead of
     # returning None (which would flatten all ratios to 1.0).
-    from sqlalchemy import or_, and_
     iv = db.query(IndexValue).filter(
         IndexValue.commodity_id == commodity_id,
         or_(
@@ -520,5 +616,12 @@ def get_single_index_value_detailed(
     ).first()
     if iv:
         return float(iv.value), "scraped_temporal_carry_forward"
+
+    # Same carry-forward, over the monthly store. Last, so it never displaces a
+    # quarterly value; present at all so a monthly-only series is not left to go
+    # flat past its final observation while a quarterly one is protected.
+    carried = _monthly_carry_forward(db, commodity_id, year, quarter)
+    if carried is not None:
+        return carried, "monthly_carry_forward"
 
     return None, None

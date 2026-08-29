@@ -199,12 +199,17 @@ def test_margin_inside_the_hundred_is_not_applied_twice(db, tenant_a):
         _cleanup(db, template_ids=[tpl.id], series_ids=[s.id])
 
 
-def test_the_drops_monthly_series_is_visible_and_the_divergence_is_stated(
-        db, tenant_a):
+def test_the_drops_monthly_series_is_visible_and_the_store_is_named(db, tenant_a):
     """The drop's 121 series landed in the monthly layer, not the legacy
     quarterly table, so without this the series would be empty for nearly every
-    catalog combo. `data_resolver` cannot see that layer yet, so the payload
-    says which store it read rather than hiding the difference."""
+    catalog combo.
+
+    `data_resolver` has since gained a monthly tier, so reading that store is no
+    longer a divergence from the costing engine — both read it, both take the
+    quarter mean of the actual months. The payload still names the store: it is
+    the one place a caller can see where a level came from, and this test is what
+    would catch the two sides drifting apart again.
+    """
     monthly = [(2024, m, 100.0) for m in range(1, 4)] + \
               [(2024, m, 150.0) for m in range(4, 7)]
     s = _series(db, monthly=monthly)
@@ -214,9 +219,18 @@ def test_the_drops_monthly_series_is_visible_and_the_divergence_is_stated(
         assert len(result.series) == 2
         assert result.series[-1]["level"] == pytest.approx(150.0)
         assert result.components[0]["value_source"] == "index_monthly_values"
-        # Said out loud, because the costing engine will show this line flat.
-        assert result.value_sources["matches_costing_engine"] is False
-        assert "data_resolver" in result.value_sources["note"]
+        assert result.value_sources["by_store"]["index_monthly_values"] == 1
+        # No longer a divergence: the costing engine reads this store too.
+        assert result.value_sources["matches_costing_engine"] is True
+        assert "the two agree" in result.value_sources["note"]
+
+        # And the two really do agree, rather than merely claiming to — the
+        # resolver is asked directly for the same period the combo evaluated.
+        from app.services.data_resolver import get_single_index_value_detailed
+        engine_value, engine_source = get_single_index_value_detailed(
+            db, tenant_a["team_id"], s.id, "Europe", 2024, 2)
+        assert engine_source == "monthly_actual"
+        assert engine_value == pytest.approx(150.0)
     finally:
         _cleanup(db, template_ids=[tpl.id], series_ids=[s.id])
 

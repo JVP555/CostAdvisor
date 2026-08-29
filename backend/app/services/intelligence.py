@@ -457,13 +457,19 @@ def derive(
     counts: dict[str, int] = defaultdict(int)
     for src in value_source.values():
         counts[src] += 1
+    # `data_resolver` gained a monthly tier (unit 12 follow-up), so reading the
+    # monthly store is no longer a divergence from the costing engine — both
+    # sides now see it, and both aggregate a quarter as the mean of its actual
+    # months. The field stays rather than being deleted: it is the one place a
+    # caller can see which store a level came from, and a future second store
+    # would need exactly this seam again.
     out.value_sources = {
         "by_store": dict(counts),
-        "matches_costing_engine": "index_monthly_values" not in counts,
+        "matches_costing_engine": True,
         "note": (
-            "levels for some lines come from the drop's monthly series, which "
-            "`data_resolver` does not read — the costing engine will show those "
-            "lines riding flat until it gains that tier"
+            "some lines resolve through the drop's monthly series; the costing "
+            "engine reads that store too, at the same quarter-mean of actual "
+            "months, so the two agree"
             if "index_monthly_values" in counts else
             "every line resolves through the same store the costing engine reads"
         ),

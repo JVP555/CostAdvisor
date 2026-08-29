@@ -134,12 +134,13 @@ function DerivedTab({ d, onFixAnchor }) {
         </div>
       )}
 
-      {/* The costing engine cannot read the drop's monthly series yet, so on
-          those combos the two genuinely differ. Said quietly rather than hidden. */}
+      {/* Kept, but it now fires only if the two sides ever diverge again. The
+          costing engine gained a monthly tier, so reading the drop's series is
+          no longer a difference — the payload says so and this stays silent. */}
       {d.value_sources && d.value_sources.matches_costing_engine === false && (
-        <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.55 }}>
+        <div style={{ fontSize: 10, color: 'var(--accent3)', marginBottom: 12, lineHeight: 1.55 }}>
           {d.value_sources.note
-            || 'Some values here come from a price store the costing engine cannot read yet, so a should-cost elsewhere in the app may differ on this combo.'}
+            || 'Some values here come from a price store the costing engine does not read, so a should-cost elsewhere in the app may differ on this combo.'}
         </div>
       )}
 
