@@ -672,3 +672,43 @@ def test_the_block_type_vocabulary_covers_every_drop_source():
         "index_narrative", "index_source_meta",
     }
     assert expected <= set(BLOCK_TYPES)
+
+
+def test_the_approvals_queue_filters_by_provenance(db, tenant_a, client_as):
+    """The curation console reads "everything not yet signed off". Answering that
+    by fetching the whole library and filtering client-side stops working the
+    moment the editorial loader lands its real volume, so the filter is on the
+    endpoint."""
+    c = client_as(tenant_a)
+    made = []
+    try:
+        for prov, block_type in (("imported", "supplier_note"),
+                                 ("ai_draft", "compliance"),
+                                 ("human_approved", "macro_drivers")):
+            r = _post(c, tenant_a, block_type=block_type, provenance=prov)
+            assert r.status_code == 201, r.text
+            made.append(r.json()["id"])
+
+        base = f"/api/editorial/blocks?team_id={tenant_a['team_id']}"
+        mine = lambda rows: [b for b in rows if b["id"] in made]  # noqa: E731
+
+        unsigned = mine(c.get(f"{base}&provenance=imported&provenance=ai_draft").json())
+        assert {b["provenance"] for b in unsigned} == {"imported", "ai_draft"}
+        assert len(unsigned) == 2
+
+        approved = mine(c.get(f"{base}&provenance=human_approved").json())
+        assert len(approved) == 1
+        # The badge rides along, so the queue does not re-invent the caveat.
+        assert approved[0]["badge"]["reviewed"] is True
+        assert approved[0]["badge"]["caveat"] is None
+
+        # Unfiltered still returns everything — the filter is additive.
+        assert len(mine(c.get(base).json())) == 3
+
+        # An unknown state is refused rather than silently matching nothing.
+        assert c.get(f"{base}&provenance=nonsense").status_code == 422
+
+        # Pagination exists for the same reason the filter does.
+        assert len(c.get(f"{base}&limit=1").json()) == 1
+    finally:
+        _cleanup(db, block_ids=made)

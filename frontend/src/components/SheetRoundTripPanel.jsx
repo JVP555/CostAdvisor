@@ -2,11 +2,20 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import api, { formatApiError } from '../api';
 import { useToast } from './Toast';
 
-/* Scrum 27b — sheet round-trip: export a filtered slice of catalog combo
- * prices, edit offline, reimport as a reviewable diff, apply separately.
- * Sits alongside the existing "Import Prices" bulk-upload panel in
- * Formulas.jsx — a different workflow (review a targeted slice vs. bulk
- * initial load), not a replacement. */
+/* Scrum 27b — sheet round-trip: export a filtered slice, edit offline, reimport
+ * as a reviewable diff, apply separately.
+ *
+ * Payload-agnostic, matching the backend: `sheet_roundtrip` is a mechanism plus
+ * registered per-payload specs, so a second payload is a spec and one registry
+ * line, not new machinery. This component takes the same shape — the payload
+ * key, its filter form and how to label a row key are props, and the diff /
+ * apply / run-history half is identical for every payload. The two callers are
+ * catalog combo prices (Formulas) and dimension decisions (the curation
+ * console).
+ *
+ * The two rules the backend enforces and this must not undo: importing only
+ * ever computes a diff (applying is a separate, explicit call), and rejected
+ * or invalid rows are shown rather than silently absorbed. */
 
 const KIND_LABEL = {
   change: { label: 'Change', color: 'var(--accent)' },
@@ -15,7 +24,20 @@ const KIND_LABEL = {
   unmatched_key: { label: 'Row not found — ignored', color: 'var(--muted)' },
 };
 
-export default function SheetRoundTripPanel({ catalogRows }) {
+export default function SheetRoundTripPanel({
+  // Catalog combo prices stay the default so the existing Formulas usage is
+  // unchanged by the generalisation.
+  payloadKey = 'formula_coverage_price',
+  title = 'Review & apply price changes',
+  blurb = 'Export a slice, edit prices offline, reimport to see exactly what changed before applying anything.',
+  exportFilename = 'formula_coverage_prices.xlsx',
+  // Passed by a caller with its own filters; when absent the built-in
+  // subfamily / needs-review form below is used.
+  renderFilters,
+  filterParams: filterParamsProp,
+  rowKeyLabel = (k) => `${k.code} · ${k.region}`,
+  catalogRows = [],
+}) {
   const { addToast } = useToast();
   const fileInputRef = useRef(null);
 
@@ -38,6 +60,7 @@ export default function SheetRoundTripPanel({ catalogRows }) {
   }, [catalogRows]);
 
   const filterParams = () => {
+    if (filterParamsProp) return filterParamsProp();
     const p = {};
     if (subfamilyId) p.subfamily_id = subfamilyId;
     if (needsReviewOnly) p.needs_review = true;
@@ -45,22 +68,22 @@ export default function SheetRoundTripPanel({ catalogRows }) {
   };
 
   const loadPastRuns = () => {
-    api.get('/api/sheets/import-runs', { params: { payload_key: 'formula_coverage_price' } })
+    api.get('/api/sheets/import-runs', { params: { payload_key: payloadKey } })
       .then(({ data }) => setPastRuns(data))
       .catch(() => {});
   };
-  useEffect(() => { loadPastRuns(); }, []);
+  useEffect(() => { loadPastRuns(); }, [payloadKey]);
 
   const handleExport = async () => {
     setExporting(true);
     try {
-      const { data } = await api.get('/api/sheets/formula_coverage_price/export', {
+      const { data } = await api.get(`/api/sheets/${payloadKey}/export`, {
         params: filterParams(), responseType: 'blob',
       });
       const url = window.URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'formula_coverage_prices.xlsx';
+      a.download = exportFilename;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -80,7 +103,7 @@ export default function SheetRoundTripPanel({ catalogRows }) {
     try {
       const form = new FormData();
       form.append('file', file);
-      const { data } = await api.post('/api/sheets/formula_coverage_price/import', form, {
+      const { data } = await api.post(`/api/sheets/${payloadKey}/import`, form, {
         params: filterParams(),
       });
       setRun(data);
@@ -123,24 +146,24 @@ export default function SheetRoundTripPanel({ catalogRows }) {
       border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px',
       marginBottom: 12, background: 'var(--surface)',
     }}>
-      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-        Review &amp; apply price changes
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-        Export a slice, edit prices offline, reimport to see exactly what changed before applying anything.
-      </div>
+      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>{blurb}</div>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-        <select className="ca-select" style={{ fontSize: 11 }} value={subfamilyId} onChange={e => setSubfamilyId(e.target.value)}>
-          <option value="">All subfamilies</option>
-          {subfamilyOptions.map(([id, label]) => (
-            <option key={id} value={id}>{label}</option>
-          ))}
-        </select>
-        <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-          <input type="checkbox" checked={needsReviewOnly} onChange={e => setNeedsReviewOnly(e.target.checked)} />
-          Needs review only
-        </label>
+        {renderFilters ? renderFilters() : (
+          <>
+            <select className="ca-select" style={{ fontSize: 11 }} value={subfamilyId} onChange={e => setSubfamilyId(e.target.value)}>
+              <option value="">All subfamilies</option>
+              {subfamilyOptions.map(([id, label]) => (
+                <option key={id} value={id}>{label}</option>
+              ))}
+            </select>
+            <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input type="checkbox" checked={needsReviewOnly} onChange={e => setNeedsReviewOnly(e.target.checked)} />
+              Needs review only
+            </label>
+          </>
+        )}
         <button className="ca-btn ca-btn-ghost ca-btn-sm" style={{ fontSize: 10 }} onClick={handleExport} disabled={exporting}>
           {exporting ? 'Exporting…' : '↓ Export slice'}
         </button>
@@ -165,7 +188,7 @@ export default function SheetRoundTripPanel({ catalogRows }) {
                   const k = KIND_LABEL[d.kind] || { label: d.kind, color: 'var(--muted)' };
                   return (
                     <tr key={d.id}>
-                      <td style={{ fontFamily: "'JetBrains Mono', monospace" }}>{d.row_key.code} · {d.row_key.region}</td>
+                      <td style={{ fontFamily: "'JetBrains Mono', monospace" }}>{rowKeyLabel(d.row_key)}</td>
                       <td>{d.column}</td>
                       <td>{d.old_value ?? '—'}</td>
                       <td>{d.new_value ?? '—'}</td>

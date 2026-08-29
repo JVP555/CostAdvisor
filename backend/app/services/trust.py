@@ -50,6 +50,7 @@ from app.models.formula_template import (
     FormulaRegionCoverage, FormulaTemplate, FormulaTemplateComponent,
 )
 from app.models.index_layer import TypeCode
+from app.models.user import User
 
 # Catalog recipes legitimately run 99.9–110 because margin sits inside the 100%
 # total, so "closed" is a band rather than exactly 100. Outside it the weights
@@ -483,6 +484,16 @@ def review_queue(
     rows.sort(key=sort_key)
     window = rows[offset: offset + limit]
 
+    # Resolved on read from the FK rather than stored: unit 11 moved
+    # `reviewed_by` off a copied email precisely so a sign-off stays explicable
+    # after the reviewer changes their address. A queue rendering a bare UUID
+    # would hand that gain straight back.
+    reviewer_ids = {c.reviewed_by_id for c, _ in window if c.reviewed_by_id}
+    reviewer_names = {
+        u.id: u.email
+        for u in db.query(User).filter(User.id.in_(reviewer_ids)).all()
+    } if reviewer_ids else {}
+
     return [
         {
             "template_id": coverage.template_id,
@@ -500,6 +511,11 @@ def review_queue(
             "proxy_density_tier": coverage.proxy_density_tier,
             "reviewed_at": coverage.reviewed_at,
             "reviewed_by_id": coverage.reviewed_by_id,
+            "reviewed_by_name": reviewer_names.get(coverage.reviewed_by_id),
+            # Carried so the console can show a sign-off is pinned to the exact
+            # line set that was signed off, rather than merely asserting it:
+            # change a weight and the combo comes back here.
+            "review_fingerprint": coverage.review_fingerprint,
         }
         for coverage, template in window
     ], total

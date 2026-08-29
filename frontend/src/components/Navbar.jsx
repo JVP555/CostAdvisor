@@ -91,6 +91,7 @@ export default function Navbar() {
     // separate from costing, and a role without it must not even see the entry.
     // That separation is the reason the category exists.
     ...(canSeeContracts ? [{ path: '/contracts', label: 'Contracts' }] : []),
+    { path: '/curation', label: 'Curation' },
   ];
 
   const handleLogout = async () => { setOpen(false); await logout(); };

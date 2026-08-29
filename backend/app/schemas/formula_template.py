@@ -194,6 +194,13 @@ class TrustQueueRow(BaseModel):
     proxy_density_tier: str | None = None
     reviewed_at: datetime | None = None
     reviewed_by_id: uuid.UUID | None = None
+    # Resolved from the FK on read, never stored — a copied email decays the
+    # moment the reviewer changes their address.
+    reviewed_by_name: str | None = None
+    # The line set the sign-off was pinned to. Change a weight and the combo
+    # returns to the queue; a reorder does not, because sort_order is
+    # presentation and re-queueing on it would train reviewers to ignore the flag.
+    review_fingerprint: str | None = None
 
 
 class TrustQueueOut(BaseModel):

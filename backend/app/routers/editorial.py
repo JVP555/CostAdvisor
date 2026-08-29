@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.editorial import (
-    BLOCK_TYPES, PROVENANCE_BADGES, SUBJECT_TYPES, EditorialBlock,
+    BLOCK_TYPES, PROVENANCE_BADGES, PROVENANCE_STATES, SUBJECT_TYPES, EditorialBlock,
     EditorialBlockVersion,
 )
 from app.models.user import User
@@ -84,13 +84,27 @@ def list_blocks(team_id: uuid.UUID,
                 subject_type: str | None = Query(None),
                 subject_code: str | None = Query(None),
                 block_type: str | None = Query(None),
+                provenance: list[str] | None = Query(None),
+                limit: int = Query(200, ge=1, le=1000),
+                offset: int = Query(0, ge=0),
                 db: Session = Depends(get_db),
                 current_user: User = Depends(get_current_user)):
+    """Blocks visible to this team: its own plus the platform library.
+
+    `provenance` filters the four-state review ladder, which is what an
+    approvals queue reads — "everything not yet signed off" is the question, and
+    answering it by fetching the whole library and filtering client-side stops
+    working the moment the editorial loader lands its real volume.
+    """
     require_permission(db, current_user, team_id, "content.view")
     if subject_type and subject_type not in SUBJECT_TYPES:
         raise HTTPException(422, f"Invalid subject_type. Allowed: {sorted(SUBJECT_TYPES)}")
     if block_type and block_type not in BLOCK_TYPES:
         raise HTTPException(422, f"Invalid block_type. Allowed: {sorted(BLOCK_TYPES)}")
+    for prov in (provenance or []):
+        if prov not in PROVENANCE_STATES:
+            raise HTTPException(
+                422, f"Invalid provenance. Allowed: {sorted(PROVENANCE_STATES)}")
 
     from sqlalchemy import or_
     q = (
@@ -105,7 +119,12 @@ def list_blocks(team_id: uuid.UUID,
         q = q.filter(EditorialBlock.subject_code == subject_code)
     if block_type:
         q = q.filter(EditorialBlock.block_type == block_type)
-    rows = q.order_by(EditorialBlock.subject_code, EditorialBlock.block_type).all()
+    if provenance:
+        q = q.filter(EditorialBlock.provenance.in_(provenance))
+    rows = (
+        q.order_by(EditorialBlock.subject_code, EditorialBlock.block_type)
+        .offset(offset).limit(limit).all()
+    )
     return [_out(b) for b in rows]
 
 
