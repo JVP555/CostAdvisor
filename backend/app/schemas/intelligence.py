@@ -94,6 +94,9 @@ class VolatilityOut(BaseModel):
 class TrustOut(BaseModel):
     # Read from SCRUM-78's stored field, never recomputed here.
     grade: str | None = None
+    # Shipped with the grade rather than written by each screen — the state and
+    # the customer-facing claim are the same thing.
+    caveat: str | None = None
     needs_review: bool = False
     reviewed_at: datetime | None = None
     inputs: dict = {}

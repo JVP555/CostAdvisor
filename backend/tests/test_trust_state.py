@@ -807,3 +807,48 @@ def test_the_catalog_list_carries_the_grade_not_the_retired_confidence(
     finally:
         _cleanup(db, template_ids=[tpl.id], code_ids=[good.id, unbought.id],
                  series_ids=[s_ok.id, s_dry.id])
+
+
+def test_the_queue_doubles_as_the_cross_library_coverage_index(db, tenant_a, client_as):
+    """Omitting `needs_review` means no filter, not "only the queued ones".
+
+    Unit 11 built this endpoint because coverage was listable only per template,
+    so it is the cross-library coverage listing as well as the review queue — the
+    Intelligence catalogue needs every (template, region) pair, and a default
+    that silently hid the clean ones would give it a catalogue of defects.
+    """
+    s_ok, s_dry = _series(db), _series(db)
+    good, unbought = _code(db, s_ok), _code(db, s_dry, resolution="no_series")
+    clean_tpl, clean_cov = _combo(db, created_by=tenant_a["user_id"],
+                                  lines=[(100, good, "index", False)])
+    bad_tpl, bad_cov = _combo(db, created_by=tenant_a["user_id"],
+                              lines=[(100, unbought, "index", False)])
+    try:
+        apply_assessment(db, clean_cov)
+        apply_assessment(db, bad_cov)
+        db.commit()
+
+        c = client_as(tenant_a)
+        base = f"/api/formulas/review-queue?team_id={tenant_a['team_id']}"
+
+        # Scoped by grade so the assertion does not depend on how many combos
+        # the library happens to hold — the point is the filter's presence, not
+        # a page position.
+        high = {r["template_code"] for r in
+                c.get(f"{base}&grade={GRADE_HIGH}&limit=500").json()["rows"]}
+        assert clean_tpl.code in high, "a clean combo must appear in the index"
+
+        blocked = {r["template_code"] for r in
+                   c.get(f"{base}&grade={GRADE_BLOCKED}&limit=500").json()["rows"]}
+        assert bad_tpl.code in blocked
+
+        queued_high = {r["template_code"] for r in
+                       c.get(f"{base}&grade={GRADE_HIGH}&needs_review=true&limit=500").json()["rows"]}
+        assert clean_tpl.code not in queued_high, "the explicit queue must still exclude clean combos"
+
+        # And the index is strictly the larger of the two.
+        assert (c.get(f"{base}&limit=1").json()["total"]
+                >= c.get(f"{base}&needs_review=true&limit=1").json()["total"])
+    finally:
+        _cleanup(db, template_ids=[clean_tpl.id, bad_tpl.id],
+                 code_ids=[good.id, unbought.id], series_ids=[s_ok.id, s_dry.id])

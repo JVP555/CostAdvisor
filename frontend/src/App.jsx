@@ -36,7 +36,7 @@ import ForecastArea from './pages/workspace/ForecastArea';
 import NegotiateArea from './pages/workspace/NegotiateArea';
 import NegotiateDetailArea from './pages/workspace/NegotiateDetailArea';
 import IntelligenceArea from './pages/workspace/IntelligenceArea';
-import IntelligenceDetailArea from './pages/workspace/IntelligenceDetailArea';
+import IntelligenceComboArea from './pages/workspace/IntelligenceComboArea';
 import { useAuth } from './AuthContext';
 
 export default function App() {
@@ -82,7 +82,10 @@ export default function App() {
             <Route path="/negotiate" element={<NegotiateArea />} />
             <Route path="/negotiate/:costModelId" element={<NegotiateDetailArea />} />
             <Route path="/intelligence" element={<IntelligenceArea />} />
-            <Route path="/intelligence/:costModelId" element={<IntelligenceDetailArea />} />
+            {/* Combo grain is the library's own; the cost-model route resolves a
+                product to the same combo and reports how it got there. */}
+            <Route path="/intelligence/combo/:templateId/:region" element={<IntelligenceComboArea />} />
+            <Route path="/intelligence/:costModelId" element={<IntelligenceComboArea />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

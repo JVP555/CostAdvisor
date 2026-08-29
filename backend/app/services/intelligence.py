@@ -60,6 +60,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from app.constants.trust import GRADE_CAVEATS, GRADE_UNRATED
 from app.models.formula_template import FormulaRegionCoverage, FormulaTemplate
 from app.models.index_data import CommodityIndex, IndexValue
 from app.models.index_layer import IndexMonthlyValue
@@ -346,6 +347,13 @@ def derive(
         inputs = coverage.trust_inputs or {}
         out.trust = {
             "grade": coverage.trust_grade,
+            # The customer-facing claim ships with the state that produced it,
+            # the same way the editorial provenance badge does. A screen that
+            # writes its own caveat can drift from the grade beside it, and the
+            # mockup's unconditional "not reviewed by an expert" is what that
+            # drift looks like: it caveats combos nobody questioned and vouches
+            # for none of them.
+            "caveat": GRADE_CAVEATS.get(coverage.trust_grade or GRADE_UNRATED),
             "needs_review": coverage.needs_review,
             "reviewed_at": coverage.reviewed_at,
             "inputs": inputs,

@@ -447,7 +447,12 @@ def delete_formula(
 def get_review_queue(
     team_id: uuid.UUID,
     grade: list[str] | None = Query(None),
-    needs_review: bool | None = Query(True),
+    # Omitted = no filter. Unit 11 built this because coverage was only
+    # listable per template, so it is the cross-library coverage listing as well
+    # as the review queue — the Intelligence catalogue needs every (template,
+    # region) pair, not just the queued ones. Callers that want the queue send
+    # `needs_review=true` explicitly.
+    needs_review: bool | None = Query(None),
     order_by: str = Query("severity"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
