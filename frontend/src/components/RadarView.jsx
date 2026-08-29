@@ -250,6 +250,16 @@ function WindowDrawer({ windowId, onClose, onDismissed, onFlagged }) {
                 </div>
                 {/* A threshold without its unit cannot be read: an index level is
                     base 100, where nothing is money. */}
+                {/* The other half of the cross-link: the contract page lists the
+                    windows it drives, and a window points back at its contract. */}
+                {win.scope_contract_id && (
+                  <div style={{ marginTop: 8 }}>
+                    <button className="ca-btn ca-btn-sm ca-btn-ghost" style={{ fontSize: 10 }}
+                      onClick={() => navigate('/contracts')}>
+                      Open the contract
+                    </button>
+                  </div>
+                )}
                 {win.threshold_value !== null && win.threshold_value !== undefined && (
                   <div style={{ fontSize: 11, marginTop: 6 }}>
                     <span style={{ color: 'var(--muted)' }}>Threshold applied </span>
@@ -443,7 +453,7 @@ function Windows({ teamId, onInspect, reloadKey }) {
           </div>
           <div style={{ color: 'var(--muted)', fontSize: 11, lineHeight: 1.6, maxWidth: 460, margin: '0 auto' }}>
             {state === 'open'
-              ? 'Nothing is running against you right now — but check Coverage before reading that as calm: a product whose cost lines never resolve cannot produce a window at all.'
+              ? 'Nothing is running against you right now — but check Coverage before reading that as calm: a product whose cost lines never resolve cannot produce a window at all. Recording a contract term and notice period is the one feed you can fill in directly.'
               : 'Nothing here yet.'}
           </div>
         </div>
@@ -755,12 +765,25 @@ const TABS = [
 export default function RadarView() {
   const { activeTeamId } = useAuth();
   const { addToast } = useToast();
+  const navigate = useNavigate();
+  // Same per-feature probe the nav uses: contracts sit behind their own
+  // permission, so the link is hidden rather than leading to a 403.
+  const [canSeeContracts, setCanSeeContracts] = useState(false);
   const [tab, setTab] = useState('windows');
   const [inspecting, setInspecting] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [running, setRunning] = useState(false);
 
   const reload = () => setReloadKey(k => k + 1);
+
+  useEffect(() => {
+    if (!activeTeamId) return;
+    let cancelled = false;
+    api.get('/api/contracts/can-access', { params: { team_id: activeTeamId } })
+      .then(({ data }) => { if (!cancelled) setCanSeeContracts(!!data.can_view); })
+      .catch(() => { if (!cancelled) setCanSeeContracts(false); });
+    return () => { cancelled = true; };
+  }, [activeTeamId]);
 
   const runRadar = async () => {
     setRunning(true);
@@ -784,7 +807,15 @@ export default function RadarView() {
             {t.label}
           </button>
         ))}
-        <button className="ca-btn ca-btn-sm ca-btn-ghost" style={{ marginLeft: 'auto' }}
+        {canSeeContracts && (
+          <button className="ca-btn ca-btn-sm ca-btn-ghost" style={{ marginLeft: 'auto' }}
+            onClick={() => navigate('/contracts')}
+            title="Contract terms and notice periods — the notice deadline is the one hard future date the radar has">
+            Contracts
+          </button>
+        )}
+        <button className="ca-btn ca-btn-sm ca-btn-ghost"
+          style={canSeeContracts ? undefined : { marginLeft: 'auto' }}
           onClick={runRadar} disabled={running}
           title="Re-evaluate every feed now. A standing window is refreshed rather than duplicated, and a dismissed one is never reopened (owner/admin).">
           {running ? 'Running…' : '⟳ Run radar'}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import api from '../api';
 import TeamSelector from './TeamSelector';
 import ThemeSelector from './ThemeSelector';
 
@@ -8,12 +9,24 @@ import ThemeSelector from './ThemeSelector';
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, pendingInviteCount } = useAuth();
+  const { user, logout, pendingInviteCount, activeTeamId } = useAuth();
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
   const itemRefs = useRef([]);
+
+  // There is no effective-permissions read in this app; the convention is a
+  // per-feature probe, and this is the one for contracts.
+  const [canSeeContracts, setCanSeeContracts] = useState(false);
+  useEffect(() => {
+    if (!activeTeamId) { setCanSeeContracts(false); return; }
+    let cancelled = false;
+    api.get('/api/contracts/can-access', { params: { team_id: activeTeamId } })
+      .then(({ data }) => { if (!cancelled) setCanSeeContracts(!!data.can_view); })
+      .catch(() => { if (!cancelled) setCanSeeContracts(false); });
+    return () => { cancelled = true; };
+  }, [activeTeamId]);
 
   const closeMenu = (restoreFocus = false) => {
     setOpen(false);
@@ -73,6 +86,11 @@ export default function Navbar() {
     { path: '/formulas', label: 'Formulas' },
     { path: '/alerts', label: 'Alerts' },
     { path: '/quotes', label: 'Quotes' },
+    // Contracts is conditional, not just conditionally useful: contract prices
+    // and notice dates sit behind their own `contracts.*` permission category,
+    // separate from costing, and a role without it must not even see the entry.
+    // That separation is the reason the category exists.
+    ...(canSeeContracts ? [{ path: '/contracts', label: 'Contracts' }] : []),
   ];
 
   const handleLogout = async () => { setOpen(false); await logout(); };

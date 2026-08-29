@@ -866,6 +866,23 @@ def test_a_role_that_can_cost_but_not_see_contracts_is_refused(
     assert c.get(f"/api/contracts?team_id={tenant_a['team_id']}").status_code == 403
     assert c.post(f"/api/contracts?team_id={tenant_a['team_id']}",
                   json={"reference": "nope"}).status_code == 403
+    # And the probe the UI gates the nav entry on says so rather than 403ing:
+    # hiding the entry needs an answer, not an error, or every page load for a
+    # user without access logs a failure.
+    probe = c.get(f"/api/contracts/can-access?team_id={tenant_a['team_id']}")
+    assert probe.status_code == 200
+    assert probe.json() == {"can_view": False, "can_edit": False, "can_delete": False}
+
+
+def test_can_access_probe_is_not_parsed_as_a_contract_id(db, tenant_a, client_as):
+    """`/can-access` is registered ahead of `/{contract_id}`; registered after,
+    the literal segment would be parsed as a UUID and 422 instead."""
+    r = client_as(tenant_a).get(f"/api/contracts/can-access?team_id={tenant_a['team_id']}")
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body) == {"can_view", "can_edit", "can_delete"}
+    # The team owner holds all three.
+    assert body == {"can_view": True, "can_edit": True, "can_delete": True}
 
 
 def test_contracts_permissions_exist_and_are_plan_granted(db):

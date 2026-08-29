@@ -29,7 +29,7 @@ from app.schemas.contract import (
     VALID_CADENCES, VALID_CLAUSE_TYPES,
 )
 from app.services.audit import log_event
-from app.services.permissions import require_permission
+from app.services.permissions import has_permission, require_permission
 
 router = APIRouter()
 
@@ -95,6 +95,29 @@ def _validate(db: Session, team_id: uuid.UUID, data, *, clauses, cost_model_ids)
         if not db.query(CostModel).filter(CostModel.id == cm_id,
                                           CostModel.team_id == team_id).first():
             raise HTTPException(404, f"Cost model {cm_id} not found in this team")
+
+
+@router.get("/can-access")
+def can_access(team_id: uuid.UUID, db: Session = Depends(get_db),
+               current_user: User = Depends(get_current_user)):
+    """Whether to show the Contracts entry at all, and whether it is editable.
+
+    Contract prices and notice dates are more sensitive than a should-cost
+    curve, which is why `contracts.*` is its own permission category rather than
+    riding on `costing.view` — so a role that can run a costing but was not
+    given contract access must not even see the nav entry. There is no
+    effective-permissions read in this app; the convention is a per-feature
+    probe (`formulas/can-edit-platform`, `fx-rates/can-manage-pairs`) and this
+    follows it, exposing three booleans rather than the permission model.
+
+    Registered ahead of `/{contract_id}` so the literal segment is never parsed
+    as a UUID.
+    """
+    return {
+        "can_view": has_permission(db, current_user, team_id, "contracts.view"),
+        "can_edit": has_permission(db, current_user, team_id, "contracts.edit"),
+        "can_delete": has_permission(db, current_user, team_id, "contracts.delete"),
+    }
 
 
 @router.get("", response_model=list[ContractOut])
