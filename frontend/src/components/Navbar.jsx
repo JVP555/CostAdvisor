@@ -92,6 +92,7 @@ export default function Navbar() {
     // That separation is the reason the category exists.
     ...(canSeeContracts ? [{ path: '/contracts', label: 'Contracts' }] : []),
     { path: '/curation', label: 'Curation' },
+    { path: '/dimensions', label: 'Dimensions' },
   ];
 
   const handleLogout = async () => { setOpen(false); await logout(); };
