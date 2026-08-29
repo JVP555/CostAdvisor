@@ -5,6 +5,7 @@ import { useToast } from '../../components/Toast';
 import IndexPopupModal from '../../components/IndexPopupModal';
 import AddIndexModal from '../../components/AddIndexModal';
 import DerivedIndexesModal from '../../components/DerivedIndexesModal';
+import ResolutionModal from '../../components/ResolutionModal';
 import EditCellModal from '../../components/EditCellModal';
 import FxCustomEditModal from '../../components/FxCustomEditModal';
 import exportCsv from '../../utils/exportCsv';
@@ -241,6 +242,7 @@ export default function IndexLibraryArea() {
   const { activeTeamId, user } = useAuth();
   const isSuperAdmin = !!user?.is_super_admin;
   const [showDerived, setShowDerived] = useState(false);
+  const [showResolution, setShowResolution] = useState(false);
   const { addToast } = useToast();
   const [syncing, setSyncing] = useState(false);
   const [data, setData] = useState([]);
@@ -597,6 +599,43 @@ export default function IndexLibraryArea() {
     }
   };
 
+  // Recompute the two derived platform scales. Both change a number every
+  // consumer reads — the volatility percentile on every series and the seasonal
+  // profile behind every combo's amplitude — so both are super-admin, and both
+  // are on-demand siblings of their own scheduled jobs.
+  //
+  // The volatility ladder is REGENERATED rather than imported: the shipped one
+  // deviates from this library's real dispersion by enough to pin the single
+  // most volatile series below the top rung. Recalibrating is expected to move
+  // percentiles; that is a correct diff, not a regression.
+  const [recalibrating, setRecalibrating] = useState(false);
+  const handleRecalibrate = async () => {
+    setRecalibrating(true);
+    try {
+      const { data: cal } = await api.post('/api/dossiers/volatility-calibration/recompute', {});
+      addToast(`Volatility recalibrated — ${cal?.n_rungs} rungs over ${cal?.n_series} series (${cal?.step?.toFixed(1)} pts per rung).`, 'success');
+    } catch (err) {
+      addToast(formatApiError(err) || 'Recalibration failed', 'error');
+    } finally {
+      setRecalibrating(false);
+    }
+  };
+
+  const [reseasoning, setReseasoning] = useState(false);
+  const handleRecomputeSeasonality = async () => {
+    setReseasoning(true);
+    try {
+      const { data: rep } = await api.post('/api/seasonality/recompute');
+      // `insufficient` is reported, never filled with a flat 100 — a series that
+      // cannot support a fit has no profile rather than a fake calm one.
+      addToast(`Seasonality recomputed — ${rep?.computed ?? 0} updated, ${rep?.unchanged ?? 0} unchanged, ${rep?.insufficient ?? 0} without enough history.`, 'success');
+    } catch (err) {
+      addToast(formatApiError(err) || 'Seasonality recompute failed', 'error');
+    } finally {
+      setReseasoning(false);
+    }
+  };
+
   // Export exactly what's on screen, in display order — same filtered set the
   // table renders, so the CSV can never disagree with the grid.
   const handleExport = () => {
@@ -664,6 +703,22 @@ export default function IndexLibraryArea() {
               {projecting ? 'Projecting…' : '⟳ Project forecasts'}
             </button>
           )}
+          {isSuperAdmin && (
+            <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleRecalibrate} disabled={recalibrating}
+              title="Refit the platform volatility ladder over every series' month-over-month dispersion. Percentiles will move — the ladder is regenerated, not imported (super-admin)">
+              {recalibrating ? 'Recalibrating…' : '⟳ Recalibrate volatility'}
+            </button>
+          )}
+          {isSuperAdmin && (
+            <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={handleRecomputeSeasonality} disabled={reseasoning}
+              title="Refit the 12-month seasonal profile for every series with enough monthly history (super-admin)">
+              {reseasoning ? 'Recomputing…' : '⟳ Recompute seasonality'}
+            </button>
+          )}
+          <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={() => setShowResolution(true)}
+            title="Which series the catalog actually stands on, what cannot be priced and why, and what to source next">
+            Resolution
+          </button>
           {isSuperAdmin && (
             <button className="ca-btn ca-btn-sm ca-btn-ghost" onClick={() => setShowDerived(true)}
               title="Manage composite (calculated) and proxy indexes">Derived indexes</button>
@@ -938,6 +993,10 @@ export default function IndexLibraryArea() {
         isSuperAdmin={isSuperAdmin}
         onAdded={fetchData}
       />
+
+      {showResolution && (
+        <ResolutionModal onClose={() => setShowResolution(false)} />
+      )}
 
       {showDerived && (
         <DerivedIndexesModal onClose={() => { setShowDerived(false); fetchData(); }} />

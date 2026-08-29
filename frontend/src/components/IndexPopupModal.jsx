@@ -4,6 +4,7 @@ import { useToast } from './Toast';
 import SeriesChart from './SeriesChart';
 import { computeStats } from '../utils/seriesStats';
 import IndexDetailPanel from './IndexDetailPanel';
+import IndexIntelPanel from './IndexIntelPanel';
 import FxPairModal from './FxPairModal';
 import exportCsv from '../utils/exportCsv';
 
@@ -467,6 +468,11 @@ export default function IndexPopupModal({
             </div>
           </div>
         )}
+
+        {/* Volatility / seasonality / dossier (Wave 3). Each panel is silent
+            or states its own reason when the series has nothing stored — no
+            fabricated flat curve, no bare percentile. */}
+        <IndexIntelPanel commodityId={commodityId} region={region} />
 
         {/* AI Analysis */}
         <div className="ca-card" style={{ marginBottom: 16, padding: 16 }}>
