@@ -795,3 +795,80 @@ def test_the_decision_export_only_lists_undecided_values(db):
         db.execute(text("DELETE FROM dimension_unresolved WHERE kind = :k "
                         "AND raw_value LIKE 'Cross-sector %'"), {"k": KIND_INDUSTRY})
         db.commit()
+
+
+# ── Orphan repair (SCRUM-77 follow-up) ───────────────────────────────────────
+
+def test_repair_deletes_only_what_nothing_supports(db):
+    """The predicate has two halves and both are load-bearing.
+
+    An earlier loader pass wrote assertions against aliases that were later
+    rebuilt; the FK nulled out and the never-delete rule kept the rows, leaving
+    141 live `industry` assertions whose raw value has nothing to do with the
+    term they sit under. But *plenty* of sound rows also have no alias —
+    `functionality_family` has 56 — so deleting on "no alias" alone would
+    destroy real data. Only a row failing both halves is unsupported by
+    anything.
+    """
+    from app.services.dimension_repair import repair
+
+    good = _term(db, "industry", f"repair-good-{uuid.uuid4().hex[:6]}", "Repair Good")
+    other = _term(db, "industry", f"repair-other-{uuid.uuid4().hex[:6]}", "Repair Other")
+    upsert_alias(db, good, good.label, source="taxonomy")
+    upsert_alias(db, other, other.label, source="taxonomy")
+    db.commit()
+    try:
+        # 1. Sound and aliased.
+        assert_term(db, good, subject_type="formula", subject_code="RPR-ALIASED",
+                    raw_value=good.label,
+                    matched_alias=resolve_raw(db, "industry", good.label))
+        # 2. No alias recorded, but the raw value still resolves to this term.
+        #    Sound — the mapping exists, only the back-link is missing.
+        a2 = assert_term(db, good, subject_type="formula", subject_code="RPR-ALIASLESS",
+                         raw_value=good.label)
+        a2.matched_alias_id = None
+        # 3. No alias, and the raw value belongs to a DIFFERENT term. Orphan.
+        a3 = assert_term(db, good, subject_type="formula", subject_code="RPR-ORPHAN",
+                         raw_value=other.label)
+        a3.matched_alias_id = None
+        # 4. No alias and no raw value at all — unjudgeable, must be kept.
+        a4 = assert_term(db, good, subject_type="formula", subject_code="RPR-NORAW")
+        a4.matched_alias_id = None
+        a4.raw_value = None
+        db.commit()
+
+        dry = repair(db, kind="industry", apply=False)
+        mine = {o.subject_code for o in dry.orphans}
+        assert "RPR-ORPHAN" in mine
+        assert "RPR-ALIASLESS" not in mine, "an alias-less row that still resolves is sound"
+        assert "RPR-ALIASED" not in mine
+        assert "RPR-NORAW" not in mine, "nothing to judge is not the same as wrong"
+        assert dry.dry_run is True
+        db.rollback()
+
+        # The dry run wrote nothing.
+        survivors = {a.subject_code for a in db.query(DimensionAssertion)
+                     .filter(DimensionAssertion.term_id == good.id).all()}
+        assert {"RPR-ALIASED", "RPR-ALIASLESS", "RPR-ORPHAN", "RPR-NORAW"} <= survivors
+
+        applied = repair(db, kind="industry", apply=True)
+        db.commit()
+        assert applied.deleted >= 1
+        after = {a.subject_code for a in db.query(DimensionAssertion)
+                 .filter(DimensionAssertion.term_id == good.id).all()}
+        assert "RPR-ORPHAN" not in after
+        assert {"RPR-ALIASED", "RPR-ALIASLESS", "RPR-NORAW"} <= after
+
+        # Idempotent: the rows it would match are gone.
+        again = repair(db, kind="industry", apply=True)
+        db.commit()
+        assert not [o for o in again.orphans if o.subject_code == "RPR-ORPHAN"]
+    finally:
+        db.rollback()
+        bypass_rls_var.set(True)
+        db.query(DimensionAssertion).filter(
+            DimensionAssertion.subject_code.in_(
+                ["RPR-ALIASED", "RPR-ALIASLESS", "RPR-ORPHAN", "RPR-NORAW"])).delete(
+            synchronize_session=False)
+        db.commit()
+        _cleanup(db, term_ids=[good.id, other.id])
