@@ -42,8 +42,15 @@
 :root{
   --bg:#eef2f5;--surface:#ffffff;--surface2:#eef3f5;
   --glass:rgba(255,255,255,.82);--border:#dbe3e8;
-  --blue:#007068;--teal:#007069;--green:#0A714F;
+  --blue:#007068;--teal:#00A99D;--green:#0A714F;
   --amber:#805D11;--red:#BC2929;--purple:#7c5cbf;
+  /* Real StaminaChem secondary accent (steel blue) — verified ~3.4:1 on white,
+     so it's used only for large text (>=24px/18.66px bold) and UI-component
+     surfaces, never small body text. --teal is now the actual brand teal
+     (#00A99D, confirmed from staminachem.com's own CSS) rather than a near-
+     duplicate of --blue — its only two usages are both on the dark
+     --ink/--ink2 testimonial band, where it comfortably clears AA (~5.2:1). */
+  --accent-blue:#2596be;
   --ink:#062a26;--ink2:#0a3a34;  /* deep teal for dark contrast bands */
   --text:#0f2228;--muted:#54666d;--dim:#63737a;
   --font-display:'Space Grotesk',system-ui,sans-serif;
@@ -180,7 +187,7 @@ section{padding:96px 0}
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
 .hero-stats{display:flex;gap:32px;margin-top:40px;flex-wrap:wrap}
 .hero-stat{display:flex;flex-direction:column}
-.hero-stat-val{font-size:26px;font-weight:800;font-family:var(--font-mono);color:var(--blue)}
+.hero-stat-val{font-size:26px;font-weight:800;font-family:var(--font-mono);color:var(--accent-blue)}
 .hero-stat-label{font-size:11px;color:var(--dim);font-family:var(--font-mono);letter-spacing:.5px}
 
 /* ── Hero spatial mockup ─────────────────────────────────── */
@@ -906,7 +913,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   .fd3-card h3{font-family:var(--font-sans);font-weight:800;font-size:18px;letter-spacing:-.018em;margin-bottom:10px;line-height:1.15;color:var(--text)}
   .fd3-card>p{font-family:var(--font-mono);font-size:12px;color:var(--muted);line-height:1.8;margin:0;flex:1}
   .fd3-stat{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
-  .fd3-stat-val{font-family:var(--font-mono);font-size:24px;font-weight:700;color:var(--blue);display:block;line-height:1;margin-bottom:4px}
+  .fd3-stat-val{font-family:var(--font-mono);font-size:24px;font-weight:700;color:var(--accent-blue);display:block;line-height:1;margin-bottom:4px}
   .fd3-stat-desc{font-family:var(--font-mono);font-size:10px;color:var(--dim);line-height:1.5}
   /* Secondary tier: compact bordered table grid */
   .fd3-secondary{display:grid;grid-template-columns:repeat(4,1fr);margin-top:20px;border:1px solid var(--border);border-radius:12px;overflow:hidden}

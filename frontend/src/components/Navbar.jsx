@@ -164,7 +164,7 @@ export default function Navbar() {
         title="Visit the CostAdvisor website"
         style={{ display: 'flex', alignItems: 'center', gap: 6 }}
       >
-        <Logo size={26} style={{ borderRadius: 8, boxShadow: '0 3px 10px rgba(15,34,40,.28)' }} />
+        <Logo size={34} style={{ borderRadius: 9, boxShadow: '0 3px 10px rgba(15,34,40,.18)' }} />
         Cost<span>Advisor</span>
       </div>
       {tabs.map(t => (
