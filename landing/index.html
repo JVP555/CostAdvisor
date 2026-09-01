@@ -1385,6 +1385,34 @@ const APP_URL = window.location.hostname.includes('dev.')
 // Sign-in kicks off the Google OAuth flow directly at the API's /auth/login (host-aware).
 document.querySelectorAll('.js-signin').forEach(a => { a.href = `${API_URL}/auth/login`; });
 
+// If the visitor already has a live app session (they clicked through from the
+// app's own logo, or just still has a valid cookie), skip the OAuth round-trip
+// entirely: swap Sign In for a direct way back in. /auth/me + /auth/refresh are
+// the exact same endpoints the app itself uses (AuthContext.jsx / api.js) —
+// reused as-is, no new backend surface.
+(async () => {
+  const credOpts = { credentials: 'include' };
+  let loggedIn = false;
+  try {
+    let r = await fetch(`${API_URL}/auth/me`, credOpts);
+    if (!r.ok) {
+      const rr = await fetch(`${API_URL}/auth/refresh`, { method: 'POST', ...credOpts });
+      if (rr.ok) r = await fetch(`${API_URL}/auth/me`, credOpts);
+    }
+    loggedIn = r.ok;
+  } catch { /* treat any network/CORS failure as logged out — Sign In stays */ }
+
+  if (!loggedIn) return;
+  // Prefer the exact page they came from (set when the app's own logo sends
+  // them here); otherwise land them somewhere useful rather than the marketing
+  // page they're already looking at.
+  const backTo = document.referrer.startsWith(APP_URL) ? document.referrer : `${APP_URL}/dashboard`;
+  document.querySelectorAll('.js-signin').forEach(a => {
+    a.textContent = 'CostAdvisor';
+    a.href = backTo;
+  });
+})();
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ── Static data ──────────────────────────────────────────────
