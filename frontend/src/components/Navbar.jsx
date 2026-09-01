@@ -4,6 +4,7 @@ import { useAuth } from '../AuthContext';
 import api from '../api';
 import TeamSelector from './TeamSelector';
 import ThemeSelector from './ThemeSelector';
+import Logo from './Logo';
 
 
 export default function Navbar() {
@@ -148,7 +149,8 @@ export default function Navbar() {
 
   return (
     <nav className="ca-nav">
-      <div className="ca-logo" onClick={() => navigate('/dashboard')}>
+      <div className="ca-logo" onClick={() => navigate('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Logo size={26} />
         Cost<span>Advisor</span>
       </div>
       {tabs.map(t => (
