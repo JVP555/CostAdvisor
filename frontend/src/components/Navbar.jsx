@@ -149,7 +149,7 @@ export default function Navbar() {
 
   return (
     <nav className="ca-nav">
-      <div className="ca-logo" onClick={() => navigate('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="ca-logo" onClick={() => navigate('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <Logo size={26} />
         Cost<span>Advisor</span>
       </div>
