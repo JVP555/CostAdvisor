@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from slowapi.errors import RateLimitExceeded
@@ -47,6 +47,18 @@ app.add_middleware(SlowAPIMiddleware)
 # available and a DSN configured).
 if _SDK_AVAILABLE and settings.sentry_dsn:
     app.add_middleware(SentryAsgiMiddleware)
+
+# The API has no page content to serve and should never be crawled — GSC
+# flagged both api.costadvisor.org and api-dev.costadvisor.org as 404s Google
+# had bothered to fetch. X-Robots-Tag is the header-level equivalent of a
+# noindex meta tag and applies to every response (JSON included), which
+# robots.txt alone doesn't guarantee for a crawler that ignores it.
+@app.middleware("http")
+async def add_robots_header(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -110,3 +122,8 @@ app.include_router(demo.router, prefix="/api/demos", tags=["demos"])
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/robots.txt")
+def robots_txt():
+    return Response(content="User-agent: *\nDisallow: /\n", media_type="text/plain")

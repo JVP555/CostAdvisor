@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- The app is a logged-in tool, not marketing content — it should never be
+       indexed (GSC flagged app.dev.costadvisor.org's "/" as indexed). Backed
+       up by public/robots.txt and the X-Robots-Tag header in public/_headers. -->
+  <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" type="image/png" href="/logo.png" />
   <title>CostAdvisor</title>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">

@@ -6,6 +6,14 @@ import TeamSelector from './TeamSelector';
 import ThemeSelector from './ThemeSelector';
 import Logo from './Logo';
 
+// Mirrors the host-aware branching landing/index.html's own script uses for
+// API_URL/APP_URL — the logo now points *out* to the marketing site (the app
+// itself has a real Dashboard tab for internal navigation instead).
+const LANDING_URL = window.location.hostname.includes('dev.')
+  ? 'https://dev.costadvisor.org'
+  : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:3333'
+    : 'https://costadvisor.org';
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -59,13 +67,14 @@ export default function Navbar() {
     return () => cancelAnimationFrame(id);
   }, [open]);
 
-  // The 8-tab journey shell (Scrum 61/UI-1): raw index feeds → portfolio →
-  // monitor → forecast → negotiate, plus the two cross-cutting/back-office
-  // tabs (Intelligence, Team) and Admin (super-admin only). This is the
-  // primary nav now — Dashboard/Formulas/Products/Suppliers no longer get a
-  // persistent tab (Monitor/Portfolio are their new-IA homes; the other two
-  // stay reachable, not gone, via the account menu below).
+  // The journey shell (Scrum 61/UI-1): Dashboard first, then raw index feeds
+  // → portfolio → monitor → forecast → negotiate, plus the two cross-cutting/
+  // back-office tabs (Intelligence, Team) and Admin (super-admin only).
+  // Formulas/Products/Suppliers still have no persistent tab (Monitor/
+  // Portfolio are their new-IA homes; the other two stay reachable, not
+  // gone, via the account menu below).
   const tabs = [
+    { path: '/dashboard', label: 'Dashboard' },
     { path: '/index-library', label: 'Indexes' },
     { path: '/portfolio', label: 'Portfolio' },
     { path: '/monitor', label: 'Monitor' },
@@ -79,9 +88,9 @@ export default function Navbar() {
   // Old flat-nav pages with no slot in the 8-tab journey shell. This is not a
   // leftovers list — /formulas, /alerts and /quotes have no other inbound
   // link anywhere in the app, and /suppliers' only one is a back-button from
-  // its own child, so for four of these six this menu is the sole entry point.
+  // its own child, so for most of these this menu is the sole entry point.
+  // Dashboard lives as a top-level tab now, not here.
   const goToLinks = [
-    { path: '/dashboard', label: 'Dashboard' },
     { path: '/products', label: 'Products' },
     { path: '/suppliers', label: 'Suppliers' },
     { path: '/formulas', label: 'Formulas' },
@@ -149,8 +158,13 @@ export default function Navbar() {
 
   return (
     <nav className="ca-nav">
-      <div className="ca-logo" onClick={() => navigate('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Logo size={26} />
+      <div
+        className="ca-logo"
+        onClick={() => { window.location.href = LANDING_URL; }}
+        title="Visit the CostAdvisor website"
+        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+      >
+        <Logo size={26} style={{ borderRadius: 8, boxShadow: '0 3px 10px rgba(15,34,40,.28)' }} />
         Cost<span>Advisor</span>
       </div>
       {tabs.map(t => (
