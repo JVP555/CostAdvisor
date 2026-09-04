@@ -102,7 +102,12 @@ function Concentration({ onOpenSeries }) {
       <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 8, fontFamily: "'JetBrains Mono', monospace" }}>
         Library total indexed weight: {data.library_total_weight?.toLocaleString()}
       </div>
-      <table className="ca-table" style={{ fontSize: 11 }}>
+      {/* .ca-grid-scroll: without it, a table wider than the modal (long
+          commodity keys, the share bar + percentage) bleeds text out past
+          the card's border instead of scrolling — the same failure mode
+          documented on that class, this component just never adopted it. */}
+      <div className="ca-grid-scroll" style={{ maxHeight: 420 }}>
+      <table className="ca-table" style={{ fontSize: 11, tableLayout: 'fixed', width: '100%' }}>
         <thead>
           <tr>
             <th>Series</th>
@@ -116,7 +121,7 @@ function Concentration({ onOpenSeries }) {
             <tr key={s.commodity_id}
               onClick={() => onOpenSeries?.(s.commodity_id)}
               style={{ cursor: onOpenSeries ? 'pointer' : 'default' }}>
-              <td style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              <td style={{ fontFamily: "'JetBrains Mono', monospace", overflowWrap: 'break-word' }}>
                 {s.commodity_key || `#${s.commodity_id}`}
               </td>
               <td style={{ textAlign: 'right' }}>{s.type_code_count}</td>
@@ -135,6 +140,7 @@ function Concentration({ onOpenSeries }) {
           ))}
         </tbody>
       </table>
+      </div>
     </>
   );
 }
@@ -258,7 +264,8 @@ function SwapBacklog() {
           <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 6, fontFamily: "'JetBrains Mono', monospace" }}>
             {entries.length} codes · library indexed weight {data.total_catalog_weight?.toLocaleString()}
           </div>
-          <table className="ca-table" style={{ fontSize: 11 }}>
+          <div className="ca-grid-scroll" style={{ maxHeight: 420 }}>
+          <table className="ca-table" style={{ fontSize: 11, tableLayout: 'fixed', width: '100%' }}>
             <thead>
               <tr>
                 <th style={{ width: 110 }}>Code</th>
@@ -272,21 +279,21 @@ function SwapBacklog() {
             <tbody>
               {entries.map(e => (
                 <tr key={e.code}>
-                  <td style={{ fontFamily: "'JetBrains Mono', monospace" }} title={e.label || undefined}>
+                  <td style={{ fontFamily: "'JetBrains Mono', monospace", overflowWrap: 'break-word' }} title={e.label || undefined}>
                     {e.code}
                   </td>
                   <td title={RANK_TITLE[e.swap_priority]}
                     style={{ fontWeight: 600, color: e.swap_priority === 'A' ? 'var(--accent2)' : 'var(--text-secondary)' }}>
                     {e.swap_priority || '—'}
                   </td>
-                  <td style={{ color: e.ideal_index ? 'var(--text-secondary)' : 'var(--muted)' }}>
+                  <td style={{ color: e.ideal_index ? 'var(--text-secondary)' : 'var(--muted)', overflowWrap: 'break-word' }}>
                     {e.ideal_index || 'not stated'}
                   </td>
                   <td style={{ textAlign: 'right', fontFamily: "'JetBrains Mono', monospace" }}>
                     {Math.round(e.catalog_weight).toLocaleString()}
                   </td>
                   <td style={{ textAlign: 'right' }}>{e.line_count}</td>
-                  <td>
+                  <td style={{ overflowWrap: 'break-word' }}>
                     {e.priceable
                       ? <span style={{ color: 'var(--muted)' }}>{e.proxy_status || 'priceable'}</span>
                       : <span style={{ color: 'var(--accent2)' }}>{e.resolution}</span>}
@@ -295,6 +302,7 @@ function SwapBacklog() {
               ))}
             </tbody>
           </table>
+          </div>
         </>
       )}
     </>
