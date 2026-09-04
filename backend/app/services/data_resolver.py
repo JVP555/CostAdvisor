@@ -3,14 +3,17 @@ Data resolver: implements the override hierarchy.
 Priority: team override > scraped value > fallback.
 """
 import uuid
+from datetime import datetime
+from types import SimpleNamespace
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text, and_, or_
 
 from app.models.index_data import CommodityIndex, IndexValue, IndexOverride, TeamIndexSource
-from app.models.index_layer import IndexMonthlyValue
+from app.models.index_layer import IndexCard, IndexMonthlyValue
 from app.models.user import User
 from app.schemas.index_data import IndexValueOut
 from app.services.scraper import SCRAPER_REGISTRY, SCRAPER_SOURCE_LABELS
+from app.services.drop.catalog_loader import REGION_MAP
 
 
 def _override_source_label(override: IndexOverride) -> str:
@@ -24,6 +27,86 @@ def _override_source_label(override: IndexOverride) -> str:
     if (override.source_file or "").startswith("provider:"):
         return "provider"
     return "team_override"
+
+
+def _monthly_only_commodity_ids(db: Session) -> set[int]:
+    """Drop-loaded commodities (`commodity_key IS NOT NULL`) with zero native
+    quarterly `IndexValue` rows — the ones that are otherwise invisible in the
+    Index Library grid, since the grid was built entirely off `IndexValue` and
+    never updated when the monthly layer landed (unlike the single-value
+    costing-engine lookup, which was)."""
+    has_quarterly = {cid for (cid,) in db.query(IndexValue.commodity_id).distinct().all()}
+    drop_ids = {
+        cid for (cid,) in db.query(CommodityIndex.id)
+        .filter(CommodityIndex.commodity_key.isnot(None)).all()
+    }
+    return drop_ids - has_quarterly
+
+
+def _monthly_synthetic_quarterly_rows(
+    db: Session, monthly_only_ids: set[int], region, commodity_name_filter,
+    commodity_ids, year, quarter, from_year, from_quarter, to_year, to_quarter,
+) -> list:
+    """Quarter-mean rows derived from `IndexMonthlyValue` for the commodities
+    above, shaped to duck-type the `scraped` query rows below so every
+    downstream step (team overrides, placeholders) treats them identically.
+
+    Actual-only, no carry-forward: this is a raw listing, not the costing
+    engine's forward-resolution path — a quarter with no observed months
+    simply doesn't produce a row, exactly like a quarter with no scraped
+    `IndexValue` today produces no row either.
+    """
+    if not monthly_only_ids:
+        return []
+    q = db.query(CommodityIndex).filter(CommodityIndex.id.in_(monthly_only_ids))
+    if commodity_name_filter:
+        q = q.filter(CommodityIndex.name == commodity_name_filter)
+    if commodity_ids is not None:
+        q = q.filter(CommodityIndex.id.in_(commodity_ids))
+    commodities = q.all()
+    if not commodities:
+        return []
+
+    cards = {
+        c.commodity_id: c.region for c in
+        db.query(IndexCard).filter(IndexCard.commodity_id.in_([c.id for c in commodities])).all()
+    }
+
+    now = datetime.now()
+    fy = from_year if from_year is not None else now.year - 1
+    fq = from_quarter if from_quarter is not None else 1
+    ty = to_year if to_year is not None else now.year + 1
+    tq = to_quarter if to_quarter is not None else 4
+    if year is not None:
+        fy, ty = year, year
+        fq = quarter if quarter is not None else 1
+        tq = quarter if quarter is not None else 4
+
+    periods = []
+    y, per = fy, fq
+    while (y, per) <= (ty, tq):
+        periods.append((y, per))
+        per += 1
+        if per > 4:
+            per, y = 1, y + 1
+
+    rows = []
+    for c in commodities:
+        # Region lives on the card in this layer, not the series (Scrum 74) —
+        # mapped through the same table the catalog loader itself uses, so a
+        # combo's region and its index's displayed region always agree.
+        mapped_region = REGION_MAP.get((cards.get(c.id) or "").upper(), "GLOBAL")
+        if region and mapped_region != region:
+            continue
+        for (py, pq) in periods:
+            value = _monthly_quarter_mean(db, c.id, py, pq)
+            if value is None:
+                continue
+            rows.append(SimpleNamespace(
+                commodity_id=c.id, commodity_name=c.name, region=mapped_region,
+                year=py, quarter=pq, value=value, scraped_at=None,
+            ))
+    return rows
 
 
 def resolve_index_values(
@@ -91,6 +174,15 @@ def resolve_index_values(
         ))
 
     scraped = query.all()
+
+    # Drop-loaded commodities with no native quarterly IndexValue row at all
+    # would otherwise never appear in this grid — see _monthly_only_commodity_ids.
+    monthly_only_ids = _monthly_only_commodity_ids(db)
+    if monthly_only_ids:
+        scraped = list(scraped) + _monthly_synthetic_quarterly_rows(
+            db, monthly_only_ids, region, commodity_name_filter, commodity_ids,
+            year, quarter, from_year, from_quarter, to_year, to_quarter,
+        )
 
     # Build dict of overrides for this team, storing full objects + user display name + commodity name
     override_query = (
