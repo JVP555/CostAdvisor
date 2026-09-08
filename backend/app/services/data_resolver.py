@@ -73,22 +73,11 @@ def _monthly_synthetic_quarterly_rows(
     }
 
     now = datetime.now()
-    fy = from_year if from_year is not None else now.year - 1
-    fq = from_quarter if from_quarter is not None else 1
     ty = to_year if to_year is not None else now.year + 1
     tq = to_quarter if to_quarter is not None else 4
     if year is not None:
-        fy, ty = year, year
-        fq = quarter if quarter is not None else 1
+        ty = year
         tq = quarter if quarter is not None else 4
-
-    periods = []
-    y, per = fy, fq
-    while (y, per) <= (ty, tq):
-        periods.append((y, per))
-        per += 1
-        if per > 4:
-            per, y = 1, y + 1
 
     rows = []
     for c in commodities:
@@ -98,14 +87,38 @@ def _monthly_synthetic_quarterly_rows(
         mapped_region = REGION_MAP.get((cards.get(c.id) or "").upper(), "GLOBAL")
         if region and mapped_region != region:
             continue
-        for (py, pq) in periods:
-            value = _monthly_quarter_mean(db, c.id, py, pq)
-            if value is None:
+
+        if year is not None:
+            fy, fq = year, quarter if quarter is not None else 1
+        elif from_year is not None:
+            fy, fq = from_year, from_quarter if from_quarter is not None else 1
+        else:
+            # No lower bound given — the caller wants everything this series
+            # actually has, not an arbitrary recent window (the bug this
+            # replaced: a hardcoded "last year" default silently dropped real
+            # older history for commodities whose monthly data goes back
+            # further, e.g. lab-eu's 2023 actuals never surfaced at all).
+            earliest = (
+                db.query(IndexMonthlyValue.year, IndexMonthlyValue.month)
+                .filter(IndexMonthlyValue.commodity_id == c.id, IndexMonthlyValue.kind == "actual")
+                .order_by(IndexMonthlyValue.year, IndexMonthlyValue.month)
+                .first()
+            )
+            if earliest is None:
                 continue
-            rows.append(SimpleNamespace(
-                commodity_id=c.id, commodity_name=c.name, region=mapped_region,
-                year=py, quarter=pq, value=value, scraped_at=None,
-            ))
+            fy, fq = earliest[0], (earliest[1] - 1) // 3 + 1
+
+        y, per = fy, fq
+        while (y, per) <= (ty, tq):
+            value = _monthly_quarter_mean(db, c.id, y, per)
+            if value is not None:
+                rows.append(SimpleNamespace(
+                    commodity_id=c.id, commodity_name=c.name, region=mapped_region,
+                    year=y, quarter=per, value=value, scraped_at=None,
+                ))
+            per += 1
+            if per > 4:
+                per, y = 1, y + 1
     return rows
 
 

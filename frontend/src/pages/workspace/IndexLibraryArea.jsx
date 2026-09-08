@@ -280,7 +280,13 @@ export default function IndexLibraryArea() {
     try {
       const now = new Date();
       const toY = now.getFullYear(), toQ = Math.ceil((now.getMonth() + 1) / 3);
-      const params = { team_id: activeTeamId, from_year: toY - 2, from_quarter: toQ, to_year: toY, to_quarter: toQ };
+      // No from_year/from_quarter: resolve_index_values only filters a lower
+      // bound when one is given, so omitting it returns a commodity's FULL
+      // history. The old `toY - 2` cap silently capped the detail popup's own
+      // "All" range option and the Historical Data table to 2 years, no
+      // matter how much real history existed — this is what actually backs
+      // both, so the cap has to come off here, not in the popup.
+      const params = { team_id: activeTeamId, to_year: toY, to_quarter: toQ };
       const [valRes, comRes, srcRes, cmRes] = await Promise.all([
         api.get('/api/indexes/values', { params }),
         api.get('/api/indexes'),
