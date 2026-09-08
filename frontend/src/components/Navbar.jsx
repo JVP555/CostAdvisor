@@ -103,6 +103,8 @@ export default function Navbar() {
     ...(canSeeContracts ? [{ path: '/contracts', label: 'Contracts' }] : []),
     { path: '/curation', label: 'Curation' },
     { path: '/dimensions', label: 'Dimensions' },
+    { path: '/scenarios', label: 'Scenarios' },
+    { path: '/support', label: 'Support' },
   ];
 
   const handleLogout = async () => { setOpen(false); await logout(); };

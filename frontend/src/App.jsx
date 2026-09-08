@@ -22,6 +22,8 @@ import Alerts from './pages/Alerts';
 import QuoteExtraction from './pages/QuoteExtraction';
 import Contracts from './pages/Contracts';
 import Curation from './pages/Curation';
+import Support from './pages/Support';
+import Scenarios from './pages/Scenarios';
 import Dimensions from './pages/Dimensions';
 import Team from './pages/Team';
 import Privacy from './pages/Privacy';
@@ -72,6 +74,8 @@ export default function App() {
             <Route path="/quotes" element={<QuoteExtraction />} />
             <Route path="/contracts" element={<Contracts />} />
             <Route path="/curation" element={<Curation />} />
+            <Route path="/support" element={<Support />} />
+            <Route path="/scenarios" element={<Scenarios />} />
             <Route path="/dimensions" element={<Dimensions />} />
             <Route path="/fx-rates" element={<Navigate to="/index-library" replace />} />
             <Route path="/index-library" element={<IndexLibraryArea />} />

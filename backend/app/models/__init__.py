@@ -44,6 +44,7 @@ from app.models.refresh_token import RefreshToken
 from app.models.auth_event import AuthEvent
 from app.models.index_projection import IndexProjectionRun, IndexProjectionPoint
 from app.models.sheet_import_run import SheetImportRun, SheetImportRowDiff
+from app.models.support import SupportThread, SupportMessage, SupportCannedResponse, SupportFAQ
 
 __all__ = [
     "User",
@@ -94,6 +95,10 @@ __all__ = [
     "IndexProjectionPoint",
     "SheetImportRun",
     "SheetImportRowDiff",
+    "SupportThread",
+    "SupportMessage",
+    "SupportCannedResponse",
+    "SupportFAQ",
     "Contract",
     "ContractClause",
     "ContractCostModel",

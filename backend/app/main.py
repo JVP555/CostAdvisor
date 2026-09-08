@@ -18,7 +18,7 @@ from app.routers import (
     invites, access_requests, settings as settings_router, formulas, demo, regions,
     collaboration, alerts, provider_credentials, sheets, quotes, resolution,
     contracts, radar, editorial, dimensions, index_dossier, seasonality,
-    intelligence,
+    intelligence, support,
 )
 # Imported for its side effect: registers the before_flush listener that
 # auto-registers region codes so the region FK never rejects a user write.
@@ -94,6 +94,7 @@ app.include_router(seasonality.router, prefix="/api/seasonality",
                   tags=["seasonality"])
 app.include_router(intelligence.router, prefix="/api/intelligence",
                   tags=["intelligence"])
+app.include_router(support.router, prefix="/api/support", tags=["support"])
 app.include_router(indexes.router, prefix="/api/indexes", tags=["indexes"])
 # Platform-grain index resolution reads (Scrum 74) — deliberately its own
 # surface rather than a mode of /api/indexes, which is team-scoped.
