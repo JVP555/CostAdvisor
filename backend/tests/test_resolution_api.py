@@ -503,3 +503,51 @@ def test_a_combo_diagnosis_is_scoped_to_one_variant(db, tenant_a):
         assert diagnose_combo(db, tpl.id, "NA", variant="nonexistent").coverage_exists is False
     finally:
         _cleanup(db, [tpl.id], [blocked.id], [dry.id])
+
+
+def test_platform_totals_do_not_include_any_team_fork(db, tenant_a, client_as):
+    """H3. The swap backlog is platform-grain by design — its own docstring says
+    it ranks what the CATALOGUE stands on.
+
+    `formula_template_components` carries `tenant_isolation` RLS, so before this
+    it returned a different total to every caller: their own forks folded into a
+    number presented as library-wide. Two users, one endpoint, two answers.
+
+    The fix is a `team_id IS NULL` filter, NOT an RLS bypass. A bypass would have
+    been worse than the bug — it would pull every team's private forks into an
+    aggregate any authenticated user can read. Filtering to platform rows is also
+    RLS-neutral: platform rows are visible to everyone under the policy, so the
+    answer is identical for every caller by construction.
+
+    No forked templates exist in the catalogue today; this builds one, because
+    Scrum 68 ships forking and the defect activates the moment a team uses it.
+    """
+    series = _series(db, f"fork-{uuid.uuid4().hex[:6]}", with_history=True)
+    code = _code(db, f"FRK-{uuid.uuid4().hex[:5]}", series)
+    fork = FormulaTemplate(
+        team_id=tenant_a["team_id"], created_by=tenant_a["user_id"],
+        name=f"fork-{uuid.uuid4().hex[:6]}", code=f"FK-{uuid.uuid4().hex[:6]}",
+        expression=None,
+    )
+    db.add(fork)
+    db.commit()
+    db.add(FormulaTemplateComponent(
+        template_id=fork.id, region="Europe", name="forked-line",
+        component_type="index", commodity_id=series.id, type_code_id=code.id,
+        weight_pct=100, is_proxy=False, sort_order=0,
+    ))
+    db.commit()
+    try:
+        body = client_as(tenant_a).get(
+            "/api/resolution/swap-backlog?limit=1000").json()
+        entry = next(e for e in body["entries"] if e["code"] == code.code)
+        assert entry["catalog_weight"] == 0.0, (
+            f"the caller's own fork leaked into the platform total "
+            f"({entry['catalog_weight']})"
+        )
+        assert entry["line_count"] == 0
+        # The code itself is platform reference data and must still be listed —
+        # the fix hides forked WEIGHT, not the existence of a type code.
+        assert entry["code"] == code.code
+    finally:
+        _cleanup(db, [fork.id], [code.id], [series.id])

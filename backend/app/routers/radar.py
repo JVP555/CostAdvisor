@@ -32,7 +32,7 @@ from app.schemas.radar import (
     CoverageReportOut, ModelCoverageOut, RadarRunOut, SignalIn, SignalOut,
     WindowDetailOut, WindowOut, WindowProductOut,
 )
-from app.services.audit import log_event
+from app.services.audit import log_event, log_platform_event
 from app.services.permissions import has_permission, require_permission
 from app.services.trigger_radar import run_radar, team_coverage
 
@@ -314,8 +314,16 @@ def create_signal(team_id: uuid.UUID, data: SignalIn, db: Session = Depends(get_
     db.add(sig)
     db.flush()
     out = SignalOut.model_validate(sig)
-    log_event(db, team_id, current_user.id, "create", "market_signal", str(sig.id),
-              new_value={"signal_type": sig.signal_type, "platform": data.platform})
+    # A platform-scoped signal is not the caller's team's event. Logging it
+    # against `team_id` both misattributes it and puts it at risk: audit_logs
+    # CASCADEs on team delete, so removing that team would erase the record of a
+    # platform action nobody in it took.
+    if sig.team_id is None:
+        log_platform_event(db, current_user.id, "create", "market_signal", str(sig.id),
+                           new_value={"signal_type": sig.signal_type, "platform": True})
+    else:
+        log_event(db, team_id, current_user.id, "create", "market_signal", str(sig.id),
+                  new_value={"signal_type": sig.signal_type, "platform": False})
     db.commit()
     return out
 
@@ -331,8 +339,16 @@ def delete_signal(signal_id: uuid.UUID, db: Session = Depends(get_db),
             raise HTTPException(403, "Platform-wide signals are super-admin only")
     else:
         require_permission(db, current_user, sig.team_id, "indexes.edit")
-    if sig.team_id:
-        log_event(db, sig.team_id, current_user.id, "delete", "market_signal", str(sig.id))
+    # `if sig.team_id:` used to guard this, so deleting a PLATFORM signal — the
+    # most privileged version of this action, super-admin only — wrote no audit
+    # row at all, against the standing rule that every admin action is audited.
+    detail = {"signal_type": sig.signal_type, "platform": sig.team_id is None}
+    if sig.team_id is None:
+        log_platform_event(db, current_user.id, "delete", "market_signal",
+                           str(sig.id), previous_value=detail)
+    else:
+        log_event(db, sig.team_id, current_user.id, "delete", "market_signal",
+                  str(sig.id), previous_value=detail)
     db.delete(sig)
     db.commit()
     return {"status": "deleted"}
