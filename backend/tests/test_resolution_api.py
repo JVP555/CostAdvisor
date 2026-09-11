@@ -450,3 +450,56 @@ def test_endpoints_need_no_team_id(db, tenant_a, client_as):
 def test_authentication_is_still_required(client):
     for path in ("/api/resolution/concentration", "/api/resolution/type-codes/X"):
         assert client.get(path).status_code == 401
+
+
+def test_a_combo_diagnosis_is_scoped_to_one_variant(db, tenant_a):
+    """A (template, region) can carry several recipes, and pooling them produces
+    arithmetic that cannot be true.
+
+    `formula_template_components.variant` exists because the catalog keys combos
+    on (formula, region, variant) — bentonite activated vs natural, talc treated
+    vs untreated. The diagnosis read filtered only on (template, region), so it
+    summed both recipes' lines: the live bentonite combo at NA reported **148%**
+    blocked weight against a recipe whose own invariant is that weights close at
+    100. Each variant must be diagnosed on its own lines.
+    """
+    dry = _series(db, f"dry-{uuid.uuid4().hex[:6]}", with_history=False)
+    blocked = _code(db, f"BLK-{uuid.uuid4().hex[:5]}", dry, resolution="no_series")
+    tpl = _combo(db, tenant_a, region="NA")
+    try:
+        # A second coverage row for the SAME region, differing only by variant.
+        db.add(FormulaRegionCoverage(template_id=tpl.id, region="NA",
+                                     variant="activated", base_price=1000))
+        db.commit()
+
+        # 60% blocked in each variant, authored separately.
+        for variant in ("", "activated"):
+            db.add(FormulaTemplateComponent(
+                template_id=tpl.id, region="NA", variant=variant,
+                name=f"blocked-{variant or 'plain'}", component_type="index",
+                commodity_id=dry.id, type_code_id=blocked.id,
+                weight_pct=60, is_proxy=False, sort_order=0,
+            ))
+            db.add(FormulaTemplateComponent(
+                template_id=tpl.id, region="NA", variant=variant,
+                name=f"fixed-{variant or 'plain'}", component_type="fixed",
+                weight_pct=40, is_proxy=False, sort_order=1,
+            ))
+        db.commit()
+
+        plain = diagnose_combo(db, tpl.id, "NA")
+        activated = diagnose_combo(db, tpl.id, "NA", variant="activated")
+
+        for d in (plain, activated):
+            assert d.total_lines == 2, "a variant must see only its own lines"
+            assert d.blocked_weight_pct <= 100, (
+                f"{d.blocked_weight_pct}% — variants were pooled again"
+            )
+            assert d.blocked_weight_pct == pytest.approx(60.0)
+
+        assert plain.variant == ""
+        assert activated.variant == "activated"
+        # And the endpoint echoes which recipe it answered about.
+        assert diagnose_combo(db, tpl.id, "NA", variant="nonexistent").coverage_exists is False
+    finally:
+        _cleanup(db, [tpl.id], [blocked.id], [dry.id])
