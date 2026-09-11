@@ -282,13 +282,29 @@ function TrustQueue({ teamId }) {
 
 /* ── 2. Editorial approvals ───────────────────────────────────────────────── */
 
-function VersionHistory({ blockId }) {
+function VersionHistory({ blockId, teamId }) {
   const [versions, setVersions] = useState(null);
+  const [err, setErr] = useState(null);
   useEffect(() => {
-    api.get(`/api/editorial/blocks/${blockId}/versions`)
-      .then(({ data }) => setVersions(data))
-      .catch(() => setVersions([]));
-  }, [blockId]);
+    let cancelled = false;
+    setVersions(null); setErr(null);
+    // `team_id` is REQUIRED by the route (it is a bare param, not a Query with a
+    // default), so omitting it 422s every call. It used to be omitted, and the
+    // failure was caught into an empty list — which rendered exactly like a
+    // block that genuinely only ever had one version. A fetch that failed and a
+    // history that is empty must not look the same, so the error is now shown.
+    api.get(`/api/editorial/blocks/${blockId}/versions`, { params: { team_id: teamId } })
+      .then(({ data }) => { if (!cancelled) setVersions(data); })
+      .catch(e => { if (!cancelled) setErr(formatApiError(e) || 'Could not load version history.'); });
+    return () => { cancelled = true; };
+  }, [blockId, teamId]);
+  if (err) {
+    return (
+      <div style={{ fontSize: 10, color: 'var(--accent2)', marginTop: 8 }}>
+        Version history unavailable — {err}
+      </div>
+    );
+  }
   if (!versions) return <div style={{ fontSize: 10, color: 'var(--muted)' }}>Loading history…</div>;
   return (
     <div style={{ marginTop: 8 }}>
@@ -488,7 +504,7 @@ function EditorialQueue({ teamId }) {
             </div>
           )}
 
-          <VersionHistory blockId={open.id} />
+          <VersionHistory blockId={open.id} teamId={teamId} />
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
             {!open.body_json && (
