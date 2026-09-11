@@ -84,6 +84,50 @@ def _cleanup(db, *, series_ids=(), calibration_ids=(), producer_ids=()):
     db.commit()
 
 
+@pytest.fixture(autouse=True)
+def _restore_active_calibration(db):
+    """Put the active volatility ladder back after every test in this module.
+
+    `recompute_volatility_calibration` deactivates whatever is active and commits
+    a new active row — that is the behaviour under test. But `_cleanup` here
+    commits rather than rolling back, and although it has always accepted a
+    `calibration_ids` kwarg, **not one test ever passed it**. Six tests recompute.
+
+    While the suite shared the app's database that left the real, product-facing
+    `active_calibration()` pointing at a ladder fitted to four synthetic series
+    at 11 rungs against a production default of 21 — so every percentile the app
+    served came from test fixtures, and 150 junk rows accumulated. The separate
+    test database (conftest) stops that reaching production, but the
+    contamination is still real *inside* a run: `test_intelligence` reads
+    `active_calibration()` and would otherwise pick up whichever ladder this
+    module happened to leave behind.
+
+    An autouse fixture rather than six `calibration_ids=[...]` arguments, because
+    the seventh recomputing test would have to remember, and the first six did
+    not.
+    """
+    bypass_rls_var.set(True)
+    prior_active = db.execute(text(
+        "SELECT id FROM volatility_calibrations WHERE is_active")).scalar()
+    before = {r[0] for r in db.execute(text("SELECT id FROM volatility_calibrations"))}
+    yield
+    db.rollback()
+    bypass_rls_var.set(True)
+    after = {r[0] for r in db.execute(text("SELECT id FROM volatility_calibrations"))}
+    created = after - before
+    for cid in created:
+        db.execute(text("DELETE FROM volatility_breakpoints WHERE calibration_id = :i"),
+                   {"i": str(cid)})
+        db.execute(text("DELETE FROM volatility_calibrations WHERE id = :i"),
+                   {"i": str(cid)})
+    # Reactivate only after the replacements are gone — a partial unique index
+    # allows exactly one active row.
+    if prior_active is not None:
+        db.execute(text("UPDATE volatility_calibrations SET is_active = true WHERE id = :i"),
+                   {"i": str(prior_active)})
+    db.commit()
+
+
 @pytest.fixture(scope="module")
 def _dossiers_loaded():
     """Load the dossiers once for the module — a full load is not cheap and the
@@ -569,3 +613,26 @@ def test_a_shared_series_conflict_is_reported_not_overwritten(db, _dossiers_load
     # And the specific dossier wins over a generic one that merely fans out:
     # `electricity` fans to elec-*, so it loses those slots to elec-cn / elec-eu.
     assert "elec-cn" not in losers and "elec-eu" not in losers
+
+
+def test_recomputing_does_not_leak_the_active_ladder_to_other_tests(db):
+    """The guard on the guard: a recompute really does replace the active row,
+    and the autouse fixture really does put the prior one back.
+
+    Without the restore, `test_intelligence`'s volatility percentile would be
+    read against whichever synthetic ladder this module last committed — which
+    is exactly what happened in production data before the test database landed.
+    """
+    bypass_rls_var.set(True)
+    prior = db.execute(text(
+        "SELECT id FROM volatility_calibrations WHERE is_active")).scalar()
+
+    fresh = recompute_volatility_calibration(db, n_rungs=11, min_points=13)
+    db.commit()
+    now_active = db.execute(text(
+        "SELECT id FROM volatility_calibrations WHERE is_active")).scalar()
+    assert now_active == fresh.id, "a recompute must take over the active slot"
+    if prior is not None:
+        assert now_active != prior
+    # The fixture restores `prior` on teardown; the next test in this module
+    # asserting against the ladder proves it.
