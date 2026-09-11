@@ -33,7 +33,7 @@ from app.schemas.radar import (
     WindowDetailOut, WindowOut, WindowProductOut,
 )
 from app.services.audit import log_event
-from app.services.permissions import require_permission
+from app.services.permissions import has_permission, require_permission
 from app.services.trigger_radar import run_radar, team_coverage
 
 router = APIRouter()
@@ -80,6 +80,52 @@ def _window_out(db: Session, win: NegotiationWindow, cls=WindowOut):
     )
 
 
+# ── Contract data is gated separately from costing (SCRUM-79) ────────────────
+#
+# `contracts.*` exists so that "everyone who could run a costing" cannot read
+# contract prices and notice dates — `routers/contracts.py`'s own docstring says
+# so. But the radar reaches that data from the other side and was gated only on
+# `costing.view`, so a role holding costing and not contracts could read every
+# contract's terms through `/api/radar/windows`. Both halves were built; they
+# were never joined up.
+#
+# The leak is wider than the `clause_deadline` feed:
+#
+#   clause_deadline  the window IS the contract event — headline, evidence and
+#                    even driver_key ("clause_deadline:contract:{id}:{date}")
+#                    carry the reference, term end, notice days and deadline
+#   gap              scope_type is cost_model, but evidence carries contract_id
+#                    and `closes_on` IS the notice deadline
+#   buy_window       same: `closes_on` IS the notice deadline
+#
+# So a clause-deadline window is withheld entirely — redacting it would leave a
+# husk that still discloses a contract exists with a deadline in range. The
+# other two are redacted rather than withheld, because the window itself is
+# about the product and a costing-only user should still learn their product has
+# a gap; only the contract-derived fields come out.
+_CONTRACT_EVIDENCE_KEYS = frozenset({
+    "contract_id", "reference", "term_start", "term_end", "auto_renew",
+    "notice_days", "notice_deadline", "price_review_cadence",
+})
+
+
+def _redact_contract_terms(out):
+    """Strip contract-derived fields from a window payload, in place."""
+    out.scope_contract_id = None
+    if out.close_basis == "clause_deadline":
+        # The date itself is the sensitive part, so it cannot merely be
+        # relabelled. `unknown` is an honest existing state with copy already
+        # written for it, not a synthesised placeholder.
+        out.closes_on = None
+        out.closes_in_days = None
+        out.close_basis = "unknown"
+    evidence = getattr(out, "evidence", None)
+    if isinstance(evidence, dict):
+        out.evidence = {k: v for k, v in evidence.items()
+                        if k not in _CONTRACT_EVIDENCE_KEYS}
+    return out
+
+
 @router.post("/run", response_model=RadarRunOut)
 def run(team_id: uuid.UUID, db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)):
@@ -116,7 +162,17 @@ def list_windows(team_id: uuid.UUID,
         NegotiationWindow.closes_on.asc().nullslast(),
         NegotiationWindow.opened_at.desc(),
     ).all()
-    return [_window_out(db, w) for w in rows]
+
+    may_see_contracts = has_permission(db, current_user, team_id, "contracts.view")
+    out = []
+    for w in rows:
+        if w.driver == "clause_deadline" and not may_see_contracts:
+            continue          # wholly contract data — withheld, not redacted
+        payload = _window_out(db, w)
+        if not may_see_contracts:
+            _redact_contract_terms(payload)
+        out.append(payload)
+    return out
 
 
 @router.get("/windows/{window_id}", response_model=WindowDetailOut)
@@ -128,6 +184,11 @@ def get_window(window_id: uuid.UUID, db: Session = Depends(get_db),
     if not win:
         raise HTTPException(404, "Window not found")
     require_permission(db, current_user, win.team_id, "costing.view")
+    may_see_contracts = has_permission(db, current_user, win.team_id, "contracts.view")
+    if win.driver == "clause_deadline" and not may_see_contracts:
+        # 404 rather than 403: a contract-less role should not be able to probe
+        # for the existence of a contract window by watching the status code.
+        raise HTTPException(404, "Window not found")
 
     out = _window_out(db, win, cls=WindowDetailOut)
     out.evidence = win.evidence
@@ -140,6 +201,8 @@ def get_window(window_id: uuid.UUID, db: Session = Depends(get_db),
             str(cm.id): cm.negotiation_state
             for cm in db.query(CostModel).filter(CostModel.id.in_(ids)).all()
         }
+    if not may_see_contracts:
+        _redact_contract_terms(out)
     return out
 
 
@@ -151,13 +214,20 @@ def dismiss_window(window_id: uuid.UUID, db: Session = Depends(get_db),
     win = db.query(NegotiationWindow).filter(NegotiationWindow.id == window_id).first()
     if not win:
         raise HTTPException(404, "Window not found")
-    require_permission(db, current_user, win.team_id, "costing.edit")
+    # Dismissing a contract window is acting on the contract, so it takes the
+    # contract permission — a costing-only role cannot even see these.
+    if win.driver == "clause_deadline":
+        require_permission(db, current_user, win.team_id, "contracts.edit")
+    else:
+        require_permission(db, current_user, win.team_id, "costing.edit")
     win.state = "dismissed"
     win.closed_at = datetime.now(timezone.utc)
     log_event(db, win.team_id, current_user.id, "dismiss", "negotiation_window",
               str(win.id), new_value={"driver": win.driver})
     db.flush()
     out = _window_out(db, win)
+    if not has_permission(db, current_user, win.team_id, "contracts.view"):
+        _redact_contract_terms(out)
     db.commit()
     return out
 
