@@ -219,7 +219,12 @@ def dismiss_window(window_id: uuid.UUID, db: Session = Depends(get_db),
     if win.driver == "clause_deadline":
         require_permission(db, current_user, win.team_id, "contracts.edit")
     else:
-        require_permission(db, current_user, win.team_id, "costing.edit")
+        # `costing.edit` was gated on here and is not a permission row at all —
+        # the `costing` category holds only `view`. Because the plan ceiling runs
+        # before roles and no role can grant a key that does not exist, dismiss
+        # was reachable only via the membership fallback: denied outright for any
+        # team on a plan, and for any member holding a custom role.
+        require_permission(db, current_user, win.team_id, "cost_models.edit")
     win.state = "dismissed"
     win.closed_at = datetime.now(timezone.utc)
     log_event(db, win.team_id, current_user.id, "dismiss", "negotiation_window",

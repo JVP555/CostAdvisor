@@ -7,6 +7,7 @@ validation on role creation, and platform-permission resolution.
 """
 from __future__ import annotations
 
+import pathlib
 import uuid
 
 import pytest
@@ -110,3 +111,41 @@ def test_platform_permission_via_user_platform_role(db, user_factory):
     db.commit()
     assert has_platform_permission(db, u, "formulas.edit") is True
     assert has_platform_permission(db, u, "products.edit") is False  # Chemist scope is formulas.*
+
+
+def test_every_gated_permission_key_actually_exists(db):
+    """H7. A permission key that is not a row can never be granted.
+
+    `has_permission` applies the plan ceiling BEFORE roles and denies any key
+    absent from the plan, and no role can grant a permission that does not exist
+    — so such a key resolves only through the membership fallback, which fires
+    only for a member with no custom roles at all. It therefore looks fine on a
+    plan-less team with plain owners and denies everyone else.
+
+    That is exactly what `costing.edit` did: gated on by four call sites
+    (radar dismiss, note deletion, the negotiation flag, the Slack webhook
+    reveal) while the `costing` category holds only `view`. On the dev data 24 of
+    25 teams have no plan, so owners passed and nobody noticed.
+
+    This scans the routers rather than listing the four, so the next invented key
+    fails here instead of in production.
+    """
+    import re
+
+    routers = pathlib.Path(__file__).resolve().parents[1] / "app" / "routers"
+    known = {k for (k,) in db.query(Permission.key).all()}
+
+    pattern = re.compile(
+        r'(?:require_permission|has_permission)\([^)]*?"([a-z_]+\.[a-z_]+)"',
+        re.S)
+    referenced = {}
+    for path in sorted(routers.glob("*.py")):
+        for key in pattern.findall(path.read_text(encoding="utf-8")):
+            referenced.setdefault(key, set()).add(path.name)
+
+    assert referenced, "the scan found no permission checks at all — regex is wrong"
+    missing = {k: sorted(v) for k, v in referenced.items() if k not in known}
+    assert not missing, (
+        "these permission keys are gated on but do not exist as rows, so they "
+        f"can only ever pass via the membership fallback: {missing}"
+    )
