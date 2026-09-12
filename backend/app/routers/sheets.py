@@ -13,9 +13,8 @@ from app.database import get_db
 from app.models.user import User
 from app.models.sheet_import_run import SheetImportRun, SheetImportRowDiff
 from app.routers.auth import get_current_user
-from app.routers.formulas import _first_team_id
 from app.schemas.sheet_roundtrip import SheetImportRunOut, SheetApplyResult
-from app.services.audit import log_event
+from app.services.audit import log_platform_event
 from app.services.permissions import require_platform_permission
 from app.services.sheet_roundtrip import get_spec
 from app.services.sheet_roundtrip.excel_io import build_export_workbook, read_import_rows
@@ -160,12 +159,16 @@ def apply_sheet_import(
     run.applied_by = current_user.id
     run.applied_at = datetime.now(timezone.utc)
 
-    audit_team_id = _first_team_id(db, current_user.id)
-    if audit_team_id:
-        log_event(
-            db, audit_team_id, current_user.id, "apply", "sheet_import_run", str(run.id),
-            new_value={"payload_key": run.payload_key, "applied": len(applied), "skipped_stale": len(skipped_stale)},
-        )
+    # Applying a sheet is gated on a PLATFORM permission (`spec.permission_key`
+    # via require_platform_permission), so it is a platform action with no tenant
+    # to attribute it to. It used to borrow the actor's first team — misfiling it,
+    # and losing the record entirely when that team was deleted or when the actor
+    # had no team at all, which is the super-admin case this most needs to cover.
+    log_platform_event(
+        db, current_user.id, "apply", "sheet_import_run", str(run.id),
+        new_value={"payload_key": run.payload_key, "applied": len(applied),
+                   "skipped_stale": len(skipped_stale)},
+    )
     db.commit()
     db.refresh(run)
     return SheetApplyResult(run=run, applied=applied, skipped_stale=skipped_stale)
