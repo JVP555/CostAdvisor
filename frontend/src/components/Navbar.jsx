@@ -37,6 +37,19 @@ export default function Navbar() {
     return () => { cancelled = true; };
   }, [activeTeamId]);
 
+  // Support staff is a **platform** role, not a team one, so this probe has no
+  // team dependency and must not be re-run on a team switch. Same per-feature
+  // probe convention as canSeeContracts above; /auth/me carries no platform-role
+  // list to check client-side, which is why the endpoint exists.
+  const [isSupportStaff, setIsSupportStaff] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/api/support/is-staff')
+      .then(({ data }) => { if (!cancelled) setIsSupportStaff(!!data.is_staff); })
+      .catch(() => { if (!cancelled) setIsSupportStaff(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   const closeMenu = (restoreFocus = false) => {
     setOpen(false);
     if (restoreFocus) triggerRef.current?.focus();
@@ -105,6 +118,10 @@ export default function Navbar() {
     { path: '/dimensions', label: 'Dimensions' },
     { path: '/scenarios', label: 'Scenarios' },
     { path: '/support', label: 'Support' },
+    // The staff side. A super admin already reaches it via Admin → Support;
+    // this is the only door for somebody holding just the Support Agent
+    // platform role, who until now had full API access and no way in.
+    ...(isSupportStaff ? [{ path: '/support-console', label: 'Support console' }] : []),
   ];
 
   const handleLogout = async () => { setOpen(false); await logout(); };
