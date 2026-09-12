@@ -35,7 +35,9 @@ from app.models.cost_model import CostModel, FormulaVersion
 from app.models.formula_template import (
     FormulaRegionCoverage, FormulaTemplate, FormulaTemplateComponent,
 )
-from app.models.index_data import CommodityIndex, IndexValue
+from app.models.index_data import (
+    CommodityIndex, IndexOverride, IndexValue, TeamIndexSource,
+)
 from app.models.index_layer import IndexMonthlyValue
 from app.models.index_seasonality import IndexSeasonalFactor
 from app.models.product import Product
@@ -132,7 +134,8 @@ def _cleanup(db, *, template_ids=(), series_ids=(), product_ids=(),
     for tid in template_ids:
         db.execute(text("DELETE FROM formula_templates WHERE id = :i"), {"i": str(tid)})
     for sid in series_ids:
-        for table in ("index_seasonal_factors", "index_monthly_values", "index_values"):
+        for table in ("index_seasonal_factors", "index_monthly_values",
+                      "index_values", "index_overrides", "team_index_sources"):
             db.execute(text(f"DELETE FROM {table} WHERE commodity_id = :i"), {"i": sid})
         db.execute(text("DELETE FROM commodity_indexes WHERE id = :i"), {"i": sid})
     db.commit()
@@ -180,6 +183,94 @@ def test_the_fast_path_agrees_with_the_canonical_single_period_evaluator(db, ten
         assert canonical["evaluable"] is True
         assert last["level"] == pytest.approx(canonical["index_level_pct"], abs=0.01)
         assert result.value_sources["matches_costing_engine"] is True
+    finally:
+        _cleanup(db, template_ids=[tpl.id], series_ids=[s.id])
+
+
+def test_a_team_override_withdraws_the_costing_engine_claim(db, tenant_a):
+    """`derive` accepts a `team_id` and reads the platform series in bulk, so it
+    cannot see the team tiers `data_resolver` consults first. Where one of them
+    fires, the level here is simply not the costing engine's number — and the
+    payload used to assert that it was, unconditionally.
+    """
+    s = _series(db, quarterly=_quarters(BASE, [100, 120]))
+    tpl, cov = _combo(db, tenant_a["user_id"], lines=[(100, s, "index")])
+    try:
+        db.add(IndexOverride(
+            team_id=tenant_a["team_id"], commodity_id=s.id, region="Europe",
+            year=2024, quarter=2, value=999, uploaded_by=tenant_a["user_id"]))
+        db.commit()
+
+        result = derive(db, tpl.id, "Europe", team_id=tenant_a["team_id"])
+        assert result.value_sources["matches_costing_engine"] is False
+        [div] = result.value_sources["divergences"]
+        assert div["reason"] == "the team holds an override"
+        # Names the series, so a caller can see which line to go and look at.
+        assert div["commodity_ids"] == [s.id]
+        assert div["commodity_keys"] == [s.name]
+        assert "NOT what the costing engine would produce" in result.value_sources["note"]
+
+        # The engine really would return the override, rather than this merely
+        # being a claim about a claim.
+        from app.services.data_resolver import get_single_index_value_detailed
+        value, source = get_single_index_value_detailed(
+            db, tenant_a["team_id"], s.id, "Europe", 2024, 2)
+        assert source == "team_override" and value == 999
+        # And the level here is the platform series, which is the divergence.
+        assert result.series[-1]["level"] == pytest.approx(120.0)
+    finally:
+        _cleanup(db, template_ids=[tpl.id], series_ids=[s.id])
+
+
+def test_a_team_fixed_source_withdraws_the_claim_too(db, tenant_a):
+    """The other team tier: a fixed value pinned for this commodity and region
+    outranks the series for every period, not just one."""
+    s = _series(db, quarterly=_quarters(BASE, [100, 120]))
+    tpl, cov = _combo(db, tenant_a["user_id"], lines=[(100, s, "index")])
+    try:
+        db.add(TeamIndexSource(
+            team_id=tenant_a["team_id"], commodity_id=s.id, region="Europe",
+            source_type="fixed", fixed_value=42,
+            created_by=tenant_a["user_id"]))
+        db.commit()
+
+        result = derive(db, tpl.id, "Europe", team_id=tenant_a["team_id"])
+        assert result.value_sources["matches_costing_engine"] is False
+        [div] = result.value_sources["divergences"]
+        assert div["reason"] == "the team pins a fixed value"
+    finally:
+        _cleanup(db, template_ids=[tpl.id], series_ids=[s.id])
+
+
+def test_a_composite_line_diverges_even_with_no_team(db, tenant_a):
+    """A composite is computed live from other series for every caller, so this
+    one is not a tenancy question — it diverges with no team in play at all."""
+    base = _series(db, quarterly=_quarters(BASE, [100, 120]))
+    comp = _series(db, quarterly=_quarters(BASE, [100, 110]))
+    comp.composite_expression = "X"
+    comp.composite_variables = {"X": {"type": "index", "commodity_id": base.id}}
+    db.commit()
+    tpl, cov = _combo(db, tenant_a["user_id"], lines=[(100, comp, "index")])
+    try:
+        result = derive(db, tpl.id, "Europe")
+        assert result.value_sources["matches_costing_engine"] is False
+        [div] = result.value_sources["divergences"]
+        assert div["reason"] == "computed as a composite index"
+        assert div["commodity_ids"] == [comp.id]
+    finally:
+        _cleanup(db, template_ids=[tpl.id], series_ids=[comp.id, base.id])
+
+
+def test_the_claim_still_holds_for_a_team_with_nothing_of_its_own(db, tenant_a):
+    """Narrowing the claim must not amount to abandoning it — a team that has
+    configured no override, no fixed source and no composite reads exactly the
+    series the costing engine reads, and the payload should say so."""
+    s = _series(db, quarterly=_quarters(BASE, [100, 120]))
+    tpl, cov = _combo(db, tenant_a["user_id"], lines=[(100, s, "index")])
+    try:
+        result = derive(db, tpl.id, "Europe", team_id=tenant_a["team_id"])
+        assert result.value_sources["matches_costing_engine"] is True
+        assert result.value_sources["divergences"] == []
     finally:
         _cleanup(db, template_ids=[tpl.id], series_ids=[s.id])
 

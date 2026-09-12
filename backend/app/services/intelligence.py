@@ -62,7 +62,9 @@ from sqlalchemy.orm import Session
 
 from app.constants.trust import GRADE_CAVEATS, GRADE_UNRATED
 from app.models.formula_template import FormulaRegionCoverage, FormulaTemplate
-from app.models.index_data import CommodityIndex, IndexValue
+from app.models.index_data import (
+    CommodityIndex, IndexOverride, IndexValue, TeamIndexSource,
+)
 from app.models.index_layer import IndexMonthlyValue
 from app.models.index_seasonality import IndexSeasonalFactor
 from app.services.formula_resolver import (
@@ -257,10 +259,11 @@ class Intelligence:
     # Read from SCRUM-78's stored field, never recomputed here.
     trust: dict = field(default_factory=dict)
     data_gaps: list[dict] = field(default_factory=list)
-    # Which store the levels came from, and a note when that is not the store
-    # the costing engine reads. Stated rather than hidden: this engine can see
-    # the drop's monthly series and `data_resolver` cannot, so the two will
-    # disagree on exactly those combos until that tier is added there.
+    # Which store the levels came from, whether that is the number the costing
+    # engine would produce, and — where it is not — which tier of
+    # `data_resolver` this bulk read cannot see. Stated rather than hidden: a
+    # composite, a team's fixed source or a team's override all outrank the
+    # platform series over there and are invisible here.
     value_sources: dict = field(default_factory=dict)
 
 
@@ -311,6 +314,88 @@ def _pct_change(series: list[dict], quarters: int) -> float | None:
     if not earlier:
         return None
     return round((latest - earlier) / earlier * 100, 2)
+
+
+def _costing_engine_divergences(
+    db: Session,
+    commodities: dict[int, CommodityIndex],
+    commodity_ids: set[int],
+    region: str,
+    team_id: uuid.UUID | None,
+) -> list[dict]:
+    """Where this engine and the costing engine would disagree, and on what.
+
+    The costing engine resolves an index through `data_resolver`, which consults
+    three tiers ahead of the platform series: a composite index computed live
+    from other series, a team's fixed `TeamIndexSource`, and a team's
+    `IndexOverride` for the period. This engine reads `IndexValue` /
+    `IndexMonthlyValue` in bulk — which is what keeps its query budget flat in
+    the number of periods — and so sees none of them. Wherever one of those
+    tiers would fire for a line in this recipe, the level we derive is simply
+    not the number the costing engine produces, and claiming otherwise is the
+    defect this exists to remove.
+
+    Threading the tiers through properly is a separate piece of work: the bulk
+    read would have to gain a per-team override lookup without turning into an
+    N+1. Until then the honest move is to withdraw the claim where it does not
+    hold, not to quietly keep asserting it.
+
+    Errs toward reporting a divergence: an override is counted if the team holds
+    one for this commodity and region at all, without checking that its period
+    falls inside the window. Over-reporting weakens the claim; under-reporting
+    would restore the false one.
+
+    Query budget: the composite check reads the `CommodityIndex` rows already
+    fetched for names, so it is free. The two team tiers cost one bulk query
+    each, and only when a team is given. Both are bounded by the recipe, never
+    by the window, so the constant-in-periods budget still holds.
+    """
+    if not commodity_ids:
+        return []
+    out: list[dict] = []
+
+    def _entry(reason: str, ids: set[int]) -> None:
+        if not ids:
+            return
+        keys = sorted(
+            (commodities[i].commodity_key or commodities[i].name)
+            for i in ids if i in commodities
+        )
+        out.append({"reason": reason, "commodity_ids": sorted(ids),
+                    "commodity_keys": keys})
+
+    # A composite is computed live from other series for every caller, so this
+    # one diverges even with no team in play.
+    _entry("computed as a composite index",
+           {cid for cid, c in commodities.items() if c.composite_expression})
+
+    if team_id is None:
+        return out
+
+    fixed = {
+        cid for (cid,) in db.query(TeamIndexSource.commodity_id).filter(
+            TeamIndexSource.team_id == team_id,
+            TeamIndexSource.commodity_id.in_(commodity_ids),
+            TeamIndexSource.region == region,
+            TeamIndexSource.source_type == "fixed",
+            TeamIndexSource.fixed_value.isnot(None),
+        ).distinct()
+    }
+    _entry("the team pins a fixed value", fixed)
+
+    # GLOBAL is `data_resolver`'s own fallback region for an override, so an
+    # override recorded there outranks the platform series just as a
+    # region-specific one does.
+    overridden = {
+        cid for (cid,) in db.query(IndexOverride.commodity_id).filter(
+            IndexOverride.team_id == team_id,
+            IndexOverride.commodity_id.in_(commodity_ids),
+            IndexOverride.region.in_({region, "GLOBAL"}),
+        ).distinct()
+    } - fixed
+    _entry("the team holds an override", overridden)
+
+    return out
 
 
 def derive(
@@ -410,11 +495,12 @@ def derive(
     # ── Components at the latest period ─────────────────────────────────────
     weight_sum = sum(l["effective_weight_pct"] for l in lines)
     current = periods[-1]
-    names = {
-        c.id: (c.commodity_key or c.name)
+    commodities = {
+        c.id: c
         for c in db.query(CommodityIndex).filter(
             CommodityIndex.id.in_(commodity_ids)).all()
     } if commodity_ids else {}
+    names = {cid: (c.commodity_key or c.name) for cid, c in commodities.items()}
     for line in lines:
         ratio, base_value, current_value, has_data = 1.0, None, None, True
         if line["component_type"] == "index" and line["commodity_id"]:
@@ -463,16 +549,28 @@ def derive(
     # months. The field stays rather than being deleted: it is the one place a
     # caller can see which store a level came from, and a future second store
     # would need exactly this seam again.
+    divergences = _costing_engine_divergences(
+        db, commodities, commodity_ids, region, team_id)
+    if divergences:
+        note = (
+            "this level is NOT what the costing engine would produce: "
+            + "; ".join(f"{d['reason']} on {', '.join(d['commodity_keys'])}"
+                        for d in divergences)
+        )
+    elif "index_monthly_values" in counts:
+        note = ("some lines resolve through the drop's monthly series; the "
+                "costing engine reads that store too, at the same quarter-mean "
+                "of actual months, so the two agree")
+    else:
+        note = "every line resolves through the same store the costing engine reads"
     out.value_sources = {
         "by_store": dict(counts),
-        "matches_costing_engine": True,
-        "note": (
-            "some lines resolve through the drop's monthly series; the costing "
-            "engine reads that store too, at the same quarter-mean of actual "
-            "months, so the two agree"
-            if "index_monthly_values" in counts else
-            "every line resolves through the same store the costing engine reads"
-        ),
+        "matches_costing_engine": not divergences,
+        # Empty when the two agree. Each entry names the tier that fires and the
+        # series it fires on, so a caller can see *why* they disagree rather
+        # than only that they do.
+        "divergences": divergences,
+        "note": note,
     }
 
     out.change = {
