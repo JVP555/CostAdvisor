@@ -62,8 +62,12 @@ function ComboTile({ result, name, family, onOpen }) {
   const cy = CYCLE[cycle?.verdict] || null;
 
   return (
+    /* A clickable div is invisible to the keyboard and to a screen reader;
+       without this there was no keyboard path to any combo detail at all. */
     <div className="ca-card" style={{ cursor: 'pointer', transition: 'border-color .15s' }}
+      role="button" tabIndex={0} aria-label={`${name}, ${family}`}
       onClick={onOpen}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>

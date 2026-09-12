@@ -93,14 +93,14 @@ const SIGNAL_TYPES = [
   ['other', 'Other'],
 ];
 
-function CoverageChip({ coverage, codes = [], small }) {
+function CoverageChip({ coverage, codes = [] }) {
   const c = COVERAGE[coverage] || COVERAGE.unknown;
   const named = codes.length
     ? `${c.title}\nUnresolved: ${codes.join(', ')}`
     : c.title;
   return (
     <span className="ca-badge" title={named}
-      style={{ background: c.bg, color: c.color, fontWeight: 600, fontSize: small ? 9 : 10 }}>
+      style={{ background: c.bg, color: c.color, fontWeight: 600, fontSize: 10 }}>
       {c.label}
     </span>
   );
@@ -561,8 +561,18 @@ function Coverage({ teamId }) {
                 .sort((a, b) => ['unknown', 'partial', 'covered'].indexOf(a.coverage)
                               - ['unknown', 'partial', 'covered'].indexOf(b.coverage))
                 .map(m => (
+                  /* The Windows rows above are keyboard-reachable; these
+                     were not, so the coverage report was mouse-only. */
                   <tr key={m.cost_model_id} style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/portfolio/${m.cost_model_id}`)}>
+                    tabIndex={0} role="button"
+                    aria-label={`${m.product || m.cost_model_id.slice(0, 8)}, coverage ${m.coverage}`}
+                    onClick={() => navigate(`/portfolio/${m.cost_model_id}`)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(`/portfolio/${m.cost_model_id}`);
+                      }
+                    }}>
                     <td>{m.product || m.cost_model_id.slice(0, 8)}</td>
                     <td><CoverageChip coverage={m.coverage} codes={m.unresolved_type_codes} /></td>
                     <td style={{ textAlign: 'right', fontFamily: "'JetBrains Mono', monospace" }}>
