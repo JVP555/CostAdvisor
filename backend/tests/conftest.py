@@ -13,11 +13,15 @@ ladder fitted to synthetic fixtures — so every percentile the app served came
 from test data.
 
 Redirect happens before any app import, because `app.database` builds its engine
-at import time from `get_settings()`.
+at import time from `get_settings()`. The test database is then brought up to
+head automatically — it was created as a template copy, so it does not otherwise
+move when a migration lands, and the resulting failures look like broken tests
+rather than a stale schema.
 """
 from __future__ import annotations
 
 import os
+import pathlib
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -75,7 +79,73 @@ def _point_at_the_test_database() -> str:
     return url
 
 
+def _migrate_the_test_database(url: str) -> None:
+    """Bring the test database up to head before the suite touches it.
+
+    The test database was created with `createdb -T costadvisor`, a template
+    copy — which snapshots the schema at one moment and then never moves. Every
+    migration after that has to reach it separately, and the failure mode is
+    nasty: the suite fails with `relation "..." does not exist` on the new
+    table, which reads as a broken test rather than a stale database, and the
+    fix (`DATABASE_URL=...-test alembic upgrade head`) is nowhere near the
+    error. SCRUM-34 hit exactly this.
+
+    Cheap when there is nothing to do: the revision is compared against the
+    script directory's head first, so the usual run costs one query rather than
+    Alembic's full machinery.
+
+    **Never migrates the app database.** Under `COSTADVISOR_TEST_USE_APP_DB=1`
+    the URL is real data, and changing its schema as a side effect of running
+    tests is not a thing this should ever do — that mode is already opting into
+    enough. Set `COSTADVISOR_TEST_SKIP_MIGRATE=1` to manage the test database by
+    hand.
+    """
+    if os.environ.get("COSTADVISOR_TEST_USE_APP_DB") == "1":
+        return
+    if os.environ.get("COSTADVISOR_TEST_SKIP_MIGRATE") == "1":
+        return
+
+    from alembic import command
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    backend_root = pathlib.Path(__file__).resolve().parent.parent
+    cfg = Config(str(backend_root / "alembic.ini"))
+    # Resolved from this file rather than the working directory: pytest can be
+    # invoked from anywhere, and `alembic.ini`'s own `script_location` is
+    # relative.
+    cfg.set_main_option("script_location", str(backend_root / "alembic"))
+    cfg.set_main_option("sqlalchemy.url", url)
+
+    heads = set(ScriptDirectory.from_config(cfg).get_heads())
+    engine = create_engine(url, pool_pre_ping=True)
+    try:
+        with engine.connect() as conn:
+            current = set(MigrationContext.configure(conn).get_current_heads())
+    finally:
+        engine.dispose()
+    if current == heads:
+        return
+
+    print(f"\n*** Test database is at {current or '(empty)'}, head is {heads} "
+          f"— upgrading {url.rsplit('/', 1)[-1]}. ***")
+    try:
+        command.upgrade(cfg, "head")
+    except Exception as exc:
+        raise RuntimeError(
+            f"\n\nCould not migrate the test database to head: "
+            f"{type(exc).__name__}: {exc}\n\n"
+            "Run it by hand to see the full error:\n"
+            f"    DATABASE_URL={url} alembic upgrade head\n\n"
+            "Or set COSTADVISOR_TEST_SKIP_MIGRATE=1 to manage it yourself. The "
+            "suite will not run against a stale schema: the failures that "
+            "produces look like broken tests, not a stale database.\n"
+        ) from exc
+
+
 TEST_DATABASE_URL = _point_at_the_test_database()
+_migrate_the_test_database(TEST_DATABASE_URL)
 
 from app.config import get_settings  # noqa: E402  — must follow the redirect
 from app.database import SessionLocal, bypass_rls_var  # noqa: E402
