@@ -15,7 +15,9 @@ import pytest
 from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.models.rbac import Permission, Role, RolePermission, Plan, TeamMemberRole, UserPlatformRole
-from app.services.permissions import has_permission, has_platform_permission
+from app.services.permissions import (
+    MEMBER_READABLE_CATEGORIES, has_permission, has_platform_permission,
+)
 
 
 def _user(db, uid):
@@ -50,6 +52,68 @@ def test_member_fallback_is_view_export_only(db, user_factory, tenant_a):
     assert has_permission(db, member, tenant_a["team_id"], "products.export") is True
     assert has_permission(db, member, tenant_a["team_id"], "products.edit") is False
     assert has_permission(db, member, tenant_a["team_id"], "products.delete") is False
+
+
+def test_the_member_fallback_does_not_hand_over_contract_terms(db, user_factory, tenant_a):
+    """The fallback split the key and allowed every `*.view` action regardless of
+    category, so `contracts.*` — added precisely because contract prices and
+    notice deadlines are more sensitive than a should-cost curve, and granted to
+    Owner/Admin and deliberately not to Member — was handed to a plain member on
+    every team that never configured roles. Which is a new team's default state.
+    """
+    member = _user(db, user_factory()["user_id"])
+    db.add(TeamMembership(user_id=member.id, team_id=tenant_a["team_id"], role="member"))
+    db.commit()
+    _perm(db, "contracts.view")   # skip if this DB predates the category
+    assert has_permission(db, member, tenant_a["team_id"], "contracts.view") is False
+    assert has_permission(db, member, tenant_a["team_id"], "contracts.edit") is False
+    # The separation is only worth anything if ordinary reads still work.
+    assert has_permission(db, member, tenant_a["team_id"], "costing.view") is True
+    assert has_permission(db, member, tenant_a["team_id"], "products.view") is True
+
+
+def test_a_member_with_a_custom_role_never_reaches_the_fallback(db, user_factory, tenant_a):
+    """The narrowing must not become a second ceiling: a team that granted
+    contracts through a real role still gets it. `has_permission` returns on the
+    custom-role branch, so the category set is not consulted at all."""
+    member = _user(db, user_factory()["user_id"])
+    db.add(TeamMembership(user_id=member.id, team_id=tenant_a["team_id"], role="member"))
+    role = Role(team_id=tenant_a["team_id"], name=f"Buyer-{uuid.uuid4().hex[:6]}")
+    db.add(role); db.flush()
+    db.add(RolePermission(role_id=role.id, permission_id=_perm(db, "contracts.view").id))
+    db.add(TeamMemberRole(user_id=member.id, team_id=tenant_a["team_id"], role_id=role.id))
+    db.commit()
+    assert has_permission(db, member, tenant_a["team_id"], "contracts.view") is True
+
+
+def test_every_readable_category_is_a_real_permission_category(db):
+    """A typo in the set is silent — it would deny a whole category of reads to
+    every bare member with nothing to show for it. Pinned against the seeded
+    permissions rather than a second hand-written list."""
+    seeded = {
+        key.rpartition(".")[0]
+        for (key,) in db.query(Permission.key).all()
+    }
+    if not seeded:
+        pytest.skip("no permissions seeded in this DB")
+    unknown = MEMBER_READABLE_CATEGORIES - seeded
+    assert not unknown, f"not real permission categories: {sorted(unknown)}"
+
+
+def test_a_new_category_is_denied_to_bare_members_until_it_is_named(db, user_factory, tenant_a):
+    """The whole point of the allow-set: opt-in, not opt-out. A category that
+    exists in the permissions table but is not in the set must not be readable,
+    or the next sensitive key repeats `contracts`' history."""
+    member = _user(db, user_factory()["user_id"])
+    db.add(TeamMembership(user_id=member.id, team_id=tenant_a["team_id"], role="member"))
+    db.commit()
+    seeded = {key.rpartition(".")[0] for (key,) in db.query(Permission.key).all()}
+    unlisted = seeded - MEMBER_READABLE_CATEGORIES
+    if not unlisted:
+        pytest.skip("every seeded category is member-readable")
+    for category in sorted(unlisted):
+        assert has_permission(
+            db, member, tenant_a["team_id"], f"{category}.view") is False, category
 
 
 def test_custom_role_replaces_membership_fallback(db, user_factory, tenant_a):
