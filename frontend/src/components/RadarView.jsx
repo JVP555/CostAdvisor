@@ -509,9 +509,15 @@ function Coverage({ teamId }) {
 
   useEffect(() => {
     if (!teamId) return;
+    // Guarded like the sibling `Windows` fetch: a fast team switch would
+    // otherwise let a stale response land after the component has moved on, and
+    // render one team's blind spots under another team's heading.
+    let cancelled = false;
+    setReport(null); setErr(null);
     api.get('/api/radar/coverage', { params: { team_id: teamId } })
-      .then(({ data }) => setReport(data))
-      .catch(e => setErr(formatApiError(e) || 'Could not load the coverage report.'));
+      .then(({ data }) => { if (!cancelled) setReport(data); })
+      .catch(e => { if (!cancelled) setErr(formatApiError(e) || 'Could not load the coverage report.'); });
+    return () => { cancelled = true; };
   }, [teamId]);
 
   if (err) return <div className="ca-card" style={{ color: 'var(--accent2)' }}>{err}</div>;
@@ -592,10 +598,12 @@ function Signals({ teamId, onChanged }) {
   });
 
   const load = useCallback(() => {
-    if (!teamId) return;
+    if (!teamId) return undefined;
+    let cancelled = false;
     api.get('/api/radar/signals', { params: { team_id: teamId } })
-      .then(({ data }) => setSignals(data))
-      .catch(e => setErr(formatApiError(e) || 'Could not load signals.'));
+      .then(({ data }) => { if (!cancelled) setSignals(data); })
+      .catch(e => { if (!cancelled) setErr(formatApiError(e) || 'Could not load signals.'); });
+    return () => { cancelled = true; };
   }, [teamId]);
 
   useEffect(load, [load]);

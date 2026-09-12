@@ -60,11 +60,18 @@ const TABS = [
   { key: 'dimensions', label: 'Dimension decisions' },
 ];
 
-function Badge({ map, value }) {
+function Badge({ map, value, badge }) {
   const m = map[value] || { label: value || '—', color: 'var(--muted)', bg: 'var(--surface2)' };
+  // The API ships the provenance label and caveat WITH the state that produced
+  // them (`ProvenanceBadge`), precisely so the wording cannot drift from the
+  // state machine. Where a block carries one, it wins; the local map stays as
+  // the colour source and as the fallback for versions, which carry a bare
+  // provenance string and no badge.
+  const label = badge?.label || m.label;
   return (
-    <span className="ca-badge" style={{ background: m.bg, color: m.color, fontWeight: 600 }}>
-      {m.label}
+    <span className="ca-badge" title={badge?.caveat || undefined}
+      style={{ background: m.bg, color: m.color, fontWeight: 600 }}>
+      {label}
     </span>
   );
 }
@@ -436,7 +443,7 @@ function EditorialQueue({ teamId }) {
                     </td>
                     <td>{b.block_type}</td>
                     <td>
-                      <Badge map={PROVENANCE} value={b.provenance} />
+                      <Badge map={PROVENANCE} value={b.provenance} badge={b.badge} />
                       {b.team_id === null && (
                         <span style={{ fontSize: 9, color: 'var(--muted)' }} title="Platform library"> plat</span>
                       )}
@@ -473,7 +480,7 @@ function EditorialQueue({ teamId }) {
                 {' · '}v{open.current_version_no ?? '—'}
               </div>
             </div>
-            <Badge map={PROVENANCE} value={open.provenance} />
+            <Badge map={PROVENANCE} value={open.provenance} badge={open.badge} />
           </div>
 
           {/* The badge's own caveat, shipped with the state machine rather than
