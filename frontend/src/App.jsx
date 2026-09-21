@@ -23,6 +23,7 @@ import QuoteExtraction from './pages/QuoteExtraction';
 import Contracts from './pages/Contracts';
 import Curation from './pages/Curation';
 import Support from './pages/Support';
+import SupportConsole from './pages/SupportConsole';
 import Scenarios from './pages/Scenarios';
 import Dimensions from './pages/Dimensions';
 import Team from './pages/Team';
@@ -75,6 +76,10 @@ export default function App() {
             <Route path="/contracts" element={<Contracts />} />
             <Route path="/curation" element={<Curation />} />
             <Route path="/support" element={<Support />} />
+            {/* Its own route, not a tab inside /admin: that page is
+                super-admin-only and every other tab on it calls
+                super-admin endpoints. See pages/SupportConsole.jsx. */}
+            <Route path="/support-console" element={<SupportConsole />} />
             <Route path="/scenarios" element={<Scenarios />} />
             <Route path="/dimensions" element={<Dimensions />} />
             <Route path="/fx-rates" element={<Navigate to="/index-library" replace />} />
