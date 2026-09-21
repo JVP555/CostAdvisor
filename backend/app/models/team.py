@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, ForeignKey
+from sqlalchemy import String, DateTime, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,6 +19,21 @@ class Team(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    plan_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("plans.id", ondelete="SET NULL"), nullable=True
+    )
+    # Scrum 24 — team-level Slack webhook for alert delivery
+    slack_webhook_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # SCRUM-79 — the team's default fire boundary. `AlertSubscription.threshold_pct`
+    # is now nullable and means "inherit this". Both are read through
+    # `services.thresholds.effective_threshold`, never directly, so there is one
+    # place that decides which wins.
+    default_threshold_pct: Mapped[float] = mapped_column(
+        Numeric(6, 2), default=10.0, server_default="10.0", nullable=False
+    )
+    default_threshold_unit: Mapped[str] = mapped_column(
+        String(12), default="pct", server_default="pct", nullable=False
     )
 
     # Relationships
