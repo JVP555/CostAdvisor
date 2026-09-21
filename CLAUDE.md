@@ -31,6 +31,9 @@ cd backend && pytest
 # Run a single test file
 cd backend && pytest tests/test_rls.py
 
+# Run a single test function
+cd backend && pytest tests/test_rls.py::test_team_invite_rls_isolation
+
 # Database migrations
 cd backend && alembic upgrade head
 cd backend && alembic revision --autogenerate -m "description"
@@ -39,21 +42,31 @@ cd backend && alembic revision --autogenerate -m "description"
 cd frontend && npm run build
 ```
 
+No lint or type-check tooling is configured in either package (no eslint/ruff/flake8/mypy config anywhere in the repo) — don't assume `npm run lint` or a Python linter exists. There is also no frontend test runner (`frontend/package.json` only has `dev`/`build`/`preview`); all automated tests are backend (`pytest`, 56 files under `backend/tests/`). Manual QA of frontend changes is done by running `./start.sh` and exercising the UI in a browser.
+
 ## Architecture
 
 ### Deployment
 
-Two environments, same shape:
+Two environments, same shape. The public landing page (`landing/`, static HTML, no login) and the logged-in app SPA (`frontend/`) are deployed as two separate Cloudflare Workers on different subdomains:
 
 | | Production | Staging |
 |---|---|---|
-| Website | costadvisor.org | dev.costadvisor.org |
+| Landing page | costadvisor.org (+ www) | dev.costadvisor.org |
+| App SPA | app.costadvisor.org | app.dev.costadvisor.org |
 | API | api.costadvisor.org | api-dev.costadvisor.org |
 | Branch | `main` | `dev` |
 
-- **Frontend**: Cloudflare Workers serving compiled React SPA (`frontend/dist`)
+See `README.md` for the full request-flow diagram (Cloudflare → Workers → Railway → Postgres/Redis/Celery/Ollama).
+
+- **Landing**: `landing/` — a hand-written static `index.html` (no build step), deployed via its own `wrangler.jsonc`
+- **App frontend**: Cloudflare Workers serving the compiled React SPA (`frontend/dist`, built with `npm run build`)
 - **Backend**: FastAPI on Railway
 - **Database**: PostgreSQL on Railway (separate per environment)
+- **Background worker**: Redis + Celery on Railway, separate from the API process (scheduled tasks — nightly scrapes, weekly projections/seasonality, alert/radar evaluation)
+- **Backups**: off-site to Backblaze B2
+
+⚠️ Per the TODO's "Extras" section, the actual Railway-connected repo can lag significantly behind this repo's `dev` branch — confirm what's actually deployed before assuming a recent change is live.
 - **Jobs**: Redis + Celery on Railway
 - **AI**: Ollama on a private Hetzner VM, reachable only over Tailscale
 
@@ -536,7 +549,7 @@ The four blockers between the seeded catalog and a money-denominated, trustworth
 - 🟢 **Bulk base-price import** — `POST /api/formulas/coverage/upload` (`dry_run` supported; platform `formulas.edit`): CSV/XLSX columns `formula, region, base_price` (+ optional `currency, base_period, margin_pct`), forgiving per-row errors, **update-only** (a typo can't mint a stray combo; recipes/review state never touched), audit-logged. `parse_coverage_price_upload` in `file_parser.py`. Formulas page: "Import Prices" panel (FileUpload two-step dry-run preview) + template CSV download
 - 🟢 Tests: `test_weighted_formulas.py` now 17 — evaluation math (index +10% on a 60% line → 106/1060; exact anchor reproduction at base), catalog-style Σ=110 rebasing, evaluable-state reasons + data gaps, review endpoint, price upload (dry-run/apply/errors/403). Full suite 118 passed; frontend build passes
 - 🟢 **Product → catalog-formula link + auto-load** (closes Scrum 58's "creating a product auto-loads the template by formula × region") — migration `pf1a2b3c4d5e`: `products.formula_template_id` (nullable FK, SET NULL). Products page: "Catalog Formula" picker on add/edit + code-chip column; products API validates the link (platform or own-team → else 400), enriches `formula_template_code/name` (batch), explicit-null unlinks. CostModelBuilder: a catalog-linked product entering the builder (Portfolio draft flow) **auto-loads its recipe at the model's region**; loading a template via the dropdown persists the link onto the product at save (new-product POST carries it; pre-existing product gets a PUT). Tests `test_product_template_link.py` (2). Full suite 123 passed
-- 🟡 **FD-1 (index values for catalog commodities) — partial: on-demand commodity scrape shipped**: added `POST /api/indexes/scrape-all` (super-admin) — runs the ~20 registered commodity scrapers (Brent, metals, Naphtha, Urea, labor/PPI …) for every `scrape_enabled` non-FX commodity synchronously and returns per-run counts; exposed as a `canManagePairs`-gated "⟳ Sync indexes" button in `IndexLibraryArea` beside "Sync FX rates". This closes the "no on-demand way to pull live index data" gap (previously only the nightly Celery `scrape_all` + the FX button existed). **Still 🔴**: the specific `retrieval_status=free` catalog commodities that have NO scraper yet — map their `free_source_name` (World Bank Pink Sheet, EIA, Eurostat, FRED…) onto the registry with per-series IDs + region grain + per-feed verification (needs the Scrum-57 metadata seeded to identify them). Proxy estimation (executing `proxy_logic`) stays SCRUM-67/80; real price data for the 676 anchors stays business/data-blocked
+- 🟡 **FD-1 (index values for catalog commodities) — partial: on-demand commodity scrape shipped, 3 more short-code scrapers registered**: added `POST /api/indexes/scrape-all` (super-admin) — runs the ~20 registered commodity scrapers (Brent, metals, Naphtha, Urea, labor/PPI …) for every `scrape_enabled` non-FX commodity synchronously and returns per-run counts; exposed as a `canManagePairs`-gated "⟳ Sync indexes" button in `IndexLibraryArea` beside "Sync FX rates". This closes the "no on-demand way to pull live index data" gap (previously only the nightly Celery `scrape_all` + the FX button existed). **New finding**: the 2026-07 catalog drop's commodities are named with short type-codes (`CU`, `CORN`, `LNG-JKM`, …), not the old descriptive names (`Copper`, `Urea`) the existing `SCRAPER_REGISTRY` is keyed on — zero of the 83 new-format codes matched any existing key, which is the real mechanism behind "~51 of 76 catalog rows show No data" despite the registry looking populated. Registered 3 new `FREDScraper` subclasses (`backend/app/services/scrapers/fred.py`) against real, live-verified FRED series: `CU`→`PCOPPUSDM` (Global price of Copper), `CORN`→`PMAIZMTUSDM` (Global price of Corn), `LNG-JKM`→`PNGASJPUSDM` (Global price of LNG, Asia — FRED's published JKM proxy). Tests `backend/tests/test_fred_scrapers.py` (5): quarterly-averaging wiring per scraper, graceful `[]` when `fred_api_key` unset, registry/label wiring. **Still 🔴**: the rest of the `retrieval_status=free` catalog commodities with no scraper yet (World Bank Pink Sheet indicator codes and the Eurostat Labour Cost Index dataflow were both attempted and failed live verification — do not guess codes, verify against the live API first) — map their `free_source_name` onto the registry with per-series IDs + region grain + per-feed verification. Proxy estimation (executing `proxy_logic`) stays SCRUM-67/80; real price data for the 676 anchors stays business/data-blocked
 
 ---
 
@@ -702,7 +715,7 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🟢 @mention teammate in a note triggers email notification — `@email` tokens parsed, resolved against team members, `send_mention_email` (best-effort, after commit) links to `/portfolio/{id}`
   - 🟢 Permissions: any member (view) can post a note; only `costing.edit` can change the flag or delete another member's note (author can delete own). Tests `tests/test_collaboration.py` (5): create+thread, delete-own, flag set/invalid/read-back, member-can-note-not-flag, non-member 403/404
 
-- 🟢 **Scrum 26** — Index-provider API integration (stretch — Fastmarkets, Argus, ICIS). Backend/API only this pass (scope decision) — no frontend UI yet
+- 🟢 **Scrum 26** — Index-provider API integration (stretch — Fastmarkets, Argus, ICIS). Backend/API landed first; frontend now shipped too
   - 🟢 Team can configure a credential for a supported index provider — new `TeamProviderCredential` table (`team_id, provider` unique), Fernet-encrypted JSON blob (`services/provider_credentials.py`, mirrors the Google Calendar refresh-token encryption pattern with its own separate key `PROVIDER_CREDENTIAL_ENCRYPTION_KEY`). `TeamIndexSource` gets a `"provider_credential"` source type with **zero new columns** — reuses `scrape_config` to carry `{provider, series_id}`; the secret itself never touches that row, so N commodities sharing one vendor subscription share one credential to rotate
   - 🟢 `app/services/providers/` adapter package: `ProviderAdapter` interface + one concrete `FastmarketsAdapter` (explicitly commented as an illustrative REST contract — no live paid credentials exist in this environment to verify against; the interface/error-classification seam is the real deliverable). `PROVIDER_REGISTRY`/`KNOWN_PROVIDERS` mirror the existing `SCRAPER_REGISTRY` pattern; Argus/ICIS are listed as known-but-unsupported rather than hidden or crashing
   - 🟢 `GET/POST/DELETE /api/indexes/provider-credentials` + `GET .../providers` + `POST .../{id}/verify` — CRUD gated on team **owner/admin** (stricter than plain `indexes.edit`, mirrors the Scrum 23 supplier-benchmark precedent for sensitive data); list/get responses have no field to leak the secret through (`TeamProviderCredentialOut` never carries it)
@@ -711,7 +724,7 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🟢 Falls back to existing scraper/upload flow if provider API is unavailable — a missing/expired/rejected credential surfaces its reason via the same `scrape-now`/`scrape_warning` response shape the URL-scrape path already uses, and (because the fetch happens *before* any override mutation, same ordering as the existing scrape path) **never touches existing override data** — degrade, don't null out
   - 🟢 Adding/rotating/removing a credential are audit-logged (`create`/`rotate`/`delete` on `team_provider_credential`, following the codebase's actual verb+noun `log_event` convention) — audit payload carries only `{provider, rotated}` metadata, never the secret
   - 🟢 Tests `tests/test_provider_credentials.py` (15) + a new RLS case in `tests/test_rls.py`: owner/admin gating, audit-logged with no plaintext leakage anywhere in the response or audit rows, rotate reuses the same row, missing/unregistered-provider give clean errors (never a 500), a provider value resolves and wins over a pre-existing scraped value with `source="provider"`, deleting a credential degrades a source without touching its existing overrides, `FastmarketsAdapter` unit-tested against a mocked `httpx.AsyncClient` (success fixture, 401→`rejected`, expired-token body→`expired`) — full suite 234 passed, verified live (migration applied + downgrade/upgrade cycle) from inside WSL
-  - 🔴 Frontend UI (Team Settings credential panel, new dropdown option in `AddIndexModal`/`IndexDetailPanel`) — deliberately out of scope this pass, ticket's acceptance criteria are all backend
+  - 🟢 **Frontend UI shipped**: new `components/ProviderCredentialsSection.jsx` (add/verify/rotate/delete, status badges, gated on the team's own owner/admin role, mirroring the backend's own gate) wired into `Team.jsx`'s Settings tab beside Role Settings; `AddIndexModal.jsx` gained a `provider_credential` source-type option (provider picker sourced from the team's own `status: 'ok'` credentials + a series-ID field), submitting `scrape_config: {provider, series_id}` to the existing `POST /api/indexes/sources` endpoint — no backend change needed, both surfaces were already built for this
 
 ---
 
@@ -776,8 +789,9 @@ Every team wants a slightly different catalog. Show platform-vs-team origin so a
   - 🟢 Proxy (`is_proxy`) and no-data (`has_data=False`, rides flat) lines are marked distinctly on every attributed line, reusing fields `evaluate_weighted_template` already produces — never presented at the same strength as a directly-indexed line
   - 🟢 Every claim traceable without re-running the engine — each line carries `component_id`, `commodity_id`/`commodity_name`, `base_value`/`current_value`/`ratio`, `depth`/`via_template_id`/`via_template_name`/`line_region` (enriched the same way `/resolve` enriches, in two batch lookups)
   - 🟢 Audit-logged (`negotiation_position_generated` on `formula_template`) following the exact `/brief` precedent — "assembling a negotiation position surfaces sensitive cost intelligence"
-  - 🟢 No migration, no frontend — pure computation over existing engine + FX/unit/Incoterm utilities; AC explicitly states the output is inspectable via the API alone
+  - 🟢 No migration; API-only originally, now also has a frontend surface — pure computation over existing engine + FX/unit/Incoterm utilities; AC explicitly states the output is inspectable via the API alone
   - 🟢 Tests `tests/test_negotiation_position.py` (12): identity (`attributed_total + unexplained_remainder == ask`), traceability, proxy/no-data marking, evidence always `None`, no-base-price movement fallback (200, not an error), fully-unevaluable combo still 200s, currency normalization (known rate + missing-rate note), unit normalization (both declared + one-sided note), Incoterm mismatch (no adjustments → note; with adjustments → real correction, pinned against `normalize_price`), a chained (`component_type="formula"`, depth>0) combo evaluates correctly, permission/visibility/invalid-period gates, audit logged. Full suite 271 passed, verified live from inside WSL (no migration this scrum — no schema change)
+  - 🟢 **Frontend surface added** — a "Negotiation Position" panel in `components/FormulaDetailModal.jsx` (supplier-price input + optional currency/unit/Incoterm overrides under an "Advanced" toggle, Compute button, Target/Ask/Unexplained stats, an attributed-lines table). Reuses the existing `Stat` component and the modal's own `template.id`/region/period state (already used to call the sibling `/evaluate` endpoint). **PDF export**: reuses the app-wide `window.print()` + document-title-slug pattern from `Brief.jsx`/`NegotiateDetailArea.jsx`, but since `FormulaDetailModal` is a plain overlay div with no dedicated print route (not `.ca-page`/`.ca-print-page`), added a small generic `ca-print-isolate`/`ca-print-isolate-target` utility to `styles.css`'s `@media print` block — hides everything in the DOM except the marked panel via `visibility`, rather than the display-toggling convention the full-page views use. `QuoteExtraction.jsx`'s existing `PositionPreview` (quote-line-only, no attribution table) is untouched — this is a separate, fuller surface for typed supplier prices
 
 - 🟢 **Scrum 31** — Supplier trust & margin grading (reputation score from collected data). Real ticket text lives at `sample_idea/scrum32/prompt.txt` ("Supplier trust & margin grading (depends on alias canonicalisation)") — same story as this pre-existing TODO entry under a different source-tracker number, unlike every other numbering mismatch this session; updated in place rather than filed as a colliding "32b"
   - 🟢 Score computed from: gap trend (drift), pricing volatility (consistency), implied margin (magnitude) — `services/supplier_trust.py`. Deterministic, no ML: `magnitude_score = 100 − avg(|gap%|)×2`, `consistency_score = 100 − stdev(gap%)×2`, `drift_score` from a linear-regression slope of gap% over quarters (reuses `index_projection.py`'s existing pure-Python OLS fitter rather than a second copy), composite `0.5×magnitude + 0.3×consistency + 0.2×drift` → a letter grade A–F. `_should_cost_for_period` (Scrum 23's benchmark helper) extracted from `routers/suppliers.py` into `costing_engine.should_cost_for_period` so both the live benchmark and the persisted scorer share one should-cost pipeline, never two driftable copies
