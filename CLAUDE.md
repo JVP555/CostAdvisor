@@ -44,6 +44,12 @@ cd frontend && npm run build
 
 No lint or type-check tooling is configured in either package (no eslint/ruff/flake8/mypy config anywhere in the repo) — don't assume `npm run lint` or a Python linter exists. There is also no frontend test runner (`frontend/package.json` only has `dev`/`build`/`preview`); all automated tests are backend (`pytest`, 56 files under `backend/tests/`). Manual QA of frontend changes is done by running `./start.sh` and exercising the UI in a browser.
 
+**If setting up a fresh local/CI Postgres for the test suite**, two gotchas will silently break RLS-dependent tests rather than raising a clear error:
+- **The DB role the app connects as must NOT be a superuser or have BYPASSRLS.** Postgres skips RLS policies entirely for superusers and BYPASSRLS roles regardless of what the app sets via `bypass_rls_var` — every RLS-isolation test fails with "team B can see team A's data" even though the policy itself is correct. A container created with `POSTGRES_USER=costadvisor` makes that user the cluster's bootstrap superuser, which can't even demote itself (`ALTER ROLE ... NOSUPERUSER` errors "must be SUPERUSER"). Fix: create a second, ordinary role with schema privileges and point `DATABASE_URL`/`TEST_DATABASE_URL` at that role instead.
+- **Two Fernet keys must be set** (`PROVIDER_CREDENTIAL_ENCRYPTION_KEY`, `GOOGLE_CALENDAR_ENCRYPTION_KEY`) or the provider-credentials and Google Calendar tests fail — generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+
+See `jvpdocs/Handover.md` for a fuller orientation (branch structure, deploy staleness, what's next) aimed at whoever picks this repo up next.
+
 ## Architecture
 
 ### Deployment
