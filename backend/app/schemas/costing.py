@@ -211,6 +211,10 @@ class BriefResult(BaseModel):
     currency: str
     unit: str
     current_should_cost: float
+    # Cost before margin, at the current period — a defensible negotiating
+    # floor distinct from should-cost (which already bakes in an assumed
+    # acceptable margin). Null only when there's no formula to compute from.
+    current_floor: float | None = None
     current_actual_price: float | None
     gap: float | None
     gap_pct: float | None
