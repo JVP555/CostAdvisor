@@ -1,7 +1,9 @@
 # Remaining work — plan
 
-**Written 2026-09-27.** Covers everything in `CLAUDE.md` that is still 🔴 or 🟡, grouped by what is actually
-blocking it, with an implementation plan for each buildable item.
+**Written 2026-09-27; kept current as items land.** Covers everything in `CLAUDE.md` that is still 🔴 or 🟡,
+grouped by what is actually blocking it, with an implementation plan for each buildable item.
+
+> **Done so far:** B1 validation console · B2 real forecasts · A3 price-list import. Bucket B is empty.
 
 `CLAUDE.md` stays the authoritative per-scrum tracker. This file is the *forward* view: what is left, in what
 order, and what each piece needs. Where the two disagree, `CLAUDE.md` is right about history and this file is
@@ -16,8 +18,8 @@ completely different kinds of unblocking.
 
 | Bucket | Count | Who unblocks it |
 |---|---|---|
-| **A. Mocked, unbuilt** | 6 | An engineer. A clickable mockup exists at `/preview/*` for each. |
-| **B. Backend shipped, no screen** | 2 | An engineer, in an afternoon. Wire, do not mock. |
+| **A. Mocked, unbuilt** | 5 (was 6) | An engineer. A clickable mockup exists at `/preview/*` for each. |
+| **B. Backend shipped, no screen** | 0 (was 2) | ✅ both wired. |
 | **C. Not a coding task** | 6 | An account, a signature, a dashboard, or a dataset. |
 | **D. Deliberately not doing** | 3 | Nobody — decided against, reasons recorded. |
 
@@ -93,7 +95,17 @@ region inheritance), not the workflow.
 Risk: an LLM that returns plausible weights summing to 97% and a feed name that does not exist. Both are handled
 by refusing to promote until the recipe closes at 100% and every index resolves.
 
-### A3. Supplier price-list import — Scrum 30 · `/preview/price-list-import`
+### A3. Supplier price-list import — Scrum 30 — ✅ SHIPPED
+
+*Live at `/price-lists`; the mockup is deleted. Detail in `CLAUDE.md`'s Scrum 30 entry.*
+
+Shipped roughly as planned, with two things the plan did not anticipate. Matching needed a **fourth**
+state: `ambiguous` (a fuzzy top score within 0.06 of the runner-up, or two cost models sharing a product
+name) is a question, not a weak match, and folding it into `unmatched` would have hidden the one case a
+supplier selector actually fixes. And period derivation has a load-bearing preference order — `valid_from`
+> `quote_date` > `valid_until` — because a list valid until the end of Q1 usually started in Q4.
+
+<details><summary>Original plan</summary>
 
 *Best effort-to-value ratio of the six. The parser already exists.*
 
@@ -114,6 +126,8 @@ locators, no LLM) is reusable almost as-is. The new work is downstream of parsin
 
 Reuse the `prices.import` / `prices.edit` permission keys; a new `price_lists.*` category would need a full
 permissions/plan/role migration for a distinction this does not need.
+
+</details>
 
 ### A4. Negotiation prep — Scrum 29 · `/preview/negotiation-prep`
 
@@ -192,37 +206,28 @@ The installable shell shipped (`manifest.json` + a hand-written `sw.js`, no Work
 
 ---
 
-## B. Backend shipped, nothing calls it
+## B. Backend shipped, nothing calls it — ✅ both wired
 
-Both are tested, working software with no screen. **Wire these to the real endpoint; mocking them would replace
-working software with a drawing.** Verified by grep: no frontend file references either path.
+### B1. Index data-quality validation console — Scrum 33 — ✅ SHIPPED
 
-### B1. Index data-quality validation console — Scrum 33
+Live at `/validation` (account menu: **Data quality**). Reading is open to any authenticated user and only
+running is super-admin, matching the API's own split, so the Run button is absent rather than present and
+403-ing.
 
-`GET /api/validation/findings` · `/runs` · `/preview`, `POST /runs` (super-admin).
+One thing the plan got wrong: findings are not always two-sided. A declared drop issue states a problem
+with no counterpart — `right_label` is null on the first page of real data — so the detail view renders
+only the sides that carry a label.
 
-1,554 stored findings across the index library — contradictions, gaps and notes, each naming the table, key and
-the two conflicting values, each with a fingerprint so a re-run does not duplicate it and a resolved finding is
-stamped rather than deleted. None of it is visible anywhere.
+### B2. Real index forecasts on the Forecast tab — Scrum 21 follow-up — ✅ SHIPPED
 
-A filterable table (by check, origin, severity, subject) plus a "run now" button is most of the feature. The
-findings already carry everything a row needs. Natural home: a tab in Admin, or a panel in the Index Library
-next to "Derived indexes".
+The composite was dropped rather than having a forecast bolted onto it; each headline commodity is charted
+as itself with its own vintage and prediction interval.
 
-### B2. Real index forecasts on the Forecast tab — Scrum 21 follow-up
-
-`GET /api/indexes/{id}/projections/latest`, `POST /api/indexes/project-all`.
-
-A real OLS projection engine with residual-based confidence bands, stored vintages, and an explicit
-`fitted` / `hold` / `no_history` status exists — and nothing fetches it. `ForecastArea` charts a synthetic
-composite of real history with no forward line at all, which is honest but half a page.
-
-The blocker recorded in `CLAUDE.md` is real but narrower than it reads: projections are per
-`(commodity, region)` and the Forecast page charts a *blended composite*, so there is no 1:1 line to extend.
-The fix is a page change, not an engine change — chart the headline commodities as individual real series with
-their real projected bands, instead of averaging them into one composite that cannot be forecast.
-
----
+The thing worth carrying forward: **a stored vintage goes stale against its own series.** Two of the five
+headline series are fitted to history ending 2026 Q2 while 2026 Q3 has since been observed, so a projected
+point can already be a fact. Anything else consuming projections needs the same guard — drop projected
+points at or before the newest observation, and say the vintage is behind rather than quietly shortening
+the horizon.
 
 ## C. Not a coding task
 
@@ -261,8 +266,8 @@ Recorded so nobody re-opens them as oversights.
 
 Effort-to-value, with the risky item placed where there is room to absorb a regression.
 
-1. **B1 + B2** — two shipped backends, no migration, no risk. Biggest visible gain per day of work.
-2. **A3 price-list import** — reuses the parser, feeds the core gap loop directly.
+1. ~~**B1 + B2**~~ — ✅ done.
+2. ~~**A3 price-list import**~~ — ✅ done.
 3. **A5 per-region proxies** — raises the trustworthiness of every index badge in the catalog.
 4. **A4 negotiation prep** — no new engine, and it is the feature the product is named for.
 5. **A6 push** — small, self-contained, finishes the PWA story.

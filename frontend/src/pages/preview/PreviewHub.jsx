@@ -46,24 +46,6 @@ const MOCKED = [
   },
 ];
 
-// Backend shipped and tested; nothing in the UI calls it. These must be wired
-// to the real endpoint, not mocked — a fixture here would replace working
-// software with a drawing.
-const UNWIRED = [
-  {
-    title: 'Index data-quality validation console',
-    scrum: 'Scrum 33',
-    api: 'GET /api/validation/findings · /runs · /preview',
-    blurb: '1,554 stored findings — contradictions, gaps and notes across the index library, each naming the table, key and the two conflicting values. No screen reads any of it.',
-  },
-  {
-    title: 'Real index forecasts on the Forecast tab',
-    scrum: 'Scrum 21 follow-up',
-    api: 'GET /api/indexes/{id}/projections/latest',
-    blurb: 'A real OLS projection engine with stored vintages and confidence bands exists and nothing fetches it. Forecast currently charts history only, which is honest but half a page.',
-  },
-];
-
 // Not a coding task. Listed because they are the things actually standing
 // between the product and a paying customer.
 const NON_CODE = [
@@ -80,7 +62,7 @@ export default function PreviewHub() {
     <div className="ca-page ca-fade-in">
       <h1 className="ca-h1">What is still to build</h1>
       <p className="ca-subtitle">
-        What is mocked, what is built and unreached, and what no amount of code will close.
+        What is still drawn rather than built, and what no amount of code will close.
       </p>
 
       <div className="ca-card" style={{ marginBottom: 24, borderColor: 'var(--accent3)', background: 'var(--accent3-dim)' }}>
@@ -117,32 +99,6 @@ export default function PreviewHub() {
             <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10 }}>{m.blurb}</p>
             <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.size}</div>
           </Link>
-        ))}
-      </div>
-
-      <h2 className="ca-h2" style={{ marginBottom: 4 }}>Built, but nothing calls it</h2>
-      <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 16 }}>
-        Shipped and tested backends with no screen. Wire these to the real endpoint — do not mock them.
-      </p>
-      <div className="ca-card" style={{ marginBottom: 36, padding: 0 }}>
-        {UNWIRED.map((u, i) => (
-          <div
-            key={u.title}
-            style={{
-              padding: 18,
-              borderTop: i === 0 ? 'none' : '1px solid var(--row-divider)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>{u.title}</span>
-              <span className="ca-tag">{u.scrum}</span>
-              <span className="ca-badge" style={{ background: 'var(--accent4-dim)', color: 'var(--accent4)', marginLeft: 'auto' }}>
-                backend ready
-              </span>
-            </div>
-            <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6 }}>{u.blurb}</p>
-            <code style={{ fontSize: 10, color: 'var(--muted)' }}>{u.api}</code>
-          </div>
         ))}
       </div>
 
