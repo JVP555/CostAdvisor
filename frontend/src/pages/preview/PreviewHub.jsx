@@ -31,13 +31,6 @@ const MOCKED = [
     size: 'Medium — no new engine',
   },
   {
-    to: '/preview/region-proxies',
-    scrum: 'Scrum 57 follow-up',
-    title: 'Per-region sourcing',
-    blurb: 'One representative feed still speaks for every region of a commodity in the UI. The data largely exists on IndexCard already — what is missing is the read and this screen.',
-    size: 'Small — re-scoped; do not build the table it was first scoped as',
-  },
-  {
     to: '/preview/notifications',
     scrum: 'Extras — PWA',
     title: 'Push notifications',

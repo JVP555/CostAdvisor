@@ -33,6 +33,7 @@ from app.services.data_resolver import resolve_index_values
 from app.services.file_parser import parse_index_upload
 from app.services.scraper import GenericWebScraper, smart_scrape, smart_scrape_all, detect_source_type, ScrapedDataPoint
 from app.services.audit import log_event
+from app.services.index_region_coverage import coverage as region_coverage
 from app.services.index_projection import (
     run_projection, latest_projection, project_all_series, DEFAULT_HORIZON_QUARTERS,
 )
@@ -115,6 +116,22 @@ def get_public_quarterly_indexes(
             qoq_pct=qoq,
         ))
     return out
+
+
+@router.get("/region-coverage")
+def get_region_coverage(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Per-region sourcing facts for every drop-loaded series (Scrum 57 follow-up).
+
+    Declared before the `/{commodity_id}` routes on purpose — a literal segment
+    after an int path param is parsed as that param and 422s.
+
+    Platform metadata with no tenant dimension, so any authenticated user, same
+    tier as the commodity list itself.
+    """
+    return region_coverage(db)
 
 
 @router.put("/{commodity_id}/proxy-logic", response_model=CommodityIndexOut)

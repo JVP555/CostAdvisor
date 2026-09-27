@@ -120,6 +120,7 @@ export default function Navbar() {
     // Reading findings is open to any authenticated user; only the Run
     // button inside is super-admin, matching the API's own split.
     { path: '/validation', label: 'Data quality' },
+    { path: '/index-sourcing', label: 'Index sourcing' },
     { path: '/scenarios', label: 'Scenarios' },
     { path: '/support', label: 'Support' },
     // The staff side. A super admin already reaches it via Admin → Support;
