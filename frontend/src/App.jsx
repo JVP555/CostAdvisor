@@ -27,6 +27,7 @@ import SupportConsole from './pages/SupportConsole';
 import Scenarios from './pages/Scenarios';
 import Dimensions from './pages/Dimensions';
 import Validation from './pages/Validation';
+import PriceListImport from './pages/PriceListImport';
 import Team from './pages/Team';
 import Privacy from './pages/Privacy';
 import Profile from './pages/Profile';
@@ -46,7 +47,6 @@ import IntelligenceComboArea from './pages/workspace/IntelligenceComboArea';
 import PreviewHub from './pages/preview/PreviewHub';
 import NestedFormulasPreview from './pages/preview/NestedFormulasPreview';
 import AiCostModelerPreview from './pages/preview/AiCostModelerPreview';
-import PriceListImportPreview from './pages/preview/PriceListImportPreview';
 import NegotiationPrepPreview from './pages/preview/NegotiationPrepPreview';
 import RegionProxyPreview from './pages/preview/RegionProxyPreview';
 import NotificationsPreview from './pages/preview/NotificationsPreview';
@@ -93,6 +93,7 @@ export default function App() {
             <Route path="/scenarios" element={<Scenarios />} />
             <Route path="/dimensions" element={<Dimensions />} />
             <Route path="/validation" element={<Validation />} />
+            <Route path="/price-lists" element={<PriceListImport />} />
             <Route path="/fx-rates" element={<Navigate to="/index-library" replace />} />
             <Route path="/index-library" element={<IndexLibraryArea />} />
             <Route path="/portfolio" element={<PortfolioArea />} />
@@ -113,7 +114,6 @@ export default function App() {
             <Route path="/preview" element={<PreviewHub />} />
             <Route path="/preview/nested-formulas" element={<NestedFormulasPreview />} />
             <Route path="/preview/ai-cost-modeler" element={<AiCostModelerPreview />} />
-            <Route path="/preview/price-list-import" element={<PriceListImportPreview />} />
             <Route path="/preview/negotiation-prep" element={<NegotiationPrepPreview />} />
             <Route path="/preview/region-proxies" element={<RegionProxyPreview />} />
             <Route path="/preview/notifications" element={<NotificationsPreview />} />

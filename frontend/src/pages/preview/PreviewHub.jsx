@@ -24,13 +24,6 @@ const MOCKED = [
     size: 'Large — needs a review/provenance path',
   },
   {
-    to: '/preview/price-list-import',
-    scrum: 'Scrum 30',
-    title: 'Supplier price-list import',
-    blurb: 'PDF price list into ActualPrice. The parser already exists (Scrum 31b); matching a row to a cost model is the new part.',
-    size: 'Medium — parser is reusable',
-  },
-  {
     to: '/preview/negotiation-prep',
     scrum: 'Scrum 29',
     title: 'Negotiation prep',
@@ -87,7 +80,7 @@ export default function PreviewHub() {
     <div className="ca-page ca-fade-in">
       <h1 className="ca-h1">What is still to build</h1>
       <p className="ca-subtitle">
-        Six mocked surfaces, two features waiting only on a screen, and the things no amount of code will close.
+        What is mocked, what is built and unreached, and what no amount of code will close.
       </p>
 
       <div className="ca-card" style={{ marginBottom: 24, borderColor: 'var(--accent3)', background: 'var(--accent3-dim)' }}>

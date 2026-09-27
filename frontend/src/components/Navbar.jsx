@@ -109,6 +109,7 @@ export default function Navbar() {
     { path: '/formulas', label: 'Formulas' },
     { path: '/alerts', label: 'Alerts' },
     { path: '/quotes', label: 'Quotes' },
+    { path: '/price-lists', label: 'Price lists' },
     // Contracts is conditional, not just conditionally useful: contract prices
     // and notice dates sit behind their own `contracts.*` permission category,
     // separate from costing, and a role without it must not even see the entry.
