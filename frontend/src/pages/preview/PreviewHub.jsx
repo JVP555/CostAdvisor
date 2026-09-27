@@ -23,13 +23,6 @@ const MOCKED = [
     blurb: 'Draft a cost structure for a product nobody has decomposed. Draft-then-approve, reusing the estimator proposal tables rather than a second staging model.',
     size: 'Large — needs a review/provenance path',
   },
-  {
-    to: '/preview/notifications',
-    scrum: 'Extras — PWA',
-    title: 'Push notifications',
-    blurb: 'The installable shell shipped; push did not. Free via VAPID — no paid relay, no Firebase.',
-    size: 'Small — well-trodden path',
-  },
 ];
 
 // Not a coding task. Listed because they are the things actually standing

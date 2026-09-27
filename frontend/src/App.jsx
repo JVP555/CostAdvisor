@@ -49,7 +49,6 @@ import IntelligenceComboArea from './pages/workspace/IntelligenceComboArea';
 import PreviewHub from './pages/preview/PreviewHub';
 import NestedFormulasPreview from './pages/preview/NestedFormulasPreview';
 import AiCostModelerPreview from './pages/preview/AiCostModelerPreview';
-import NotificationsPreview from './pages/preview/NotificationsPreview';
 import { useAuth } from './AuthContext';
 
 export default function App() {
@@ -116,7 +115,6 @@ export default function App() {
             <Route path="/preview" element={<PreviewHub />} />
             <Route path="/preview/nested-formulas" element={<NestedFormulasPreview />} />
             <Route path="/preview/ai-cost-modeler" element={<AiCostModelerPreview />} />
-            <Route path="/preview/notifications" element={<NotificationsPreview />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
