@@ -17,7 +17,7 @@ from app.routers import (
     fx_rates, audit, portfolio, admin, ai, account, freight_lanes,
     invites, access_requests, settings as settings_router, formulas, demo, regions,
     collaboration, alerts, provider_credentials, sheets, quotes, price_lists,
-    negotiation_prep, push, resolution,
+    negotiation_prep, push, ai_cost_modeler, resolution,
     contracts, radar, editorial, dimensions, index_dossier, seasonality,
     intelligence, support, index_validation,
 )
@@ -110,6 +110,7 @@ app.include_router(quotes.router, prefix="/api/quotes", tags=["quotes"])
 app.include_router(price_lists.router, prefix="/api/price-lists", tags=["price-lists"])
 app.include_router(negotiation_prep.router, prefix="/api/negotiation-prep", tags=["negotiation-prep"])
 app.include_router(push.router, prefix="/api/push", tags=["push"])
+app.include_router(ai_cost_modeler.router, prefix="/api/ai-cost-modeler", tags=["ai-cost-modeler"])
 app.include_router(prices.router, prefix="/api/prices", tags=["prices"])
 app.include_router(volumes.router, prefix="/api/volumes", tags=["volumes"])
 app.include_router(fx_rates.router, prefix="/api/fx-rates", tags=["fx-rates"])

@@ -29,6 +29,7 @@ import Dimensions from './pages/Dimensions';
 import Validation from './pages/Validation';
 import PriceListImport from './pages/PriceListImport';
 import IndexSourcing from './pages/IndexSourcing';
+import AiCostModeler from './pages/AiCostModeler';
 import Team from './pages/Team';
 import Privacy from './pages/Privacy';
 import Profile from './pages/Profile';
@@ -47,7 +48,6 @@ import IntelligenceComboArea from './pages/workspace/IntelligenceComboArea';
 // Unbuilt features, drawn against hardcoded fixtures so their shape can be
 // reviewed before anyone writes a migration. See pages/preview/PreviewHub.jsx.
 import PreviewHub from './pages/preview/PreviewHub';
-import AiCostModelerPreview from './pages/preview/AiCostModelerPreview';
 import { useAuth } from './AuthContext';
 
 export default function App() {
@@ -93,6 +93,7 @@ export default function App() {
             <Route path="/validation" element={<Validation />} />
             <Route path="/price-lists" element={<PriceListImport />} />
             <Route path="/index-sourcing" element={<IndexSourcing />} />
+            <Route path="/ai-cost-modeler" element={<AiCostModeler />} />
             <Route path="/fx-rates" element={<Navigate to="/index-library" replace />} />
             <Route path="/index-library" element={<IndexLibraryArea />} />
             <Route path="/portfolio" element={<PortfolioArea />} />
@@ -112,7 +113,6 @@ export default function App() {
                 PreviewBadge saying so — they are not behind a flag because
                 the badge, not the routing, is what keeps them honest. */}
             <Route path="/preview" element={<PreviewHub />} />
-            <Route path="/preview/ai-cost-modeler" element={<AiCostModelerPreview />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
