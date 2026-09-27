@@ -10,13 +10,6 @@ import { PreviewBadge } from '../../components/PreviewBadge';
 
 const MOCKED = [
   {
-    to: '/preview/nested-formulas',
-    scrum: 'Scrum 27',
-    title: 'Nested cost models',
-    blurb: 'A component that is itself a cost model. Weight flattening, depth cap and cycle detection all have a working precedent in the template resolver.',
-    size: 'Large — touches the costing engine',
-  },
-  {
     to: '/preview/ai-cost-modeler',
     scrum: 'Scrum 32',
     title: 'AI cost modeler',

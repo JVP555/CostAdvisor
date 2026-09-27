@@ -1136,11 +1136,24 @@ def _compute_indexed_cost_detailed(
                 component_label=line.label, period=cur_label,
                 reason="index-linked component has no bound commodity",
             ))
+        elif line.component_type == "model":
+            # Scrum 27 — a nested cost model that could not be expanded. It
+            # keeps its weight (dropping it would silently rescale every other
+            # line) but rides flat, and the reason is reported rather than
+            # letting it pass for a fixed cost.
+            has_data = False
+            ratio = 1.0
+            data_gaps.append(DataGap(
+                component_label=line.label, period=cur_label,
+                reason=line.unresolved_reason or "sub-model could not be resolved",
+            ))
         else:
             ratio = 1.0
         contribution = comp_base * weight * ratio
         indexed_cost += contribution
         components.append(ComponentBreakdown(
+            via_cost_model_id=line.via_cost_model_id,
+            via_cost_model_name=line.via_cost_model_name,
             label=line.label,
             commodity_id=line.commodity_id,
             commodity_name=line.commodity_name,

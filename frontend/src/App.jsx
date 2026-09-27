@@ -47,7 +47,6 @@ import IntelligenceComboArea from './pages/workspace/IntelligenceComboArea';
 // Unbuilt features, drawn against hardcoded fixtures so their shape can be
 // reviewed before anyone writes a migration. See pages/preview/PreviewHub.jsx.
 import PreviewHub from './pages/preview/PreviewHub';
-import NestedFormulasPreview from './pages/preview/NestedFormulasPreview';
 import AiCostModelerPreview from './pages/preview/AiCostModelerPreview';
 import { useAuth } from './AuthContext';
 
@@ -113,7 +112,6 @@ export default function App() {
                 PreviewBadge saying so — they are not behind a flag because
                 the badge, not the routing, is what keeps them honest. */}
             <Route path="/preview" element={<PreviewHub />} />
-            <Route path="/preview/nested-formulas" element={<NestedFormulasPreview />} />
             <Route path="/preview/ai-cost-modeler" element={<AiCostModelerPreview />} />
           </Route>
           <Route path="*" element={<NotFound />} />
