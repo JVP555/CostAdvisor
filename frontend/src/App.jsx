@@ -26,6 +26,7 @@ import Support from './pages/Support';
 import SupportConsole from './pages/SupportConsole';
 import Scenarios from './pages/Scenarios';
 import Dimensions from './pages/Dimensions';
+import Validation from './pages/Validation';
 import Team from './pages/Team';
 import Privacy from './pages/Privacy';
 import Profile from './pages/Profile';
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="/support-console" element={<SupportConsole />} />
             <Route path="/scenarios" element={<Scenarios />} />
             <Route path="/dimensions" element={<Dimensions />} />
+            <Route path="/validation" element={<Validation />} />
             <Route path="/fx-rates" element={<Navigate to="/index-library" replace />} />
             <Route path="/index-library" element={<IndexLibraryArea />} />
             <Route path="/portfolio" element={<PortfolioArea />} />
