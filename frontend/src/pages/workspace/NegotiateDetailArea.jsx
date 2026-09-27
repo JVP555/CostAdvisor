@@ -139,6 +139,9 @@ export default function NegotiateDetailArea() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="ca-btn ca-btn-ghost" onClick={() => navigate(`/cost-models/${costModelId}`)}>View Model</button>
           <button className="ca-btn ca-btn-ghost" onClick={() => navigate(`/cost-models/${costModelId}/evolution`)}>Evolution</button>
+          <button className="ca-btn ca-btn-ghost" onClick={() => navigate(`/negotiate/${costModelId}/prep`)}>
+            Prepare for the call
+          </button>
           <button className="ca-btn ca-btn-primary" onClick={handleExportPDF}>Export PDF</button>
         </div>
       </div>

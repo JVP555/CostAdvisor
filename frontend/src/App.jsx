@@ -41,6 +41,7 @@ import MonitorArea from './pages/workspace/MonitorArea';
 import ForecastArea from './pages/workspace/ForecastArea';
 import NegotiateArea from './pages/workspace/NegotiateArea';
 import NegotiateDetailArea from './pages/workspace/NegotiateDetailArea';
+import NegotiationPrepArea from './pages/workspace/NegotiationPrepArea';
 import IntelligenceArea from './pages/workspace/IntelligenceArea';
 import IntelligenceComboArea from './pages/workspace/IntelligenceComboArea';
 // Unbuilt features, drawn against hardcoded fixtures so their shape can be
@@ -48,7 +49,6 @@ import IntelligenceComboArea from './pages/workspace/IntelligenceComboArea';
 import PreviewHub from './pages/preview/PreviewHub';
 import NestedFormulasPreview from './pages/preview/NestedFormulasPreview';
 import AiCostModelerPreview from './pages/preview/AiCostModelerPreview';
-import NegotiationPrepPreview from './pages/preview/NegotiationPrepPreview';
 import NotificationsPreview from './pages/preview/NotificationsPreview';
 import { useAuth } from './AuthContext';
 
@@ -102,6 +102,7 @@ export default function App() {
             <Route path="/monitor" element={<MonitorArea />} />
             <Route path="/forecast" element={<ForecastArea />} />
             <Route path="/negotiate" element={<NegotiateArea />} />
+            <Route path="/negotiate/:costModelId/prep" element={<NegotiationPrepArea />} />
             <Route path="/negotiate/:costModelId" element={<NegotiateDetailArea />} />
             <Route path="/intelligence" element={<IntelligenceArea />} />
             {/* Combo grain is the library's own; the cost-model route resolves a
@@ -115,7 +116,6 @@ export default function App() {
             <Route path="/preview" element={<PreviewHub />} />
             <Route path="/preview/nested-formulas" element={<NestedFormulasPreview />} />
             <Route path="/preview/ai-cost-modeler" element={<AiCostModelerPreview />} />
-            <Route path="/preview/negotiation-prep" element={<NegotiationPrepPreview />} />
             <Route path="/preview/notifications" element={<NotificationsPreview />} />
           </Route>
           <Route path="*" element={<NotFound />} />

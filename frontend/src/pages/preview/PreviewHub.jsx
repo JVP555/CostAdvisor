@@ -24,13 +24,6 @@ const MOCKED = [
     size: 'Large — needs a review/provenance path',
   },
   {
-    to: '/preview/negotiation-prep',
-    scrum: 'Scrum 29',
-    title: 'Negotiation prep',
-    blurb: 'Log what the supplier claimed, answer each claim with evidence. Never predicts their counter — it has no supplier-cost data and will not pretend to.',
-    size: 'Medium — no new engine',
-  },
-  {
     to: '/preview/notifications',
     scrum: 'Extras — PWA',
     title: 'Push notifications',
