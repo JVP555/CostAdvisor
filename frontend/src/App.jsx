@@ -40,6 +40,15 @@ import NegotiateArea from './pages/workspace/NegotiateArea';
 import NegotiateDetailArea from './pages/workspace/NegotiateDetailArea';
 import IntelligenceArea from './pages/workspace/IntelligenceArea';
 import IntelligenceComboArea from './pages/workspace/IntelligenceComboArea';
+// Unbuilt features, drawn against hardcoded fixtures so their shape can be
+// reviewed before anyone writes a migration. See pages/preview/PreviewHub.jsx.
+import PreviewHub from './pages/preview/PreviewHub';
+import NestedFormulasPreview from './pages/preview/NestedFormulasPreview';
+import AiCostModelerPreview from './pages/preview/AiCostModelerPreview';
+import PriceListImportPreview from './pages/preview/PriceListImportPreview';
+import NegotiationPrepPreview from './pages/preview/NegotiationPrepPreview';
+import RegionProxyPreview from './pages/preview/RegionProxyPreview';
+import NotificationsPreview from './pages/preview/NotificationsPreview';
 import { useAuth } from './AuthContext';
 
 export default function App() {
@@ -95,6 +104,17 @@ export default function App() {
                 product to the same combo and reports how it got there. */}
             <Route path="/intelligence/combo/:templateId/:region" element={<IntelligenceComboArea />} />
             <Route path="/intelligence/:costModelId" element={<IntelligenceComboArea />} />
+
+            {/* Mockups. Every one of these renders fixtures and carries a
+                PreviewBadge saying so — they are not behind a flag because
+                the badge, not the routing, is what keeps them honest. */}
+            <Route path="/preview" element={<PreviewHub />} />
+            <Route path="/preview/nested-formulas" element={<NestedFormulasPreview />} />
+            <Route path="/preview/ai-cost-modeler" element={<AiCostModelerPreview />} />
+            <Route path="/preview/price-list-import" element={<PriceListImportPreview />} />
+            <Route path="/preview/negotiation-prep" element={<NegotiationPrepPreview />} />
+            <Route path="/preview/region-proxies" element={<RegionProxyPreview />} />
+            <Route path="/preview/notifications" element={<NotificationsPreview />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

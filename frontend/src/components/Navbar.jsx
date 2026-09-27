@@ -122,6 +122,10 @@ export default function Navbar() {
     // this is the only door for somebody holding just the Support Agent
     // platform role, who until now had full API access and no way in.
     ...(isSupportStaff ? [{ path: '/support-console', label: 'Support console' }] : []),
+    // One entry, not seven: the hub lists every mocked surface. Deliberately
+    // not permission-gated — each page says on its face that it is running on
+    // fixtures, which is a stronger guard than hiding it would be.
+    { path: '/preview', label: 'What’s next (mockups)' },
   ];
 
   const handleLogout = async () => { setOpen(false); await logout(); };
