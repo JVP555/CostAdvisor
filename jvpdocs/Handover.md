@@ -7,16 +7,17 @@ is long and it is history. **This file is the mental model**: what the system is
 handful of non-obvious rules that will cost you a day each if you learn them by breaking something.
 
 **Reading order for a new engineer:** this file → `jvpdocs/local-setup.md` (get it running) →
-`jvpdocs/remaining-work-plan.md` (what is left and in what order) → `CLAUDE.md` (only when you need the history
+`jvpdocs/remaining-work-plan.md` (what is left, and the three places the plan's own
+assumptions turned out to be wrong about the data) → `CLAUDE.md` (only when you need the history
 of a specific scrum). `DESIGN.md` before touching any UI.
 
 ---
 
 ## 1. Read this before you touch deploy
 
-**The Railway-connected repo is not this repo, and it is stale.** As of 2026-09-10 it was ~72 commits behind
-and frozen at the 2026-08-22 go-live merge; it has drifted further since. Nothing from Scrum 26 onward, and
-**none of the 12 "Index Data Layer v2" units**, is live. Do not verify anything infra-related against the live
+**The Railway-connected repo is not this repo, and it is stale.** It is frozen at the 2026-08-22 go-live
+merge (`5b63c04`); `dev` is **126 commits** past that as of this snapshot. Nothing from Scrum 26 onward,
+**none of the 12 "Index Data Layer v2" units**, and none of the eight features in §7 is live. Do not verify anything infra-related against the live
 domains and conclude the code is broken — check whether that code is even deployed first. Syncing it needs
 someone with access to the deploy repo and the Railway/Cloudflare dashboards.
 
@@ -92,6 +93,10 @@ The bridge between them is `services/formula_resolver.get_effective_lines(db, fv
 `calculate_evolution`, `calculate_brief`, `calculate_price_change`, `_compute_indexed_cost_forward`. That is why
 should-cost, breakdown, Evolution, Brief, Price-Change and the forward should-cost cannot disagree for the same
 formula version. **If you add a seventh consumer, route it through `get_effective_lines` too.**
+
+It is also where **nested cost models** (Scrum 27) are expanded: a component of `component_type='model'`
+folds its child's lines in with weights multiplied. That is why nesting needed no change to
+`costing_engine.py` at all — every consumer inherited it. See §7 for what nesting means numerically.
 
 ### 3.2 The index resolution chain, in order
 
@@ -187,7 +192,7 @@ from "may you write your own copy".
 
 ### Backend — `backend/app/`
 
-FastAPI at `main.py`. 41 routers, all prefixed `/api/` except auth (`/auth/`). 69 Alembic migrations.
+FastAPI at `main.py`. 44 routers, all prefixed `/api/` except auth (`/auth/`). 74 Alembic migrations, 63 test files.
 
 The services worth knowing by name:
 
@@ -205,6 +210,11 @@ The services worth knowing by name:
 | `incoterm_normalizer.py` / `fx_converter.py` / `unit_converter.py` | the comparability pipeline. Any pricing logic must account for all three. |
 | `drop/` | the 2026-07 data-drop reader, normalisation, authority rules, loaders. |
 | `sheet_roundtrip/` | export → edit offline → reimport → diff → apply. Payload-agnostic; two registered payloads. |
+| `price_list.py` | matching a supplier price-list row to a cost model (exact/fuzzy/ambiguous/unmatched) and deriving its period. Parsing is `quote_extraction.py`'s, reused unchanged. |
+| `negotiation_prep.py` | checks a supplier's claim against the brief's own drivers. The verdict is never stored — it recomputes, because the driver's real movement changes as index data lands. |
+| `ai_cost_modeler.py` | prompt, defensive parse, index resolution and the two promotion gates. Refuses rather than degrades. |
+| `index_region_coverage.py` | per-region sourcing facts off `IndexCard`. A silent series field is not a disagreement. |
+| `push.py` | web push over VAPID. Best-effort like email; a 404/410 prunes the subscription. |
 
 **Data model spine.** `CostModel → FormulaVersion → FormulaComponent` is the team's formula.
 `ChemicalFamily → Subfamily → Product/FormulaTemplate` is the catalog taxonomy.
@@ -258,8 +268,13 @@ cd frontend && npm run build                # must be clean before you commit
 3. **Python 3.14**: the pinned `pydantic-core` / `psycopg2-binary` / `sqlalchemy` versions have no wheels for it.
    Install newer versions of just those three locally — **do not change `requirements.txt`** without validating
    the real deploy target's Python version.
+4. **The checked-in `backend/venv` is WSL-native.** On a Windows host it has `venv/bin/python` (an ELF binary)
+   and no `venv/Scripts/python.exe`, so nothing runs from Git Bash or PowerShell. Drive it through WSL:
+   `wsl.exe -e bash -lc 'cd /mnt/c/.../backend && ./venv/bin/python -m pytest -q'`. Postgres and Redis are
+   inside WSL too, which is why `pg_isready` appears missing from the Windows side while the database is
+   perfectly healthy.
 
-Against a properly seeded database the suite is green (675 passed / 5 skipped at last full run; the skips are
+Against a properly seeded database the suite is green (793 passed / 5 skipped at last full run; the skips are
 drop-dependent tests that skip cleanly without the data drop). Against a genuinely fresh database expect ~20
 failures in `test_catalog_retarget` / `test_onboarding` / `test_seed_catalog` / `test_seed_combos` — those
 assume a pre-seeded DB state (the catalog workbook loaded, a super-admin seed user existing), not code bugs.
@@ -290,6 +305,14 @@ Learned the hard way, each one from a real bug in this repo.
   NULL means a platform-level event with no tenant, and the RLS policy keeps those invisible to tenants.
 - **Alembic for every schema change.** Never modify tables by hand. Verify the downgrade too — every migration
   here has been up/down/up cycled.
+- **A CHECK constraint can exist without being declared on the model class.**
+  `ck_formula_components_component_type` was added by a migration, so reading `app/models/cost_model.py` says
+  there is no constraint. If a new enum value inserts fine in your head and fails in Postgres, look for one
+  the model never declared.
+- **Correcting a migration after it has been applied does nothing.** Alembic has already recorded the
+  revision, so the corrected body never runs — downgrade and re-upgrade. And remember the **test database is
+  separate**: `DATABASE_URL="${APP_URL}_test" alembic downgrade -1 && DATABASE_URL="${APP_URL}_test" alembic
+  upgrade head`. Both of these cost a debugging session each.
 - **Pydantic schemas in `app/schemas/` are the API contract.** Keep them in sync with the ORM models.
 
 ---
@@ -311,9 +334,9 @@ of this snapshot, the last eight open items: the data-quality console (Scrum 33)
 negotiation prep (Scrum 29), web push, nested "Lego" cost models (Scrum 27) and the AI cost modeler
 (Scrum 32).
 
-### What the newest work assumes, in one place
+### Four rules the last eight features encode
 
-Four things a newcomer will otherwise rediscover the hard way.
+Each one a newcomer would otherwise rediscover by breaking something.
 
 1. **Nested cost models contribute composition, not price.** A `component_type='model'` line folds the
    child's lines into the parent with weights multiplied; the parent's `base_price` stays the anchor. Same
@@ -334,15 +357,7 @@ Four things a newcomer will otherwise rediscover the hard way.
    no verdict ever presents a cited driver as grounds for paying more — the verdicts differ only in *how*
    a claim fails. The claim is stored; the verdict is recomputed each read.
 
-### Two migration traps this work hit
-
-- **A CHECK constraint can exist without being on the model class.**
-  `ck_formula_components_component_type` was added by a migration and is invisible from
-  `app/models/cost_model.py`. If a new enum value inserts fine in your head and fails in Postgres, look for
-  a constraint the model never declared.
-- **Correcting a migration after it has been applied does nothing.** Alembic has already recorded the
-  revision, so the corrected body never runs. Downgrade and re-upgrade — and remember the **test database
-  is separate**: `DATABASE_URL="${APP_URL}_test" alembic downgrade -1 && ... upgrade head`.
+---
 
 ## 8. Where everything else lives
 
