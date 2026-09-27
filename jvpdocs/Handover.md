@@ -1,6 +1,6 @@
 # Handover — how CostAdvisor actually works
 
-**Snapshot: 2026-09-27.** Written so somebody who has never seen this repo can be productive in a day.
+**Snapshot: 2026-09-27 (updated end of day).** Written so somebody who has never seen this repo can be productive in a day.
 
 `CLAUDE.md` is the authoritative, continuously-updated tracker — every scrum, what shipped, what is flagged. It
 is long and it is history. **This file is the mental model**: what the system is, how the pieces fit, and the
@@ -296,38 +296,61 @@ Learned the hard way, each one from a real bug in this repo.
 
 ## 7. Where things stand
 
-**Wave 1 (sellable)** — code complete. What remains is paperwork and accounts: vendor DPAs, incident-response
-contacts, SMTP credentials, Search Console verification, field CWV.
+**Every feature in every wave is built.** What remains needs an account, a signature, a dashboard or a
+dataset — see `jvpdocs/remaining-work-plan.md` §C, or the in-app **What's left** page (account menu).
 
-**Wave 2 (catalog)** — all scrums shipped. What remains is data: base-price anchors for the combos, and feed
+**Wave 1 (sellable)** — code complete. Remaining: vendor DPAs, incident-response contacts, SMTP
+credentials, Search Console verification, field CWV.
+
+**Wave 2 (catalog)** — all scrums shipped. Remaining is data: base-price anchors for the combos, and feed
 mapping for the catalog commodities (FD-1).
 
-**Wave 3 (intelligence & depth)** — nearly all shipped, including all 12 units of the Index Data Layer v2.
-Four features are genuinely unbuilt, and two are built with no screen.
+**Wave 3 (intelligence & depth)** — all shipped, including all 12 units of the Index Data Layer v2 and, as
+of this snapshot, the last eight open items: the data-quality console (Scrum 33), real index forecasts
+(Scrum 21), supplier price-list import (Scrum 30), per-region sourcing (Scrum 57 follow-up), guided
+negotiation prep (Scrum 29), web push, nested "Lego" cost models (Scrum 27) and the AI cost modeler
+(Scrum 32).
 
-**`jvpdocs/remaining-work-plan.md` is the forward view** — everything outstanding, grouped by what is actually
-blocking it, with an implementation plan and a suggested order for each buildable item.
+### What the newest work assumes, in one place
 
-### The mockups
+Four things a newcomer will otherwise rediscover the hard way.
 
-Six unbuilt features have clickable, design-complete mockups running on hardcoded fixtures, at `/preview/*`
-(account menu → **What's next (mockups)**). Each states the model, endpoints and behaviour it assumes, so it is
-a specification you can click rather than a drawing. They are deliberately not permission-gated: every panel
-carries a loud amber badge saying it is not wired, which is a stronger guard than hiding them.
+1. **Nested cost models contribute composition, not price.** A `component_type='model'` line folds the
+   child's lines into the parent with weights multiplied; the parent's `base_price` stays the anchor. Same
+   convention as a chained `FormulaTemplate`, and what keeps weights summing to one. Cycles are refused at
+   **save** (`assert_valid_nesting`) because a loop is unbounded recursion inside the engine. An
+   unresolvable sub-model keeps its weight, rides flat and reports a data gap — dropping it would silently
+   rescale everything else.
+2. **A stored projection vintage goes stale against its own series.** Two of the five headline series are
+   fitted to history that has since been overtaken, so a "projected" quarter can already be a fact.
+   Anything consuming `/projections/latest` must drop projected points at or before the newest observation
+   and say the vintage is behind — see `forwardOf()` in `ForecastArea.jsx`.
+3. **The AI cost modeler never writes a cost model, never invents an index, and never degrades to
+   silence.** Promotion is gated on the recipe closing at 100% and every index line binding; an
+   unresolvable suggested feed is flagged and blocks promotion by name; an unreachable model returns 503
+   rather than an empty draft that reads like a considered answer.
+4. **Negotiation prep takes the supplier's position as an input.** The app holds no supplier-cost data and
+   will not predict their counter. The should-cost has already consumed every verified index movement, so
+   no verdict ever presents a cited driver as grounds for paying more — the verdicts differ only in *how*
+   a claim fails. The claim is stored; the verdict is recomputed each read.
 
-**When you wire one, delete its fixtures and its `<PreviewBadge />` in the same commit.**
+### Two migration traps this work hit
 
-Two items in that plan are **not** mocked on purpose — the index-validation console (Scrum 33) and real index
-forecasts on the Forecast tab (Scrum 21). Both have shipped, tested backends that nothing in the UI calls.
-Mocking those would replace working software with a picture of it; they need wiring, not drawing.
-
----
+- **A CHECK constraint can exist without being on the model class.**
+  `ck_formula_components_component_type` was added by a migration and is invisible from
+  `app/models/cost_model.py`. If a new enum value inserts fine in your head and fails in Postgres, look for
+  a constraint the model never declared.
+- **Correcting a migration after it has been applied does nothing.** Alembic has already recorded the
+  revision, so the corrected body never runs. Downgrade and re-upgrade — and remember the **test database
+  is separate**: `DATABASE_URL="${APP_URL}_test" alembic downgrade -1 && ... upgrade head`.
 
 ## 8. Where everything else lives
 
 - `CLAUDE.md` — the full TODO tracker, architecture conventions, security rules, and the readiness scorecard
   (every non-shipped item scored ease + value with reasoning). Read before starting anything.
-- `jvpdocs/remaining-work-plan.md` — what is left, planned.
+- `jvpdocs/remaining-work-plan.md` — what is left (nothing buildable), plus a record of the three
+  places the plan's own assumptions turned out to be wrong about the data. Worth reading before
+  trusting any ticket's description of a dataset.
 - `jvpdocs/local-setup.md`, `development.md` — getting it running.
 - `jvpdocs/wave1manual.md` — the complete non-code checklist for Wave 1.
 - `jvpdocs/security-posture.md`, `eu-data-residency.md`, `backup-retention-policy.md`, `incident-response.md`,

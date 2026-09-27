@@ -45,9 +45,7 @@ import NegotiateDetailArea from './pages/workspace/NegotiateDetailArea';
 import NegotiationPrepArea from './pages/workspace/NegotiationPrepArea';
 import IntelligenceArea from './pages/workspace/IntelligenceArea';
 import IntelligenceComboArea from './pages/workspace/IntelligenceComboArea';
-// Unbuilt features, drawn against hardcoded fixtures so their shape can be
-// reviewed before anyone writes a migration. See pages/preview/PreviewHub.jsx.
-import PreviewHub from './pages/preview/PreviewHub';
+import WhatsLeft from './pages/WhatsLeft';
 import { useAuth } from './AuthContext';
 
 export default function App() {
@@ -109,10 +107,9 @@ export default function App() {
             <Route path="/intelligence/combo/:templateId/:region" element={<IntelligenceComboArea />} />
             <Route path="/intelligence/:costModelId" element={<IntelligenceComboArea />} />
 
-            {/* Mockups. Every one of these renders fixtures and carries a
-                PreviewBadge saying so — they are not behind a flag because
-                the badge, not the routing, is what keeps them honest. */}
-            <Route path="/preview" element={<PreviewHub />} />
+            {/* Was the index of six clickable mockups; all six are built, so it
+                now lists only what no coding session can close. */}
+            <Route path="/preview" element={<WhatsLeft />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
