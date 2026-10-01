@@ -1,6 +1,6 @@
 # Handover — how CostAdvisor actually works
 
-**Snapshot: 2026-09-27 (updated end of day).** Written so somebody who has never seen this repo can be productive in a day.
+**Snapshot: 2026-10-01 (updated end of day).** Written so somebody who has never seen this repo can be productive in a day.
 
 `CLAUDE.md` is the authoritative, continuously-updated tracker — every scrum, what shipped, what is flagged. It
 is long and it is history. **This file is the mental model**: what the system is, how the pieces fit, and the
@@ -333,6 +333,135 @@ of this snapshot, the last eight open items: the data-quality console (Scrum 33)
 (Scrum 21), supplier price-list import (Scrum 30), per-region sourcing (Scrum 57 follow-up), guided
 negotiation prep (Scrum 29), web push, nested "Lego" cost models (Scrum 27) and the AI cost modeler
 (Scrum 32).
+
+### 7.1 Mock-data audit (2026-10-01) — nothing is fabricated on the frontend
+
+Six features shipped briefly (2026-09-27) as hardcoded-fixture `/preview/*` mockups behind an amber
+`PreviewBadge`, specifically so the spec (model, endpoints, behaviour assumed) was written down before the
+real build: nested cost models, the AI cost modeler, supplier price-list import, negotiation prep,
+per-region sourcing, and web push.
+
+**Verified directly against the current code, not against commit messages**: `frontend/src/pages/preview/`
+no longer exists; `/preview` now routes to `WhatsLeft.jsx` (a real-gaps-only page); and every one of the six
+real surfaces calls its real backend endpoint —
+
+| Feature | Real surface | Real endpoint(s) |
+|---|---|---|
+| Nested cost models | `CostModelBuilder.jsx` | `GET /api/cost-models/{id}/nestable` |
+| AI cost modeler | `pages/AiCostModeler.jsx` | `/api/ai-cost-modeler/drafts` |
+| Price-list import | `pages/PriceListImport.jsx` | `/api/price-lists/*` |
+| Negotiation prep | `pages/workspace/NegotiationPrepArea.jsx` | `/api/negotiation-prep/*` |
+| Per-region sourcing | `pages/IndexSourcing.jsx` | `/api/indexes/region-coverage` |
+| Web push | `components/PushNotifications.jsx` | `/api/push/*` + real `pushManager.subscribe()` |
+
+A repo-wide grep for `mock`/`fixture`/`dummy`/`PreviewBadge`/`fabricat*` across `frontend/src` turns up only
+comments confirming the opposite (design-mockup references to `sample_idea/*.html` used purely for layout,
+and explicit notes that a previously-fabricated feature was deleted) — no live component renders invented
+data as if it were real. The one piece of genuine dead code found along the way,
+`_unused_PermissionForm` in `pages/Admin.jsx`, is unreferenced and never rendered — harmless, worth deleting
+whenever that file is next touched, not a data-integrity issue.
+
+**Two honest, explicitly-labelled placeholders remain** (not mocks — they say plainly they are not real yet,
+which is the house style, not an oversight):
+- The Forecast tab's composite headline-index chart has no 1:1 real-forecast substitute for its synthetic
+  multi-index blend (§4's note in `CLAUDE.md`'s Scrum 21 entry); real per-series forecasts exist and are
+  charted elsewhere (`ForecastArea.jsx`'s own per-commodity cards, `/index-sourcing`).
+- Intelligence's "Product Intelligence" tab was flagged as a persistence-dependency placeholder when
+  written; as of this snapshot it renders a real `ContextTab` fed by the editorial-block and dimension data
+  that landed later (Units 7–8) rather than the original placeholder text — worth a direct look before
+  assuming the old flag still applies if you touch that file.
+
+### 7.2 What remains — everything still 🔴/🟡 in `CLAUDE.md`, by kind
+
+**Non-code (an account, a signature, a dashboard, or a dataset — nothing a coding session closes):**
+
+1. **Deploy sync** — the Railway-connected repo is ~126 commits behind `dev`; nothing from Scrum 26 onward
+   is live. Needs whoever holds the Railway/Cloudflare dashboards.
+2. **SMTP credentials** — no provider account chosen; invites/alerts/demo confirmations fail silently until
+   one is.
+3. **VAPID keys in production** — push works locally; needs `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` as
+   Railway env vars.
+4. **Vendor DPA list + named incident-response contacts** — the last two items before
+   `security-posture.md` can go to a prospect.
+5. **Base-price anchors** — 199 of 200 platform combos have no real price; the import tooling (per-region
+   editor + bulk CSV) is built and waiting on the data.
+6. **FD-1 feed mapping** — the remaining free-tier catalog commodities need a human to verify each live
+   source before a scraper is wired; two guessed candidates already failed verification and were correctly
+   left out.
+7. **Google Search Console verification + field Core Web Vitals** — need real production traffic, blocked
+   by #1.
+8. **`SameSite=Strict` live cross-subdomain login verification** — needs a live staging round-trip, blocked
+   by #1.
+9. **Branch protection on `main`** — deliberately deferred; a 3-person private repo doesn't need it yet.
+
+**Small open engineering/analyst items (real, scoped, just not done):**
+
+10. **Taxonomy reconciliation** — 87 drop-vs-platform family/subfamily name mappings sit in an analyst
+    decision queue (`taxonomy_reconciliation` sheet-roundtrip payload, `/api/sheets/taxonomy_reconciliation`)
+    — the mechanism is built and tested, nobody has filled in the sheet yet. Nothing downstream consumes the
+    resulting aliases until that happens.
+11. **Scrum 28's structured per-component fields** — min/max/yield bounds are written inline in advanced
+    expressions today (`clamp`/`step`/ternaries all work); a dedicated structured-field UI is only worth
+    building alongside a redesign of the component editor, per the original ticket.
+12. **SEED-2 rebuild to the 2026-07 workbook** — blocked on a matching combos data drop from whoever owns
+    that workbook; the catalog works today with the old-shell inconsistency explicitly flagged, not silently
+    wrong.
+13. **`seed_index_metadata.py` residue** — marked SUPERSEDED but still runs against the pre-drop workbook,
+    still collapsing 158 feeds onto one representative region. Only matters for that old path.
+14. **`proxy_derivation.derive_value` is idle** — live and correct, but all 128 series carrying
+    `proxy_logic` have a null `operation`/`base_index`; nobody has configured a real spec yet. Configuration
+    gap, not a code gap.
+15. **`evaluate_all_alerts` Celery beat registration** — alerts only fire on-demand via the endpoint today,
+    not nightly; the scheduling line was never added to `celeryconfig.py`'s `beat_schedule`.
+16. **`ProductIntelligence`/`NarrativeReview` persistence model** — AI narratives are Redis-cached only
+    (7-day TTL); a real review/approval workflow needs a DB-backed model first. See §7.1 for the current
+    state of the tab this would feed.
+17. **SCRUM-71 — buy-window lock/hold verdict at catalog-combo grain.** The cost-model-grain version already
+    shipped (Scrum 22); this is a distinct, unbuilt variant for the platform catalog itself, and the ticket
+    flags a real sequencing hazard: do not build it before a combo-grain forecast exists.
+18. **CON-4 / CON-5** — the editorial-content loader (parses the raw drop JSON into `EditorialBlock` rows)
+    and the staleness-recompute job for those rows. The schema and the read path (Unit 7) are built; the
+    jobs that populate and refresh them are not.
+
+**Deliberately not doing, by design — do not re-open these as oversights:**
+
+- Predicting a supplier's likely counter-offer. No supplier-cost data exists to do it honestly; a fabricated
+  version was already built and removed once (commit `03e0856`).
+- Statistical cross-checking of two independent readings of one index series. We mostly hold only one
+  reading per series; the few exceptions don't justify the machinery.
+- Sheet-based BI/ERP export (SCRUM-69). Parking-Lot scope, never committed to this roadmap.
+
+### 7.3 Architectural follow-ups worth knowing about before you build near them
+
+Not bugs, not blockers — places where the current shape is a deliberate, scoped choice that the *next*
+piece of work in that area should know about rather than rediscover:
+
+- **The component editor has one more axis coming.** If #11 above (structured min/max/yield fields) is ever
+  picked up, it changes `FormulaComponentItem`/`FormulaComponentOut` and the Reference Index column in
+  `CostModelBuilder.jsx` a second time in the same release cycle as nested cost models did — plan both
+  together rather than bolting one onto the other.
+- **`EstimatorProposal` and the AI-cost-modeler's `AiCostDraft` are deliberately two tables, not one.**
+  `EstimatorProposal` is keyed `(template_id, region)` and approves into the *catalog*; `AiCostDraft`
+  approves into a team's own `FormulaVersion`. They share the draft-then-approve *rules*, never the table —
+  don't merge them later for "simplicity"; that was tried in planning and rejected for good reason (two
+  approve paths behind one row).
+- **The editorial-block / dimension-term layer (Units 7–8) is additive infrastructure with no owner UI
+  yet beyond Curation's review queues.** CON-4/CON-5 (above) are the next real consumers; anything else
+  that wants platform-authored prose or faceted tagging should read from this layer rather than inventing a
+  second one.
+- **Nested cost models and catalog template chaining are two separate recursion mechanisms with the same
+  shape on purpose** (`formula_resolver.flatten_components` for templates, `get_effective_lines` +
+  `component_type='model'` for cost models) — not yet unified, and probably shouldn't be: one is
+  platform/team catalog data, the other is strictly tenant-owned, and RLS does not enforce the boundary
+  between them at the FK level (see §3.4) — a future unification would need to re-derive the same-team-only
+  write-time guard currently living in `routers/cost_models.py`.
+- **The Intelligence combo-grain engine (`services/intelligence.py`) and the costing engine
+  (`costing_engine.py`) read index values through two different code paths** (`derive()`'s own bulk
+  `IndexValue`/`IndexMonthlyValue` reads vs. `data_resolver`'s per-lookup resolution chain), reconciled only
+  by a `value_sources.matches_costing_engine` disclosure flag rather than a shared code path — a deliberate
+  query-budget tradeoff (one engine needs O(1) queries regardless of window length; the other needs the
+  full 9-tier chain per lookup). Don't assume a bug if the two ever report different numbers for the same
+  combo; check `value_sources.divergences` first.
 
 ### Four rules the last eight features encode
 
