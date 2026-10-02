@@ -7,9 +7,9 @@
 | Document title | CostAdvisor — Project Handover Document |
 | Product / project | CostAdvisor (a StaminaChem product) |
 | Document owner | Engineering |
-| Version | 2.0 |
-| Date | 2026-10-01 |
-| Status | Final — for handover |
+| Version | 2.1 |
+| Date | 2026-10-02 |
+| Status | **Final — ready for handover.** Sign-Off (§15) and Roles & Responsibilities (§13) are intentionally left `[TBD]` for the outgoing and incoming teams to complete with real names before this is filed as accepted. |
 | Classification | Internal — Confidential |
 | Distribution | Engineering team; incoming maintainers only. Contains infrastructure, security and architecture detail — do not forward outside the team without review. |
 | Related documents | `CLAUDE.md`, `jvpdocs/remaining-work-plan.md`, `jvpdocs/security-posture.md`, `jvpdocs/eu-data-residency.md` (see §14) |
@@ -20,6 +20,7 @@
 |---|---|---|
 | 1.0 | 2026-09-27 | Initial handover snapshot, informal "mental model" format |
 | 2.0 | 2026-10-01 | Restructured into a formal handover template; document-control header added; feature-completeness/mock-data audit added; outstanding-items register and architectural follow-ups added |
+| 2.1 | 2026-10-02 | Final pre-handover pass: re-verified full test suite and clean build on this date (§8.1); re-confirmed `dev` fully pushed and clean; noted that the deploy-staleness commit count (§6.1, §11.1 item 1) was last measured on an earlier date and could not be independently re-verified this session (no access to the Railway-connected repo from here) — re-check the live count before acting on it |
 
 ---
 
@@ -111,11 +112,17 @@ An audit confirming nothing on the frontend is mock/placeholder data is in §10.
 ### 6.1 Read this before you touch deploy
 
 **The Railway-connected repo is not this repo, and it is stale.** It is frozen at the 2026-08-22 go-live
-merge (`5b63c04`); `dev` is **126 commits** past that as of this snapshot. Nothing from Scrum 26 onward,
-**none of the 12 "Index Data Layer v2" units**, and none of the eight features named in §5 is live. Do not
-verify anything infrastructure-related against the live domains and conclude the code is broken — check
-whether that code is even deployed first. Syncing it needs someone with access to the deploy repo and the
-Railway/Cloudflare dashboards (see §13).
+merge (`5b63c04`); `dev` was **126 commits** past that as of the 2026-10-01 snapshot. Nothing from Scrum 26
+onward, **none of the 12 "Index Data Layer v2" units**, and none of the eight features named in §5 is live.
+Do not verify anything infrastructure-related against the live domains and conclude the code is broken —
+check whether that code is even deployed first. Syncing it needs someone with access to the deploy repo and
+the Railway/Cloudflare dashboards (see §13).
+
+**Caveat on the "126" figure:** this environment only has a remote for `origin` (the GitHub fork this repo
+lives in) — there is no remote configured here for the separate Railway-connected repo, so the count above
+could not be independently re-measured on the 2026-10-02 handover date. Treat it as "last confirmed
+2026-10-01," not as freshly verified today. Whoever has access to both repos should re-run the comparison
+before relying on the number.
 
 ### 6.2 Branches
 
@@ -130,6 +137,10 @@ Railway/Cloudflare dashboards (see §13).
   `main` additionally carries its own prod infra — `frontend/wrangler.jsonc`'s Worker name is
   `costadvisor-web`; do not let a merge swap it to `dev`'s `-dev` variant or a push deploys to the wrong
   Worker.
+- **Explicit statement, not an inference:** as of this handover, `dev-push`/`main-push`/`main` are
+  deliberately left at their stale pre-Scrum-26 point — merging `dev` into them (the sync in §6.1) was not
+  performed as part of this handover and is a separate, explicit action for whoever takes over deploy
+  access. Do not assume `main` reflects anything built after the 2026-08-22 go-live merge.
 - Pushing to `main`/`main-push` triggers a real redeploy. Confirm with whoever owns those first.
 
 ### 6.3 Environments
@@ -489,7 +500,7 @@ Each one a newcomer would otherwise rediscover by breaking something.
 
 | # | Item | What it blocks | Owner (§13) |
 |---|---|---|---|
-| 1 | Deploy sync — Railway repo is ~126 commits behind `dev`; nothing from Scrum 26 onward is live | Everything built since go-live | Deploy/infra owner |
+| 1 | Deploy sync — Railway repo was ~126 commits behind `dev` as of 2026-10-01 (not independently re-verifiable from this environment — see §6.1); nothing from Scrum 26 onward is live | Everything built since go-live | Deploy/infra owner |
 | 2 | SMTP credentials — no provider account chosen | Invites, alerts, demo confirmations fail silently | Operations |
 | 3 | VAPID keys in production (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`) — push works locally | Push notifications | Deploy/infra owner |
 | 4 | Vendor DPA list + named incident-response contacts | Security posture sign-off before any enterprise prospect review | Legal / compliance |
