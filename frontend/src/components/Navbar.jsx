@@ -109,6 +109,8 @@ export default function Navbar() {
     { path: '/formulas', label: 'Formulas' },
     { path: '/alerts', label: 'Alerts' },
     { path: '/quotes', label: 'Quotes' },
+    { path: '/price-lists', label: 'Price lists' },
+    { path: '/ai-cost-modeler', label: 'AI cost modeler' },
     // Contracts is conditional, not just conditionally useful: contract prices
     // and notice dates sit behind their own `contracts.*` permission category,
     // separate from costing, and a role without it must not even see the entry.
@@ -116,12 +118,19 @@ export default function Navbar() {
     ...(canSeeContracts ? [{ path: '/contracts', label: 'Contracts' }] : []),
     { path: '/curation', label: 'Curation' },
     { path: '/dimensions', label: 'Dimensions' },
+    // Reading findings is open to any authenticated user; only the Run
+    // button inside is super-admin, matching the API's own split.
+    { path: '/validation', label: 'Data quality' },
+    { path: '/index-sourcing', label: 'Index sourcing' },
     { path: '/scenarios', label: 'Scenarios' },
     { path: '/support', label: 'Support' },
     // The staff side. A super admin already reaches it via Admin → Support;
     // this is the only door for somebody holding just the Support Agent
     // platform role, who until now had full API access and no way in.
     ...(isSupportStaff ? [{ path: '/support-console', label: 'Support console' }] : []),
+    // Everything that was mocked here is built; the page now lists only the
+    // blockers no coding session closes.
+    { path: '/preview', label: 'What’s left' },
   ];
 
   const handleLogout = async () => { setOpen(false); await logout(); };
